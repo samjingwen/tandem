@@ -30,7 +30,10 @@ func TestLiveIsolated210(t *testing.T) {
 	if !filepath.IsAbs(binary) {
 		t.Fatal("smoke binary must be an explicit absolute path")
 	}
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	work := filepath.Join(root, "work")
 	if err := os.Mkdir(work, 0700); err != nil {
 		t.Fatal(err)
@@ -178,6 +181,9 @@ func TestLiveIsolated210(t *testing.T) {
 	if err := r.CancelPending(ctx, spec); err != nil {
 		t.Fatal(err)
 	}
+	if err := r.CheckQuiescence(ctx, spec); err != nil {
+		t.Fatal("native background quiescence could not be established", err)
+	}
 	var form envelope[struct {
 		ID string `json:"id"`
 	}]
@@ -283,6 +289,20 @@ func nativePermission(t *testing.T, ctx context.Context, r *Runtime, spec core.S
 
 func testLivePermissionPolicy(t *testing.T, ctx context.Context, r *Runtime, worker core.SessionSpec) {
 	t.Helper()
+	denied := worker
+	denied.Reference = r.Reference("explicit-deny-fixture")
+	denied.AttemptID = "explicit-deny-fixture"
+	denied.TaskID = "explicit-deny-fixture"
+	var deniedSession envelope[session]
+	if err := r.request(ctx, "POST", "/api/session", map[string]any{"id": denied.Reference, "location": location{denied.Directory}, "metadata": owner(denied, ""), "permissions": []permissionRule{{"*", "*", "deny"}}}, &deniedSession); err != nil {
+		t.Fatal(err)
+	}
+	for _, action := range []string{"shell", "tandem.permission.reply"} {
+		_, effect := nativePermission(t, ctx, r, denied, action, []string{"explicitly-forbidden"}, nil, nil)
+		if effect != "deny" {
+			t.Fatalf("native explicit deny was relaxed for %s: got %s", action, effect)
+		}
+	}
 	outside := filepath.Join(filepath.Dir(worker.Directory), "outside-fixture")
 	if err := os.Mkdir(outside, 0700); err != nil {
 		t.Fatal(err)
@@ -326,7 +346,8 @@ func testLivePermissionPolicy(t *testing.T, ctx context.Context, r *Runtime, wor
 			}
 		}
 	}
-	// Saved project allows must not turn shell asks into silent execution.
+	// Explicit native saved decisions remain authoritative. Tandem must not
+	// replace an actual user "always" choice with a new ask on every command.
 	id, effect := nativePermission(t, ctx, r, worker, "shell", []string{"fixture-saved-shell"}, nil, []string{"*"})
 	if effect != "ask" {
 		t.Fatal("shell was not interactive")
@@ -334,12 +355,9 @@ func testLivePermissionPolicy(t *testing.T, ctx context.Context, r *Runtime, wor
 	if err := r.request(ctx, "POST", sessionPath(worker)+"/permission/"+id+"/reply", map[string]any{"decision": "always"}, nil); err != nil {
 		t.Fatal(err)
 	}
-	id, effect = nativePermission(t, ctx, r, worker, "shell", []string{"different-never-executed-command"}, nil, nil)
-	if effect != "ask" {
-		t.Fatal("saved shell approval bypassed a fresh native ask")
-	}
-	if err := r.request(ctx, "POST", sessionPath(worker)+"/permission/"+id+"/reply", map[string]any{"decision": "reject"}, nil); err != nil {
-		t.Fatal(err)
+	_, effect = nativePermission(t, ctx, r, worker, "shell", []string{"different-never-executed-command"}, nil, nil)
+	if effect != "allow" {
+		t.Fatal("Tandem did not preserve the native user's saved shell decision")
 	}
 }
 

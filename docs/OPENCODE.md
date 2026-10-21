@@ -56,7 +56,9 @@ Shell resources are scanner-produced commands, while grep/glob resources are sea
 
 **Load and verify this thin plugin at the assigned Location before dispatching managed model work.**
 Session rules alone do not close every 2.1.0 permission gap.
-Saved native project approvals can override an `ask`, so the plugin forces a fresh ask for managed shell commands and native grep content searches.
+Shell/content-search profiles initially ask, and the runtime's explicit saved decisions remain authoritative.
+The plugin never auto-answers those requests, and it does not relax a deny.
+Content-search permissions authorize patterns rather than every returned file in this release, so they are not an OS sandbox or a per-file confidentiality boundary.
 Grep requires confirmation because it authorizes a regular expression rather than each returned file; filename globbing does not read matching contents.
 The plugin validates canonical paths, including symlinks and search roots, before native access and checks pending new-file parents.
 It blocks model mutation of `.opencode`, native configuration documents, `.git` administration, and the loaded plugin package.
@@ -258,7 +260,7 @@ The smoke test checks exact runtime version, session creation/recovery, owned ob
 When the optional built plugin path is supplied, it starts without that plugin and hot-loads the package from an owned explicit config using URL/token-file options, without inheriting a service URL or restarting/changing the process environment.
 The all-location reload used for this proof is limited to the test's single disposable runtime, after its earlier pending work has been settled.
 It then runs a harmless native shell command proving the inherited token sentinel was cleared.
-Native permission evaluations then check worker/coordinator read/edit scope, symlink/search-root escapes, denial of native delegation/MCP/admin actions, and fresh shell asks after saved approval, without executing those tools or commands.
+Native permission evaluations then check worker/coordinator read/edit scope, symlink/search-root escapes, denial of native delegation/MCP/admin actions, and preservation of explicit saved permission choices, without executing those tools or commands.
 A disposable prompt-admission fixture calls the compiled production confirmation helper against the real pinned `ctx.permission.assert` API with model execution disabled.
 It verifies that broad native allows and saved approvals still produce a pending user ask with original request/answer metadata, and that admission remains blocked until an explicit native reply.
 The subprocess exits when its private stdin closes; only that owned subprocess is force-terminated if graceful shutdown fails.

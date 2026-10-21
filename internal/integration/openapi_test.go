@@ -74,6 +74,7 @@ type schema struct {
 	MinLength            *int              `json:"minLength"`
 	MaxLength            *int              `json:"maxLength"`
 	MinItems             *int              `json:"minItems"`
+	MaxItems             *int              `json:"maxItems"`
 }
 
 func (doc openAPI) validate(s schema, value any) error {
@@ -139,7 +140,7 @@ func (doc openAPI) validate(s schema, value any) error {
 		}
 	case "array":
 		array, ok := value.([]any)
-		if !ok || (s.MinItems != nil && len(array) < *s.MinItems) {
+		if !ok || (s.MinItems != nil && len(array) < *s.MinItems) || (s.MaxItems != nil && len(array) > *s.MaxItems) {
 			return errors.New("expected array with required item count")
 		}
 		if s.Items != nil {

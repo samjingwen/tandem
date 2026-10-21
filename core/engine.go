@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -11,15 +12,17 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type Options struct {
-	Concurrency     int
-	RuntimeID       string
-	MaxTasks        int
-	MaxDepth        int
-	RegisterProject func(context.Context, RegisterProject) (Project, error)
+	Concurrency                 int
+	RuntimeID                   string
+	MaxTasks                    int
+	MaxDepth                    int
+	MaxCoordinatorNotifications int
+	RegisterProject             func(context.Context, RegisterProject) (Project, error)
 	// AfterCreate is a failure-injection boundary, not a production callback.
 	AfterCreate func(Attempt) error
 }
@@ -31,7 +34,8 @@ type Engine struct {
 	opts       Options
 	tickMu     sync.Mutex
 	// effects serializes control barriers with external mutation admission.
-	effects sync.Mutex
+	effects    sync.Mutex
+	reconciled atomic.Bool
 }
 
 func New(store Store, runtime Runtime, workspaces Workspaces, opts Options) *Engine {
@@ -44,6 +48,9 @@ func New(store Store, runtime Runtime, workspaces Workspaces, opts Options) *Eng
 	if opts.MaxDepth <= 0 {
 		opts.MaxDepth = 3
 	}
+	if opts.MaxCoordinatorNotifications <= 0 {
+		opts.MaxCoordinatorNotifications = 32
+	}
 	return &Engine{store: store, runtime: runtime, workspaces: workspaces, opts: opts}
 }
 
@@ -54,9 +61,19 @@ func ID(prefix string) string {
 	}
 	return prefix + hex.EncodeToString(b[:])
 }
-func now() time.Time                                                   { return time.Now().UTC() }
-func (e *Engine) Snapshot(ctx context.Context) (State, error)          { return e.store.Snapshot(ctx) }
-func (e *Engine) RuntimeInfo(ctx context.Context) (RuntimeInfo, error) { return e.runtime.Info(ctx) }
+func now() time.Time                                          { return time.Now().UTC() }
+func (e *Engine) Snapshot(ctx context.Context) (State, error) { return e.store.Snapshot(ctx) }
+func (e *Engine) RuntimeInfo(ctx context.Context) (RuntimeInfo, error) {
+	info, err := e.runtime.Info(ctx)
+	if err != nil {
+		return info, &Error{Code: "runtime_unavailable", Message: "execution runtime metadata unavailable; check the configured endpoint, authorization and supported version"}
+	}
+	if err == nil && !e.reconciled.Load() {
+		info.Compatible = false
+		info.Detail = "startup/runtime reconciliation is pending"
+	}
+	return info, err
+}
 
 // mutate commits the idempotency receipt in the same transaction as the state
 // change. Identical retries return the original outcome, not a new snapshot.
@@ -94,8 +111,28 @@ func mutate[T any](ctx context.Context, e *Engine, op, kind string, input any, c
 }
 
 func (e *Engine) Register(ctx context.Context, op string, input RegisterProject) (Project, error) {
+	snapshot, x := e.Snapshot(ctx)
+	if x != nil {
+		return Project{}, x
+	}
+	if old, ok := snapshot.Operations[op]; ok {
+		b, err := json.Marshal(input)
+		if err != nil {
+			return Project{}, err
+		}
+		hash := sha256.Sum256(append([]byte("project.register\n"), b...))
+		if old.Fingerprint != hex.EncodeToString(hash[:]) {
+			return Project{}, &Error{Code: "operation_conflict", Message: "operation ID was already used for a different request"}
+		}
+		var previous Project
+		err = json.Unmarshal(old.Outcome, &previous)
+		return previous, err
+	}
 	if strings.TrimSpace(input.Name) == "" || input.Path == "" || input.BaseRef == "" {
 		return Project{}, Invalid("name, path and baseRef are required")
+	}
+	if e.opts.RegisterProject == nil {
+		return Project{}, Invalid("project registration validator is not configured")
 	}
 	// Repository inspection is read-only and occurs outside the DB transaction.
 	p := Project{Name: input.Name, Path: input.Path, BaseRef: input.BaseRef, Instructions: input.Instructions}
@@ -109,7 +146,10 @@ func (e *Engine) Register(ctx context.Context, op string, input RegisterProject)
 	return mutate(ctx, e, op, "project.register", input, func(s *State) (Project, error) {
 		for _, v := range s.Projects {
 			if v.Path == p.Path {
-				return Project{}, &Error{Code: "conflict", Message: "repository is already registered"}
+				p.ID = v.ID
+				p.CreatedAt = v.CreatedAt
+				s.Projects[p.ID] = p
+				return p, nil
 			}
 		}
 		p.ID = ID("prj_")
@@ -146,7 +186,7 @@ func create(s *State, input CreateTask, opts Options) (Task, error) {
 		if parent.ProjectID != input.ProjectID {
 			return Task{}, Invalid("subtasks must belong to the parent's project")
 		}
-		if parent.Desired != "active" {
+		if parent.Desired != "active" || parent.State == "completed" {
 			return Task{}, Invalid("parent does not permit new work")
 		}
 		depth := 1
@@ -162,8 +202,10 @@ func create(s *State, input CreateTask, opts Options) (Task, error) {
 		if !ok || d.ProjectID != input.ProjectID {
 			return Task{}, Invalid("dependency must exist in this project")
 		}
-		if id == input.ParentID {
-			return Task{}, Invalid("a subtask cannot depend on its parent completing")
+		for ancestor := input.ParentID; ancestor != ""; ancestor = s.Tasks[ancestor].ParentID {
+			if id == ancestor {
+				return Task{}, Invalid("a subtask cannot depend on an ancestor completing")
+			}
 		}
 	}
 	t := Task{ID: ID("tsk_"), ProjectID: input.ProjectID, ParentID: input.ParentID, Dependencies: input.Dependencies, Title: input.Title, Instructions: input.Instructions, Role: input.Role, Desired: "active", State: "queued", Generation: 1, CreatedAt: now(), UpdatedAt: now()}
@@ -197,10 +239,12 @@ func (e *Engine) Followup(ctx context.Context, op, id string, input Followup) (T
 		}
 		t.Generation++
 		t.UpdatedAt = now()
+		t.Error = ""
 		t.Instructions += "\n\nFollow-up:\n" + input.Text
 		if t.AttemptID != "" {
 			a := s.Attempts[t.AttemptID]
 			a.Generation = t.Generation
+			a.FailureCount = 0
 			s.Attempts[a.ID] = a
 			c := Command{ID: ID("cmd_"), TaskID: t.ID, AttemptID: a.ID, Kind: "prompt", Text: fmt.Sprintf("Task generation %d.\n%s", t.Generation, input.Text), Status: "pending", Generation: t.Generation, Sequence: s.Revision + 1}
 			s.Commands[c.ID] = c
@@ -229,6 +273,51 @@ func descendants(s *State, id string, cascade bool) []string {
 func (e *Engine) Control(ctx context.Context, op, id string, input Control) (Task, error) {
 	e.effects.Lock()
 	defer e.effects.Unlock()
+	if input.Action == "retry" {
+		snapshot, err := e.Snapshot(ctx)
+		if err != nil {
+			return Task{}, err
+		}
+		if _, replay := snapshot.Operations[op]; !replay {
+			if _, exists := snapshot.Tasks[id]; !exists {
+				return Task{}, NotFound("task not found")
+			}
+			for _, target := range descendants(&snapshot, id, input.Cascade) {
+				t := snapshot.Tasks[target]
+				if target != id && (t.State == "completed" || t.Desired == "cancelled") {
+					continue
+				}
+				a := snapshot.Attempts[t.AttemptID]
+				if t.State != "failed" || a.Phase != "failed" || a.Observed != "failed" {
+					return Task{}, Invalid("retry requires a conclusively failed, quiescent attempt")
+				}
+				for _, c := range snapshot.Commands {
+					if c.AttemptID == a.ID && (c.Status == "pending" || c.Status == "sending" || c.Status == "parked") {
+						return Task{}, Invalid("pending or uncertain dispatch must reconcile before retry")
+					}
+				}
+				for _, d := range snapshot.Decisions {
+					if d.AttemptID == a.ID && (d.Status == "reply_pending" || d.Status == "uncertain") {
+						return Task{}, Invalid("uncertain decision replies must reconcile before retry")
+					}
+				}
+				observed, err := e.runtime.Inspect(ctx, spec(snapshot, a))
+				if err != nil {
+					return Task{}, err
+				}
+				if !observed.Exists || !observed.Owned || observed.State != "failed" || len(observed.Decisions) > 0 {
+					return Task{}, Invalid("runtime does not confirm a failed, quiescent attempt without pending decisions")
+				}
+				checker, ok := e.runtime.(QuiescenceChecker)
+				if !ok {
+					return Task{}, Invalid("runtime cannot verify failed-attempt quiescence")
+				}
+				if err = checker.CheckQuiescence(ctx, spec(snapshot, a)); err != nil {
+					return Task{}, err
+				}
+			}
+		}
+	}
 	return mutate(ctx, e, op, "task.control/"+id, input, func(s *State) (Task, error) {
 		t, ok := s.Tasks[id]
 		if !ok {
@@ -239,7 +328,7 @@ func (e *Engine) Control(ctx context.Context, op, id string, input Control) (Tas
 		}
 		for _, key := range descendants(s, id, input.Cascade) {
 			v := s.Tasks[key]
-			if v.State == "completed" || v.Desired == "cancelled" {
+			if v.State == "completed" || v.State == "cancelled" || (v.Desired == "cancelled" && input.Action != "cancel") {
 				if key == id {
 					return t, Invalid("terminal task cannot be controlled")
 				}
@@ -247,6 +336,7 @@ func (e *Engine) Control(ctx context.Context, op, id string, input Control) (Tas
 			}
 			v.Generation++
 			v.UpdatedAt = now()
+			v.Error = ""
 			switch input.Action {
 			case "pause":
 				v.Desired = "paused"
@@ -275,16 +365,24 @@ func (e *Engine) Control(ctx context.Context, op, id string, input Control) (Tas
 					}
 				}
 			case "retry":
-				if v.State != "failed" {
+				prior := s.Attempts[v.AttemptID]
+				if v.State != "failed" || prior.Phase != "failed" || prior.Observed != "failed" {
 					return t, Invalid("retry requires a conclusively failed attempt")
 				}
 				v.Desired = "active"
 				v.AttemptID = ""
 				v.State = "queued"
+				for key, d := range s.Decisions {
+					if d.AttemptID == prior.ID && d.Status == "pending" {
+						d.Status = "expired"
+						s.Decisions[key] = d
+					}
+				}
 			}
 			if v.AttemptID != "" {
 				a := s.Attempts[v.AttemptID]
 				a.Generation = v.Generation
+				a.FailureCount = 0
 				s.Attempts[a.ID] = a
 			}
 			s.Tasks[key] = v
@@ -312,9 +410,23 @@ func (e *Engine) Reply(ctx context.Context, op, id string, input ReplyDecision) 
 		if len(input.Answer) == 0 || !json.Valid(input.Answer) {
 			return d, Invalid("answer must be valid JSON")
 		}
+		if d.Kind == "permission" {
+			var reply struct {
+				Decision string `json:"decision"`
+				Message  string `json:"message,omitempty"`
+			}
+			decoder := json.NewDecoder(bytes.NewReader(input.Answer))
+			decoder.DisallowUnknownFields()
+			if decoder.Decode(&reply) != nil || (reply.Decision != "once" && reply.Decision != "always" && reply.Decision != "reject") {
+				return d, Invalid("permission answer requires decision: once, always or reject, with optional message")
+			}
+		}
 		d.Status = "reply_pending"
 		d.Reply = input.Answer
+		d.Error = ""
 		s.Decisions[id] = d
+		t.State = "waiting_for_input"
+		s.Tasks[t.ID] = t
 		return d, nil
 	})
 }
@@ -356,6 +468,32 @@ func (e *Engine) SubmitResult(ctx context.Context, op, id string, input SubmitRe
 }
 
 func (e *Engine) Accept(ctx context.Context, op, id string) (Task, error) {
+	e.effects.Lock()
+	defer e.effects.Unlock()
+	snapshot, err := e.Snapshot(ctx)
+	if err != nil {
+		return Task{}, err
+	}
+	if _, replay := snapshot.Operations[op]; !replay {
+		t, ok := snapshot.Tasks[id]
+		if !ok {
+			return Task{}, NotFound("task not found")
+		}
+		a, ok := snapshot.Attempts[t.AttemptID]
+		if !ok {
+			return Task{}, Invalid("task has no execution attempt")
+		}
+		observation, err := e.runtime.Inspect(ctx, spec(snapshot, a))
+		if err != nil {
+			return Task{}, err
+		}
+		if !observation.Exists || !observation.Owned || observation.State != "idle" {
+			return Task{}, Invalid("runtime must currently confirm owned quiescence before acceptance")
+		}
+		if err = e.workspaces.Inspect(ctx, snapshot.Projects[t.ProjectID], a.Workspace); err != nil {
+			return Task{}, err
+		}
+	}
 	return mutate(ctx, e, op, "task.accept/"+id, struct{}{}, func(s *State) (Task, error) {
 		t, ok := s.Tasks[id]
 		if !ok {
@@ -369,6 +507,11 @@ func (e *Engine) Accept(ctx context.Context, op, id string) (Task, error) {
 		a := s.Attempts[t.AttemptID]
 		if a.Observed != "idle" {
 			return t, Invalid("execution must be confirmed quiescent before accepting")
+		}
+		for _, c := range s.Commands {
+			if c.AttemptID == a.ID && (c.Status == "pending" || c.Status == "sending" || c.Status == "parked") {
+				return t, Invalid("pending dispatch must settle before acceptance")
+			}
 		}
 		for _, ev := range r.Evidence {
 			if !ev.Passed {
@@ -423,6 +566,9 @@ func (e *Engine) Cleanup(ctx context.Context, op, id string) (Workspace, error) 
 	if op == "" {
 		return Workspace{}, Invalid("operation ID required")
 	}
+	if a.Phase == "cleaned" {
+		return a.Workspace, Invalid("workspace is already cleaned; retry its original operation ID for its receipt")
+	}
 	if t.State != "completed" && t.State != "cancelled" && t.State != "failed" {
 		return a.Workspace, Invalid("task must be terminal before cleanup")
 	}
@@ -430,17 +576,22 @@ func (e *Engine) Cleanup(ctx context.Context, op, id string) (Workspace, error) 
 	if err != nil {
 		return a.Workspace, err
 	}
-	if !o.Exists || !o.Owned || o.State != "idle" {
+	if !o.Exists || !o.Owned || (o.State != "idle" && o.State != "failed") {
 		return a.Workspace, Invalid("runtime quiescence and ownership must be proven before cleanup")
 	}
-	if err = e.workspaces.Remove(ctx, s.Projects[t.ProjectID], a.Workspace); err != nil {
+	checker, ok := e.runtime.(QuiescenceChecker)
+	if !ok {
+		return a.Workspace, Invalid("runtime cannot verify background-resource quiescence; cleanup is unavailable")
+	}
+	if err = checker.CheckQuiescence(ctx, spec(s, a)); err != nil {
 		return a.Workspace, err
 	}
 	return mutate(ctx, e, op, "workspace.cleanup/"+id, struct{}{}, func(s *State) (Workspace, error) {
 		v := s.Attempts[id]
-		v.Workspace.Allocated = false
-		v.Phase = "cleaned"
+		v.Phase = "cleanup_pending"
 		s.Attempts[id] = v
+		c := Command{ID: "cleanup_" + id, TaskID: t.ID, AttemptID: id, Kind: "cleanup", Status: "pending", Generation: v.Generation, Sequence: s.Revision + 1}
+		s.Commands[c.ID] = c
 		return v.Workspace, nil
 	})
 }
@@ -470,6 +621,9 @@ func (e *Engine) Run(ctx context.Context, interval time.Duration) error {
 			}
 			if backoff < 30*time.Second {
 				backoff *= 2
+				if backoff > 30*time.Second {
+					backoff = 30 * time.Second
+				}
 			}
 		}
 	}()
@@ -493,6 +647,7 @@ func (e *Engine) Tick(ctx context.Context) error {
 	defer e.tickMu.Unlock()
 	info, err := e.runtime.Info(ctx)
 	if err != nil || !info.Compatible {
+		e.reconciled.Store(false)
 		snapshot, x := e.Snapshot(ctx)
 		if x == nil {
 			for id, a := range snapshot.Attempts {
@@ -511,8 +666,8 @@ func (e *Engine) Tick(ctx context.Context) error {
 	ids := make([]string, 0, len(s.Attempts))
 	for id, a := range s.Attempts {
 		t := s.Tasks[a.TaskID]
-		terminal := t.State == "completed" || t.State == "cancelled" || t.State == "paused" || t.State == "failed"
-		if t.AttemptID == id && a.Phase != "cleaned" && !(terminal && (a.Observed == "idle" || a.Observed == "failed")) {
+		terminal := t.State == "completed" || t.State == "failed"
+		if a.Phase == "cleanup_pending" || (t.AttemptID == id && a.Phase != "cleaned" && !(terminal && (a.Observed == "idle" || a.Observed == "failed"))) {
 			ids = append(ids, id)
 		}
 	}
@@ -528,7 +683,7 @@ func (e *Engine) Tick(ctx context.Context) error {
 			workers, coordinators := 0, 0
 			for _, a := range s.Attempts {
 				t := s.Tasks[a.TaskID]
-				if t.AttemptID == a.ID && a.Phase != "cleaned" && a.Phase != "failed" && a.Observed != "idle" {
+				if consumesSlot(s, a) {
 					if t.Role == "coordinator" {
 						coordinators++
 					} else {
@@ -588,20 +743,33 @@ func (e *Engine) Tick(ctx context.Context) error {
 			return err
 		}
 	}
+	if err = e.notifyCoordinators(ctx); err != nil {
+		return err
+	}
+	e.reconciled.Store(true)
 	return nil
 }
 
 func (e *Engine) mark(ctx context.Context, id, state string, err error) error {
 	return e.store.Update(ctx, func(s *State) error {
 		a := s.Attempts[id]
+		before := a
 		a.Observed = state
-		a.UpdatedAt = now()
 		if err != nil {
 			a.Error = err.Error()
+			if a.FailureCount < 8 {
+				a.FailureCount++
+			}
+		}
+		if a.Observed != before.Observed || a.Error != before.Error || a.FailureCount != before.FailureCount {
+			a.UpdatedAt = now()
 		}
 		s.Attempts[id] = a
 		t := s.Tasks[a.TaskID]
-		if (state == "unknown" || state == "disconnected") && t.State != "completed" && t.State != "cancelled" {
+		if (state == "unknown" || state == "disconnected" || errors.Is(err, ErrUncertain)) && t.State != "completed" {
+			if t.State != "recovering" || t.Error != a.Error {
+				t.UpdatedAt = now()
+			}
 			t.State = "recovering"
 			t.Error = a.Error
 			s.Tasks[t.ID] = t
@@ -611,6 +779,8 @@ func (e *Engine) mark(ctx context.Context, id, state string, err error) error {
 }
 
 func (e *Engine) reconcile(ctx context.Context, id string) error {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
 	e.effects.Lock()
 	defer e.effects.Unlock()
 	s, err := e.Snapshot(ctx)
@@ -620,6 +790,37 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 	a := s.Attempts[id]
 	t := s.Tasks[a.TaskID]
 	p := s.Projects[t.ProjectID]
+	if a.Phase == "cleanup_pending" {
+		observation, x := e.runtime.Inspect(ctx, spec(s, a))
+		if x == nil && (!observation.Exists || !observation.Owned || (observation.State != "idle" && observation.State != "failed")) {
+			x = Invalid("cleanup waits for confirmed runtime ownership and quiescence")
+		}
+		if x == nil {
+			checker, ok := e.runtime.(QuiescenceChecker)
+			if !ok {
+				x = Invalid("runtime cannot verify background-resource quiescence")
+			} else {
+				x = checker.CheckQuiescence(ctx, spec(s, a))
+			}
+		}
+		if x == nil {
+			x = e.workspaces.Remove(ctx, p, a.Workspace)
+		}
+		if x != nil && !errors.Is(x, ErrWorkspaceMissing) {
+			return e.store.Update(ctx, func(s *State) error { v := s.Attempts[id]; v.Error = x.Error(); s.Attempts[id] = v; return nil })
+		}
+		return e.store.Update(ctx, func(s *State) error {
+			v := s.Attempts[id]
+			v.Workspace.Allocated = false
+			v.Phase = "cleaned"
+			v.Error = ""
+			s.Attempts[id] = v
+			c := s.Commands["cleanup_"+id]
+			c.Status = "completed"
+			s.Commands[c.ID] = c
+			return nil
+		})
+	}
 	if a.Phase == "workspace_pending" || a.Phase == "session_pending" {
 		for parent := t.ParentID; parent != ""; parent = s.Tasks[parent].ParentID {
 			if s.Tasks[parent].Desired != "active" {
@@ -638,7 +839,19 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 	if a.RuntimeID != e.opts.RuntimeID {
 		return e.mark(ctx, id, "unknown", errors.New("runtime binding changed; explicit reconciliation required"))
 	}
+	if (a.Phase == "workspace_pending" || a.Phase == "session_pending") && a.Observed == "idle" && t.Desired == "active" {
+		if !e.capacityAvailable(&s, a) {
+			return nil
+		}
+		a.Observed = "unknown"
+		if err = e.store.Update(ctx, func(s *State) error { s.Attempts[id] = a; return nil }); err != nil {
+			return err
+		}
+	}
 	if a.Phase == "workspace_pending" {
+		if a.FailureCount >= 8 {
+			return nil
+		}
 		if t.Desired != "active" {
 			return e.store.Update(ctx, func(s *State) error {
 				v := s.Tasks[t.ID]
@@ -676,7 +889,12 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				return nil
 			})
 		}
-		if err = e.runtime.Ensure(ctx, sp); err != nil {
+		if a.FailureCount >= 8 {
+			observed, x := e.runtime.Inspect(ctx, sp)
+			if x != nil || !observed.Exists || !observed.Owned {
+				return nil
+			}
+		} else if err = e.runtime.Ensure(ctx, sp); err != nil {
 			return e.mark(ctx, id, "unknown", err)
 		}
 		if e.opts.AfterCreate != nil {
@@ -685,6 +903,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			}
 		}
 		a.Phase = "session_bound"
+		a.FailureCount = 0
 		if err = e.store.Update(ctx, func(s *State) error {
 			s.Attempts[id] = a
 			c := Command{ID: "initial_" + id, TaskID: t.ID, AttemptID: id, Kind: "prompt", Text: workerPrompt(s, t, a), Status: "pending", Generation: t.Generation, Sequence: s.Revision + 1}
@@ -706,11 +925,13 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 	}
 	if err = e.store.Update(ctx, func(s *State) error {
 		v := s.Attempts[id]
-		if v.Observed != o.State || v.Error != "" {
+		if v.Observed != o.State || (v.Error != "" && !uncertainDispatch(s, id)) {
 			v.UpdatedAt = now()
 		}
 		v.Observed = o.State
-		v.Error = ""
+		if !uncertainDispatch(s, id) {
+			v.Error = ""
+		}
 		s.Attempts[id] = v
 		seen := map[string]bool{}
 		for _, d := range o.Decisions {
@@ -722,6 +943,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			if old, ok := s.Decisions[d.ID]; ok {
 				d.Status = old.Status
 				d.Reply = old.Reply
+				d.Error = old.Error
 			} else {
 				d.Status = "pending"
 			}
@@ -735,31 +957,47 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				s.Decisions[key] = d
 			}
 		}
-		vTask := s.Tasks[t.ID]
-		if vTask.Desired == "active" && vTask.State != "completed" && vTask.State != "ready_for_review" {
-			if o.State == "failed" {
-				vTask.State = "failed"
-				v.Phase = "failed"
-				s.Attempts[id] = v
-			} else if len(o.Decisions) > 0 {
-				vTask.State = "waiting_for_input"
-			} else {
-				vTask.State = "running"
-			}
-			for _, d := range s.Decisions {
-				if d.AttemptID == id && d.Status == "uncertain" {
-					vTask.State = "recovering"
-				}
-			}
-			s.Tasks[t.ID] = vTask
-		}
+		refreshTaskState(s, t.ID, o.State)
 		return nil
 	}); err != nil {
 		return err
 	}
 	if t.Desired != "active" {
-		if o.State != "idle" && o.State != "failed" {
-			if err = e.runtime.Interrupt(ctx, sp); err != nil {
+		// An admission request may still be preparing after its client timed out.
+		// Runtime idleness alone cannot settle pause/cancel in that window.
+		uncertainAdmission := false
+		for key, c := range s.Commands {
+			if c.AttemptID == id && c.Kind == "prompt" && c.Status == "sending" {
+				reconciler, ok := e.runtime.(PromptReconciler)
+				if !ok || reconciler.ReconcilePrompt(ctx, sp, c.ID, c.Text) != nil {
+					uncertainAdmission = true
+					continue
+				}
+				if err = e.store.Update(ctx, func(s *State) error {
+					v := s.Commands[key]
+					v.Status = "admitted"
+					s.Commands[key] = v
+					a := s.Attempts[id]
+					a.FailureCount = 0
+					s.Attempts[id] = a
+					return nil
+				}); err != nil {
+					return err
+				}
+				a.FailureCount = 0
+			}
+		}
+		if a.FailureCount >= 8 {
+			return nil
+		}
+		cancelPending, canCancel := e.runtime.(PendingCanceller)
+		if o.State != "idle" && o.State != "failed" || (t.Desired == "cancelled" && canCancel && t.State != t.Desired) {
+			if t.Desired == "cancelled" && canCancel {
+				err = cancelPending.CancelPending(ctx, sp)
+			} else {
+				err = e.runtime.Interrupt(ctx, sp)
+			}
+			if err != nil {
 				return e.mark(ctx, id, "unknown", err)
 			}
 			o, err = e.runtime.Inspect(ctx, sp)
@@ -770,10 +1008,15 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				return e.mark(ctx, id, "unknown", ErrUncertain)
 			}
 		}
+		if uncertainAdmission {
+			return e.mark(ctx, id, o.State, ErrUncertain)
+		}
 		return e.store.Update(ctx, func(s *State) error {
 			v := s.Tasks[t.ID]
-			v.State = v.Desired
-			v.UpdatedAt = now()
+			if v.State != v.Desired {
+				v.State = v.Desired
+				v.UpdatedAt = now()
+			}
 			s.Tasks[v.ID] = v
 			a := s.Attempts[id]
 			a.Observed = "idle"
@@ -808,6 +1051,21 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				return err
 			}
 			if err = e.runtime.Reply(ctx, sp, d, d.Reply); err != nil {
+				var rejected *Error
+				if errors.As(err, &rejected) && rejected.Code == "invalid_request" {
+					return e.store.Update(ctx, func(s *State) error {
+						v := s.Decisions[d.ID]
+						v.Status = "pending"
+						v.Reply = nil
+						v.Error = rejected.Message
+						s.Decisions[d.ID] = v
+						t := s.Tasks[v.TaskID]
+						t.State = "waiting_for_input"
+						t.Error = "decision reply was rejected; submit a corrected answer"
+						s.Tasks[t.ID] = t
+						return nil
+					})
+				}
 				return e.mark(ctx, id, "unknown", err)
 			}
 			if err = e.store.Update(ctx, func(s *State) error { v := s.Decisions[d.ID]; v.Status = "answered"; s.Decisions[d.ID] = v; return nil }); err != nil {
@@ -827,28 +1085,35 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 		}
 		return commands[i].Sequence < commands[j].Sequence
 	})
-	if len(commands) > 0 && o.State == "idle" {
-		active := 0
-		for _, other := range s.Attempts {
-			owner := s.Tasks[other.TaskID]
-			if other.ID != id && owner.Role == t.Role && owner.AttemptID == other.ID && other.Phase != "cleaned" && other.Phase != "failed" && other.Observed != "idle" {
-				active++
-			}
-		}
-		limit := e.opts.Concurrency
-		if t.Role == "coordinator" {
-			limit = 1
-		}
-		if active >= limit {
-			return nil
-		}
+	if len(commands) > 0 && o.State == "idle" && !e.capacityAvailable(&s, a) {
+		return nil
 	}
 	for _, c := range commands {
-		if err = e.store.Update(ctx, func(s *State) error { v := s.Commands[c.ID]; v.Status = "sending"; s.Commands[c.ID] = v; return nil }); err != nil {
-			return err
+		if c.Kind != "prompt" {
+			continue
 		}
-		if err = e.runtime.Prompt(ctx, sp, c.ID, c.Text); err != nil {
-			return e.mark(ctx, id, "unknown", err)
+		if c.Status == "sending" {
+			reconciler, ok := e.runtime.(PromptReconciler)
+			if !ok {
+				err = ErrUncertain
+			} else {
+				err = reconciler.ReconcilePrompt(ctx, sp, c.ID, c.Text)
+			}
+		} else {
+			if s.Attempts[id].FailureCount >= 8 {
+				return nil
+			}
+			if err = e.store.Update(ctx, func(s *State) error { v := s.Commands[c.ID]; v.Status = "sending"; s.Commands[c.ID] = v; return nil }); err != nil {
+				return err
+			}
+			err = e.runtime.Prompt(ctx, sp, c.ID, c.Text)
+		}
+		if err != nil {
+			observed := "unknown"
+			if c.Status == "sending" && errors.Is(err, ErrUncertain) {
+				observed = o.State
+			}
+			return e.mark(ctx, id, observed, err)
 		}
 		if err = e.store.Update(ctx, func(s *State) error {
 			v := s.Commands[c.ID]
@@ -856,8 +1121,11 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			s.Commands[c.ID] = v
 			a := s.Attempts[id]
 			a.Phase = "executing"
+			a.FailureCount = 0
 			a.Observed = "running"
+			a.Error = ""
 			s.Attempts[id] = a
+			refreshTaskState(s, a.TaskID, "running")
 			return nil
 		}); err != nil {
 			return err

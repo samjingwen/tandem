@@ -20,6 +20,7 @@ const allowedTools = new Set([
   "tandem_followup",
   "tandem_decision",
   "tandem_result",
+  "tandem_control",
 ])
 
 function managed(session: NativeSession): boolean {
@@ -93,6 +94,7 @@ function privateEnvironment(target: string) {
 // patterns, so their search root must instead be checked from native metadata.
 export function permissionGuard(lookup: SessionLookup, tokenFile?: string, protectedRoot?: string) {
   return async (event: PermissionEvaluation) => {
+    if (event.effect === "deny") return
     if (event.action === permissionReplyAction) {
       event.effect = "ask"
       event.message = "Confirm forwarding this exact Tandem permission answer."
@@ -100,10 +102,6 @@ export function permissionGuard(lookup: SessionLookup, tokenFile?: string, prote
     }
     const session = await lookup(event.sessionID)
     if (!managed(session)) return
-    if (event.action === "shell") {
-      event.effect = "ask"
-      return
-    }
     try {
       if (event.action === "read" || event.action === "edit") {
         for (const resource of event.resources)
@@ -118,7 +116,6 @@ export function permissionGuard(lookup: SessionLookup, tokenFile?: string, prote
       } else if (event.action === "grep" || event.action === "glob") {
         const directory = event.metadata?.path ?? "."
         await workspacePath(session.location.directory, text(directory, "search path"), tokenFile, true)
-        if (event.action === "grep") event.effect = "ask"
       }
     } catch {
       event.effect = "deny"

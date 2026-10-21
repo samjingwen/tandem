@@ -83,7 +83,8 @@ func TestInfoVersionIdentityAndConfiguration(t *testing.T) {
 	if err != nil || r.password != "provided" {
 		t.Fatal("explicit environment handoff not used")
 	}
-	if r.Reference("attempt") != r.Reference("attempt") || !sessionID.MatchString(r.Reference("attempt")) || r.Reference("attempt") == r.Reference("other") {
+	// Independent SHA-256 worked example for the documented persisted namespace.
+	if r.Reference("attempt") != "ses_4e11e895ca0608470a01070215037a08" || !sessionID.MatchString(r.Reference("attempt")) || r.Reference("attempt") == r.Reference("other") {
 		t.Fatal("invalid deterministic session reference")
 	}
 }

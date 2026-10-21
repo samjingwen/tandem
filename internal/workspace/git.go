@@ -6,10 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/samjingwen/tandem/core"
 )
@@ -19,9 +21,22 @@ type Git struct {
 	UseWorktrunk bool
 }
 
+func environment() []string {
+	var env []string
+	for _, key := range []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TMPDIR", "XDG_CONFIG_HOME", "SYSTEMROOT", "WINDIR"} {
+		if value, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+value)
+		}
+	}
+	return append(env, "GIT_CONFIG_COUNT=2", "GIT_CONFIG_KEY_0=core.hooksPath", "GIT_CONFIG_VALUE_0=/dev/null", "GIT_CONFIG_KEY_1=core.fsmonitor", "GIT_CONFIG_VALUE_1=false")
+}
+
 func Run(ctx context.Context, path string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	c := exec.CommandContext(ctx, "git", args...)
 	c.Dir = path
+	c.Env = environment()
 	b, err := c.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("git %s: %w: %s", args[0], err, strings.TrimSpace(string(b)))
@@ -52,6 +67,43 @@ func Register(ctx context.Context, r core.RegisterProject) (core.Project, error)
 		return core.Project{}, err
 	}
 	instructions := r.Instructions
+	if len(r.InstructionFiles) > 16 {
+		return core.Project{}, core.Invalid("at most 16 explicit instruction files are supported")
+	}
+	loadInstruction := func(file string) error {
+		if strings.ToLower(filepath.Ext(file)) != ".md" || strings.HasPrefix(strings.ToLower(filepath.Base(file)), ".env") {
+			return core.Invalid("instruction files must be Markdown, never private environment/authentication files")
+		}
+		resolved, e := filepath.EvalSymlinks(file)
+		if e != nil {
+			return e
+		}
+		base := strings.ToLower(filepath.Base(resolved))
+		if strings.ToLower(filepath.Ext(resolved)) != ".md" || strings.HasPrefix(base, ".env") {
+			return core.Invalid("instruction files must resolve to Markdown, never private environment/authentication files")
+		}
+		info, e := os.Stat(resolved)
+		if e != nil {
+			return e
+		}
+		if !info.Mode().IsRegular() || info.Size() > 256*1024 {
+			return core.Invalid("instruction file is nonregular or exceeds the instruction budget")
+		}
+		f, e := os.Open(resolved)
+		if e != nil {
+			return e
+		}
+		defer func() { _ = f.Close() }()
+		b, e := io.ReadAll(io.LimitReader(f, 256*1024+1))
+		if e != nil {
+			return e
+		}
+		instructions += "\n\nInstructions from " + file + ":\n" + string(b)
+		if len(instructions) > 256*1024 {
+			return core.Invalid("instructions exceed the budget; select a bounded explicit project policy")
+		}
+		return nil
+	}
 	ancestors := []string{}
 	for current := path; ; current = filepath.Dir(current) {
 		ancestors = append(ancestors, current)
@@ -61,16 +113,29 @@ func Register(ctx context.Context, r core.RegisterProject) (core.Project, error)
 	}
 	for i := len(ancestors) - 1; i >= 0; i-- {
 		file := filepath.Join(ancestors[i], "AGENTS.md")
-		if b, e := os.ReadFile(file); e == nil {
-			instructions += "\n\nInstructions from " + file + ":\n" + string(b)
+		if _, e := os.Lstat(file); e == nil {
+			if e = loadInstruction(file); e != nil {
+				return core.Project{}, e
+			}
 		} else if !errors.Is(e, os.ErrNotExist) {
 			return core.Project{}, e
 		}
-		if len(instructions) > 256*1024 {
-			return core.Project{}, core.Invalid("ancestor/project instructions exceed instruction budget; configure a bounded explicit project policy")
-		}
 	}
-	return core.Project{Name: r.Name, Path: path, BaseRef: r.BaseRef, Instructions: instructions}, nil
+	var files []string
+	for _, file := range r.InstructionFiles {
+		if !filepath.IsAbs(file) {
+			file = filepath.Join(path, file)
+		}
+		file, err = filepath.Abs(file)
+		if err != nil {
+			return core.Project{}, err
+		}
+		if err = loadInstruction(file); err != nil {
+			return core.Project{}, err
+		}
+		files = append(files, file)
+	}
+	return core.Project{Name: r.Name, Path: path, BaseRef: r.BaseRef, Instructions: instructions, InstructionFiles: files}, nil
 }
 
 func (g Git) Plan(p core.Project, owner string) core.Workspace {
@@ -109,6 +174,7 @@ func (g Git) Ensure(ctx context.Context, p core.Project, w core.Workspace) (core
 		// canonical-checkout startup scripts or copying ignored/private files.
 		c := exec.CommandContext(ctx, "wt", "--config-set", fmt.Sprintf("worktree-path = %q", w.Path), "switch", "--create", w.Branch, "--base", sha, "--no-hooks", "--no-cd", "--format", "json")
 		c.Dir = p.Path
+		c.Env = environment()
 		if b, e := c.CombinedOutput(); e != nil {
 			return w, fmt.Errorf("worktrunk allocation: %w: %s", e, b)
 		}
@@ -134,6 +200,9 @@ func (g Git) Inspect(ctx context.Context, p core.Project, w core.Workspace) erro
 		return errors.New("workspace ownership mismatch")
 	}
 	if st, err := os.Lstat(w.Path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return core.ErrWorkspaceMissing
+		}
 		return err
 	} else if st.Mode()&os.ModeSymlink != 0 {
 		return errors.New("workspace path is a symlink")
@@ -169,6 +238,9 @@ func (g Git) Remove(ctx context.Context, p core.Project, w core.Workspace) error
 	}
 	if dirty != "" {
 		return errors.New("refusing cleanup of dirty workspace, including untracked or ignored files")
+	}
+	if err = refuseProcessHolders(ctx, w.Path); err != nil {
+		return err
 	}
 	// Never delete the branch: retained commits remain inspectable after cleanup.
 	_, err = Run(ctx, p.Path, "worktree", "remove", w.Path)

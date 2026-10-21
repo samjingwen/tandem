@@ -82,7 +82,10 @@ List responses are ID-sorted JSON arrays, including `[]` when empty.
 | GET | `/snapshot` | None | Core `State`, excluding `Operations` |
 | GET | `/events` | None | Live-only SSE revision hints |
 
-`RegisterProject` contains `name`, `path`, `baseRef`, and optional `instructions`.
+`RegisterProject` contains `name`, `path`, `baseRef`, optional `instructions`, and optional `instructionFiles` (up to 16 explicit Markdown paths).
+Registration of an existing canonical path with a new operation ID refreshes its configuration while preserving its stable project ID and already assigned worktrees/sessions.
+Existing accepted operation IDs still replay their original receipt instead of rereading changed files.
+Instruction content is snapshotted for future worker prompts; shared policies outside a worktree should be supplied explicitly rather than granting broad runtime filesystem access.
 `CreateTask` contains `projectId`, `title`, `instructions`, optional `role`, optional `parentId`, and optional `dependencies` (an ID array).
 `SubmitResult` requires `attemptId`, a positive integer `generation`, `summary`, and nonempty `evidence`.
 Each evidence record contains `name`, `reference`, and `passed`.
@@ -101,6 +104,8 @@ Decision IDs are safe `dec_` plus hexadecimal IDs; runtime request references re
 The API preserves desired/observed state, command uncertainty, decision status, result acceptance, late-result flags, and evidence status exactly as supplied by core.
 An idle runtime session does not become a completed or accepted task.
 Accept does not imply merge or publication, and cleanup remains subject to core ownership checks.
+Cleanup returns a stable request receipt after persisting intent, not proof of deletion.
+Inspect the attempt's `cleanup_pending`/`cleaned` phase and error for the observed outcome.
 Task cleanup resolves and verifies the task's current owned attempt from a snapshot, then passes the attempt ID to core.
 Core rechecks terminal task state, runtime ownership/quiescence, clean checkout, and operation fingerprint before changing a workspace.
 The cleanup receipt binds the resolved attempt; a later changed task binding can conflict on retry rather than silently cleaning a replacement attempt.

@@ -207,7 +207,7 @@ const usage = `Tandem HTTP client
 Global flags: --url URL --json --operation-id ID
 Environment: TANDEM_URL (default http://127.0.0.1:7433), TANDEM_TOKEN
 
-projects register --name NAME --path PATH --base-ref REF [--instructions TEXT]
+projects register --name NAME --path PATH --base-ref REF [--instructions TEXT] [--instruction-files FILE,FILE]
 projects list
 tasks create --project ID --title TITLE --instructions TEXT [--role ROLE] [--parent ID] [--depends-on ID,ID]
 tasks list [--project ID] [--state STATE]

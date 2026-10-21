@@ -1,4 +1,8 @@
-.PHONY: prepare format format-check lint test test-race check build security plugin-check
+.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality
+
+# Explicit maintained-language ownership. Go's ./... can otherwise discover Go
+# sources shipped inside npm dependencies after plugin installation.
+GO_PACKAGES := ./cmd/... ./core/... ./internal/...
 
 prepare:
 	go mod download
@@ -12,14 +16,14 @@ format-check:
 	@test -z "$$(gofmt -l core internal cmd)" || (gofmt -l core internal cmd; exit 1)
 
 lint: format-check
-	go vet ./...
-	go tool staticcheck ./...
+	go vet $(GO_PACKAGES)
+	go tool staticcheck $(GO_PACKAGES)
 
 test:
-	go test ./...
+	go test $(GO_PACKAGES)
 
 test-race:
-	go test -race ./...
+	go test -race $(GO_PACKAGES)
 
 plugin-check:
 	npm --prefix plugin run check
@@ -27,8 +31,16 @@ plugin-check:
 check: lint test plugin-check
 
 security:
-	go tool govulncheck ./...
+	go tool govulncheck $(GO_PACKAGES)
 
-build:
+prove-quality:
+	sh tools/prove-quality.sh
+
+build: build-core plugin-build
+
+build-core:
 	mkdir -p bin
 	CGO_ENABLED=0 go build -trimpath -o bin/tandem ./cmd/tandem
+
+plugin-build:
+	npm --prefix plugin run build

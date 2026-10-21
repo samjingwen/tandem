@@ -11,8 +11,9 @@ type permissionRule struct {
 // The pinned FileAccess service emits Location-relative internal paths, absolute
 // external paths, and ../ paths for other checkouts inside the same project.
 // Session rules follow agent rules, and the last matching rule wins.
-// The thin plugin additionally guards canonical paths/tool entrypoints and forces
-// fresh shell/approval asks, which saved project approvals would otherwise bypass.
+// The thin plugin additionally guards canonical paths/tool entrypoints. Native
+// saved choices remain authoritative; forwarding another permission needs a
+// separate fresh user confirmation rather than implicit model approval.
 func sessionPermissions(spec core.SessionSpec) []permissionRule {
 	rules := []permissionRule{
 		{"*", "*", "deny"},
@@ -30,7 +31,7 @@ func sessionPermissions(spec core.SessionSpec) []permissionRule {
 		{"subagent", "*", "deny"},
 		{"opencode_*", "*", "deny"},
 	}
-	for _, name := range []string{"tandem_create", "tandem_status", "tandem_followup", "tandem_decision", "tandem_result"} {
+	for _, name := range []string{"tandem_create", "tandem_status", "tandem_followup", "tandem_decision", "tandem_result", "tandem_control"} {
 		rules = append(rules, permissionRule{name, "*", "allow"})
 	}
 	if spec.Role == "coordinator" {

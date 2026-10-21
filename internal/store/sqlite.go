@@ -40,6 +40,13 @@ func Open(directory string) (*SQLite, error) {
 	if err != nil {
 		return nil, err
 	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() || info.Mode().Perm()&0077 != 0 {
+		return nil, errors.New("state directory must be owner-only; refusing to change existing permissions automatically")
+	}
 	for _, name := range []string{"scheduler.lock", "tandem.db"} {
 		if st, e := os.Lstat(filepath.Join(dir, name)); e == nil && !st.Mode().IsRegular() {
 			return nil, fmt.Errorf("refusing nonregular state file %s", name)

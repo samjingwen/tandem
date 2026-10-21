@@ -10,12 +10,13 @@ import (
 const Version = "0.1.0"
 
 type Project struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Path         string    `json:"path"`
-	BaseRef      string    `json:"baseRef"`
-	Instructions string    `json:"instructions"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	Path             string    `json:"path"`
+	BaseRef          string    `json:"baseRef"`
+	Instructions     string    `json:"instructions"`
+	InstructionFiles []string  `json:"instructionFiles,omitempty"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
 
 type Task struct {
@@ -36,17 +37,18 @@ type Task struct {
 }
 
 type Attempt struct {
-	ID         string    `json:"id"`
-	TaskID     string    `json:"taskId"`
-	RuntimeID  string    `json:"runtimeId"`
-	SessionRef string    `json:"sessionRef"`
-	Workspace  Workspace `json:"workspace"`
-	Phase      string    `json:"phase"`
-	Observed   string    `json:"observed"`
-	Generation int       `json:"generation"`
-	Error      string    `json:"error,omitempty"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	ID           string    `json:"id"`
+	TaskID       string    `json:"taskId"`
+	RuntimeID    string    `json:"runtimeId"`
+	SessionRef   string    `json:"sessionRef"`
+	Workspace    Workspace `json:"workspace"`
+	Phase        string    `json:"phase"`
+	Observed     string    `json:"observed"`
+	Generation   int       `json:"generation"`
+	FailureCount int       `json:"failureCount"`
+	Error        string    `json:"error,omitempty"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 type Workspace struct {
@@ -80,6 +82,7 @@ type Decision struct {
 	Details    json.RawMessage `json:"details,omitempty"`
 	Status     string          `json:"status"`
 	Reply      json.RawMessage `json:"reply,omitempty"`
+	Error      string          `json:"error,omitempty"`
 }
 
 type Evidence struct {
@@ -172,6 +175,22 @@ type Runtime interface {
 	Events(context.Context, func()) error
 }
 
+// PromptReconciler checks an uncertain admission without a wake-capable retry.
+type PromptReconciler interface {
+	ReconcilePrompt(context.Context, SessionSpec, string, string) error
+}
+
+// PendingCanceller removes only this attempt's owned pending runtime inputs.
+type PendingCanceller interface {
+	CancelPending(context.Context, SessionSpec) error
+}
+
+// QuiescenceChecker verifies runtime-owned jobs before destructive checkout
+// cleanup. A foreground-idle session alone is not sufficient for that action.
+type QuiescenceChecker interface {
+	CheckQuiescence(context.Context, SessionSpec) error
+}
+
 type Workspaces interface {
 	Plan(Project, string) Workspace
 	Ensure(context.Context, Project, Workspace) (Workspace, error)
@@ -189,10 +208,11 @@ type CreateTask struct {
 }
 
 type RegisterProject struct {
-	Name         string `json:"name"`
-	Path         string `json:"path"`
-	BaseRef      string `json:"baseRef"`
-	Instructions string `json:"instructions,omitempty"`
+	Name             string   `json:"name"`
+	Path             string   `json:"path"`
+	BaseRef          string   `json:"baseRef"`
+	Instructions     string   `json:"instructions,omitempty"`
+	InstructionFiles []string `json:"instructionFiles,omitempty"`
 }
 
 type Followup struct {
@@ -236,3 +256,5 @@ func Invalid(message string) error  { return &Error{Code: "invalid_request", Mes
 func NotFound(message string) error { return &Error{Code: "not_found", Message: message} }
 
 var ErrUncertain = &Error{Code: "uncertain", Message: "external outcome cannot be established; reconciliation required"}
+
+var ErrWorkspaceMissing = &Error{Code: "workspace_missing", Message: "owned workspace directory is absent"}

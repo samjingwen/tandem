@@ -80,12 +80,12 @@ await test("managed paths are canonicalized, including new files and search root
     await guard(insideSearch)
     assert.equal(
       insideSearch.effect,
-      "ask",
-      "content search must not silently bypass per-file read permissions",
+      "allow",
+      "saved native content-search choices remain authoritative within the checked root",
     )
     const shell = evaluation("shell", ["git status"])
     await guard(shell)
-    assert.equal(shell.effect, "ask", "saved shell allow must not bypass fresh approval")
+    assert.equal(shell.effect, "allow", "the runtime's actual saved shell choice must remain authoritative")
     const gate = {
       ...evaluation("tandem.permission.reply", ["exact-answer"]),
       sessionID: "ses_unbound" as PermissionEvaluation["sessionID"],
@@ -134,6 +134,21 @@ await test("native delegation/admin/MCP tool names and outside mutation targets 
     }
     await guard({ tool: "write", sessionID: "ses_managed", input: { path: "new-file.go" } })
     await guard({ tool: "opencode_worktree_remove", sessionID: "ses_unbound", input: { directory: f.work } })
+  } finally {
+    await f.cleanup()
+  }
+})
+
+await test("fresh approval requirements never relax an existing runtime deny", async () => {
+  const f = await fixture()
+  try {
+    const guard = permissionGuard(f.lookup)
+    for (const action of ["shell", "tandem.permission.reply"]) {
+      const event = evaluation(action, ["explicitly-forbidden"])
+      event.effect = "deny"
+      await guard(event)
+      assert.equal(event.effect, "deny", "an explicit deny must not become an ask")
+    }
   } finally {
     await f.cleanup()
   }

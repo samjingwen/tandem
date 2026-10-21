@@ -131,7 +131,7 @@ func (runner Runner) projects(command string, args []string) (request, error) {
 	if command != "register" {
 		return request{}, errors.New("unknown projects command; use --help")
 	}
-	opts, ids, err := parse(args, "name path base-ref instructions", "")
+	opts, ids, err := parse(args, "name path base-ref instructions instruction-files", "")
 	if err != nil {
 		return request{}, err
 	}
@@ -142,7 +142,17 @@ func (runner Runner) projects(command string, args []string) (request, error) {
 		return request{}, err
 	}
 	text, err := runner.text(opts["instructions"])
-	return request{method: http.MethodPost, path: "/v1/projects", body: core.RegisterProject{Name: opts["name"], Path: opts["path"], BaseRef: opts["base-ref"], Instructions: text}}, err
+	var files []string
+	if value := opts["instruction-files"]; value != "" {
+		for _, file := range strings.Split(value, ",") {
+			file = strings.TrimSpace(file)
+			if file == "" {
+				return request{}, errors.New("instruction-files must be a comma-separated list of Markdown paths")
+			}
+			files = append(files, file)
+		}
+	}
+	return request{method: http.MethodPost, path: "/v1/projects", body: core.RegisterProject{Name: opts["name"], Path: opts["path"], BaseRef: opts["base-ref"], Instructions: text, InstructionFiles: files}}, err
 }
 
 func (runner Runner) tasks(command string, args []string) (request, error) {

@@ -62,6 +62,8 @@ Task count and decomposition depth are bounded.
 Dependencies must exist in the same project; new dependency edges only point from a new task to existing tasks.
 
 The coordinator uses judgment to route work and propose subtasks through validated operations.
+New child results, failures, and actual pending questions generate durable, deduplicated coordinator notifications.
+Notifications are coalesced, version the coordinator's current context, and are capped per attempt; idleness and unchanged progress never trigger a model turn.
 The engine, not the model, validates ownership, eligibility, hierarchy, and concurrency.
 Native unmanaged delegation must remain disabled in the configured task runtime.
 

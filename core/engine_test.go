@@ -193,12 +193,23 @@ func TestDroppedEventsConvergeWithoutReplay(t *testing.T) {
 	f.tick(t)
 	s := f.state(t)
 	ref := s.Attempts[s.Tasks[task.ID].AttemptID].SessionRef
-	f.r.SetState(ref, "failed")
-	f.r.Wake <- struct{}{}
 	runCtx, cancel := context.WithCancel(ctx)
 	done := make(chan error, 1)
 	go func() { done <- f.e.Run(runCtx, 10*time.Millisecond) }()
 	defer func() { cancel(); <-done }()
+	select {
+	case <-f.r.EventStarted:
+	case <-time.After(3 * time.Second):
+		t.Fatal("event subscription never started")
+	}
+	f.r.Wake <- struct{}{}
+	select {
+	case <-f.r.EventDropped:
+	case <-time.After(3 * time.Second):
+		t.Fatal("event connection did not drop")
+	}
+	// Progress occurs after the stream is gone and has no notification/replay.
+	f.r.SetState(ref, "failed")
 	deadline := time.After(3 * time.Second)
 	for {
 		if f.state(t).Tasks[task.ID].State == "failed" {
@@ -353,7 +364,7 @@ func TestPendingDecisionIsDurableAndOwnershipChecked(t *testing.T) {
 	}
 	other := core.New(f.s, f.r, f.w, core.Options{RuntimeID: "fake"})
 	for id := range s.Decisions {
-		if _, err := other.Reply(ctx, "reply", id, core.ReplyDecision{Answer: json.RawMessage(`{"reply":"reject"}`)}); err != nil {
+		if _, err := other.Reply(ctx, "reply", id, core.ReplyDecision{Answer: json.RawMessage(`{"decision":"reject"}`)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -472,5 +483,245 @@ func TestFollowupWaitsForExecutionCapacity(t *testing.T) {
 	_, prompts, _ := f.r.Counts()
 	if prompts != 2 {
 		t.Fatal("followup exceeded worker limit", prompts)
+	}
+}
+
+func TestMissingSessionDoesNotSpeculativelyReplaceWorker(t *testing.T) {
+	f := setup(t, core.Options{})
+	task := f.task(t, "missing-session")
+	f.tick(t)
+	s := f.state(t)
+	a := s.Attempts[s.Tasks[task.ID].AttemptID]
+	f.r.Mu.Lock()
+	delete(f.r.Sessions, a.SessionRef)
+	f.r.Mu.Unlock()
+	f.tick(t)
+	f.tick(t)
+	s = f.state(t)
+	if s.Tasks[task.ID].State != "recovering" || len(s.Attempts) != 1 {
+		t.Fatal("missing session was replaced", s.Tasks[task.ID])
+	}
+	creates, _, _ := f.r.Counts()
+	if creates != 1 {
+		t.Fatal("speculative duplicate", creates)
+	}
+}
+
+func TestCleanupIntentSurvivesRemovalBeforeReceiptCommit(t *testing.T) {
+	f := setup(t, core.Options{})
+	task := f.task(t, "durable-cleanup")
+	f.tick(t)
+	s := f.state(t)
+	a := s.Attempts[s.Tasks[task.ID].AttemptID]
+	if _, err := f.e.Control(ctx, "cancel-cleanup", task.ID, core.Control{Action: "cancel"}); err != nil {
+		t.Fatal(err)
+	}
+	f.tick(t)
+	receipt, err := f.e.Cleanup(ctx, "cleanup-operation", a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !receipt.Allocated {
+		t.Fatal("cleanup intent incorrectly claims immediate removal")
+	}
+	// Inject the external-effect/commit crash window: removal succeeded while the
+	// durable record still says cleanup_pending.
+	if err = f.w.Remove(ctx, f.p, a.Workspace); err != nil {
+		t.Fatal(err)
+	}
+	f.e = core.New(f.s, f.r, f.w, core.Options{RuntimeID: "fake"})
+	f.tick(t)
+	a = f.state(t).Attempts[a.ID]
+	if a.Phase != "cleaned" || a.Workspace.Allocated {
+		t.Fatal("cleanup did not reconcile absence")
+	}
+	repeated, err := f.e.Cleanup(ctx, "cleanup-operation", a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repeated != receipt {
+		t.Fatal("cleanup operation receipt changed")
+	}
+}
+
+func TestFailedAttemptRequiresExplicitRetryAndRetainsHistory(t *testing.T) {
+	f := setup(t, core.Options{})
+	task := f.task(t, "retry")
+	f.tick(t)
+	s := f.state(t)
+	a := s.Attempts[s.Tasks[task.ID].AttemptID]
+	f.r.SetState(a.SessionRef, "failed")
+	f.tick(t)
+	f.tick(t)
+	creates, _, _ := f.r.Counts()
+	if creates != 1 {
+		t.Fatal("automatic failure retry")
+	}
+	if _, err := f.e.Control(ctx, "retry-command", task.ID, core.Control{Action: "retry"}); err != nil {
+		t.Fatal(err)
+	}
+	f.tick(t)
+	s = f.state(t)
+	if len(s.Attempts) != 2 || s.Tasks[task.ID].AttemptID == a.ID {
+		t.Fatal("attempt history lost")
+	}
+}
+
+func TestDispatchWriteRetriesAreBoundedWithoutInventingFailure(t *testing.T) {
+	f := setup(t, core.Options{})
+	f.r.EnsureFailures = true
+	task := f.task(t, "bounded-retry")
+	for range 12 {
+		f.tick(t)
+	}
+	f.r.Mu.Lock()
+	calls := f.r.EnsureRequests
+	f.r.Mu.Unlock()
+	if calls != 8 {
+		t.Fatal("external write retry budget was not enforced", calls)
+	}
+	s := f.state(t)
+	if s.Tasks[task.ID].State != "recovering" || len(s.Attempts) != 1 {
+		t.Fatal("uncertain outcome replaced or mislabeled")
+	}
+	info, err := f.e.RuntimeInfo(ctx)
+	if err != nil || !info.Compatible {
+		t.Fatal("service did not finish reconciliation", err)
+	}
+}
+
+func TestCancelRemainsUncertainUntilLateAdmissionIsReconciled(t *testing.T) {
+	f := setup(t, core.Options{})
+	f.r.DeferPromptAdmission = true
+	task := f.task(t, "late-admission")
+	f.tick(t)
+	s := f.state(t)
+	a := s.Attempts[s.Tasks[task.ID].AttemptID]
+	var command core.Command
+	for _, c := range s.Commands {
+		if c.AttemptID == a.ID {
+			command = c
+		}
+	}
+	if _, err := f.e.Control(ctx, "cancel-before-admission", task.ID, core.Control{Action: "cancel"}); err != nil {
+		t.Fatal(err)
+	}
+	f.tick(t)
+	if f.state(t).Tasks[task.ID].State != "recovering" {
+		t.Fatal("idle session falsely proved cancellation of in-flight admission")
+	}
+	f.r.DeferPromptAdmission = false
+	sp := core.SessionSpec{Reference: a.SessionRef, TaskID: task.ID, AttemptID: a.ID, InstanceID: s.InstanceID, Directory: a.Workspace.Path, Role: task.Role, Title: task.Title}
+	if err := f.r.Prompt(ctx, sp, command.ID, command.Text); err != nil {
+		t.Fatal(err)
+	}
+	f.tick(t)
+	s = f.state(t)
+	if s.Tasks[task.ID].State != "cancelled" || s.Attempts[a.ID].Observed != "idle" {
+		t.Fatal("late runtime execution was not stopped")
+	}
+	creates, prompts, _ := f.r.Counts()
+	if creates != 1 || prompts != 1 {
+		t.Fatal("late admission produced duplicate worker", creates, prompts)
+	}
+}
+
+func TestUncertainPromptRecoveryDoesNotRepeatWakeCapablePost(t *testing.T) {
+	f := setup(t, core.Options{})
+	f.r.LosePromptResponse = true
+	f.task(t, "read-only-admission-recovery")
+	f.tick(t)
+	f.tick(t)
+	f.tick(t)
+	f.r.Mu.Lock()
+	requests := f.r.PromptRequests
+	f.r.Mu.Unlock()
+	if requests != 1 {
+		t.Fatal("uncertain prompt was re-posted", requests)
+	}
+}
+
+func TestDefinitivelyRejectedReplyCanBeCorrectedWithoutClaimingApproval(t *testing.T) {
+	f := setup(t, core.Options{})
+	task := f.task(t, "rejected-answer")
+	f.tick(t)
+	s := f.state(t)
+	a := s.Attempts[s.Tasks[task.ID].AttemptID]
+	f.r.SetDecisions(a.SessionRef, core.Decision{Kind: "permission", RuntimeRef: "pending", Prompt: "allow?"})
+	f.tick(t)
+	id := ""
+	for key := range f.state(t).Decisions {
+		id = key
+	}
+	f.r.ReplyError = core.Invalid("fixture runtime rejected the answer")
+	if _, err := f.e.Reply(ctx, "rejected-reply", id, core.ReplyDecision{Answer: json.RawMessage(`{"decision":"reject"}`)}); err != nil {
+		t.Fatal(err)
+	}
+	f.tick(t)
+	d := f.state(t).Decisions[id]
+	if d.Status != "pending" || d.Error == "" {
+		t.Fatal("known rejection was incorrectly labeled answered/uncertain", d)
+	}
+	f.r.ReplyError = nil
+	if _, err := f.e.Reply(ctx, "corrected-reply", id, core.ReplyDecision{Answer: json.RawMessage(`{"decision":"reject"}`)}); err != nil {
+		t.Fatal(err)
+	}
+	f.tick(t)
+	if f.state(t).Decisions[id].Status != "answered" {
+		t.Fatal("corrected reply was not applied")
+	}
+}
+
+func TestUncertainIdleAdmissionStillReservesCapacity(t *testing.T) {
+	f := setup(t, core.Options{Concurrency: 1})
+	f.r.DeferPromptAdmission = true
+	f.task(t, "uncertain")
+	f.tick(t)
+	f.task(t, "must-wait")
+	for range 3 {
+		f.tick(t)
+	}
+	if len(f.state(t).Attempts) != 1 {
+		t.Fatal("native idleness released capacity while admission was still uncertain")
+	}
+}
+
+func TestUnchangedPausedAndUncertainStateDoesNotGrowHistoryPerPoll(t *testing.T) {
+	f := setup(t, core.Options{})
+	task := f.task(t, "quiet-paused")
+	f.tick(t)
+	if _, err := f.e.Control(ctx, "pause-quiet", task.ID, core.Control{Action: "pause"}); err != nil {
+		t.Fatal(err)
+	}
+	f.tick(t)
+	before := f.state(t).Revision
+	f.tick(t)
+	f.tick(t)
+	if f.state(t).Revision != before {
+		t.Fatal("unchanged paused state created durable writes")
+	}
+	g := setup(t, core.Options{})
+	g.r.DeferPromptAdmission = true
+	g.task(t, "quiet-uncertain")
+	for range 12 {
+		g.tick(t)
+	}
+	before = g.state(t).Revision
+	g.tick(t)
+	g.tick(t)
+	if g.state(t).Revision != before {
+		t.Fatal("unchanged uncertain state created durable writes after retry budget")
+	}
+}
+
+func TestAncestorCompletionDependencyIsRejected(t *testing.T) {
+	f := setup(t, core.Options{})
+	root := f.task(t, "root")
+	child, err := f.e.Create(ctx, "child", core.CreateTask{ProjectID: f.p.ID, ParentID: root.ID, Title: "child", Instructions: "Work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.e.Create(ctx, "cycle", core.CreateTask{ProjectID: f.p.ID, ParentID: child.ID, Dependencies: []string{root.ID}, Title: "grandchild", Instructions: "Work"}); err == nil {
+		t.Fatal("ancestor completion cycle accepted")
 	}
 }

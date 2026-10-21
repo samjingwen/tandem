@@ -18,20 +18,29 @@ type Session struct {
 	Decisions []core.Decision
 }
 type Fake struct {
-	Mu                 sync.Mutex
-	Sessions           map[string]*Session
-	Creates            int
-	PromptCalls        int
-	Interrupts         int
-	Disconnected       bool
-	LoseCreateResponse bool
-	LosePromptResponse bool
-	LoseReplyResponse  bool
-	BeforeCreate       func()
-	Wake               chan struct{}
+	Mu                   sync.Mutex
+	Sessions             map[string]*Session
+	Creates              int
+	EnsureRequests       int
+	EnsureFailures       bool
+	PromptCalls          int
+	PromptRequests       int
+	DeferPromptAdmission bool
+	Interrupts           int
+	Disconnected         bool
+	LoseCreateResponse   bool
+	LosePromptResponse   bool
+	LoseReplyResponse    bool
+	ReplyError           error
+	BeforeCreate         func()
+	Wake                 chan struct{}
+	EventStarted         chan struct{}
+	EventDropped         chan struct{}
 }
 
-func New() *Fake { return &Fake{Sessions: map[string]*Session{}, Wake: make(chan struct{}, 16)} }
+func New() *Fake {
+	return &Fake{Sessions: map[string]*Session{}, Wake: make(chan struct{}, 16), EventStarted: make(chan struct{}, 16), EventDropped: make(chan struct{}, 16)}
+}
 func (f *Fake) Info(context.Context) (core.RuntimeInfo, error) {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
@@ -47,6 +56,10 @@ func (f *Fake) Ensure(_ context.Context, s core.SessionSpec) error {
 	}
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
+	f.EnsureRequests++
+	if f.EnsureFailures {
+		return core.ErrUncertain
+	}
 	if f.Disconnected {
 		return core.ErrUncertain
 	}
@@ -79,6 +92,10 @@ func (f *Fake) Inspect(_ context.Context, s core.SessionSpec) (core.Observation,
 func (f *Fake) Prompt(_ context.Context, s core.SessionSpec, id, text string) error {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
+	f.PromptRequests++
+	if f.DeferPromptAdmission {
+		return core.ErrUncertain
+	}
 	v := f.Sessions[s.Reference]
 	if v == nil {
 		return core.ErrUncertain
@@ -112,9 +129,38 @@ func (f *Fake) Interrupt(_ context.Context, s core.SessionSpec) error {
 	f.Interrupts++
 	return nil
 }
+
+func (f *Fake) CancelPending(ctx context.Context, s core.SessionSpec) error {
+	return f.Interrupt(ctx, s)
+}
+func (f *Fake) CheckQuiescence(ctx context.Context, s core.SessionSpec) error {
+	observation, err := f.Inspect(ctx, s)
+	if err != nil {
+		return err
+	}
+	if !observation.Exists || !observation.Owned || len(observation.Decisions) > 0 || (observation.State != "idle" && observation.State != "failed") {
+		return core.Invalid("fake runtime is not quiescent")
+	}
+	return nil
+}
+func (f *Fake) ReconcilePrompt(_ context.Context, s core.SessionSpec, id, text string) error {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	v := f.Sessions[s.Reference]
+	if v == nil {
+		return core.ErrUncertain
+	}
+	if actual, ok := v.Prompts[id]; !ok || actual != text {
+		return core.ErrUncertain
+	}
+	return nil
+}
 func (f *Fake) Reply(_ context.Context, s core.SessionSpec, d core.Decision, _ json.RawMessage) error {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
+	if f.ReplyError != nil {
+		return f.ReplyError
+	}
 	v := f.Sessions[s.Reference]
 	if v == nil {
 		return core.ErrUncertain
@@ -132,12 +178,20 @@ func (f *Fake) Reply(_ context.Context, s core.SessionSpec, d core.Decision, _ j
 	return errors.New("decision no longer pending")
 }
 func (f *Fake) Events(ctx context.Context, notify func()) error {
+	select {
+	case f.EventStarted <- struct{}{}:
+	default:
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-f.Wake:
 			notify()
+			select {
+			case f.EventDropped <- struct{}{}:
+			default:
+			}
 			return errors.New("injected event connection drop")
 		}
 	}

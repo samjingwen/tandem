@@ -172,6 +172,41 @@ func TestCurrentResultUsesAttemptGeneration(t *testing.T) {
 	}
 }
 
+func TestProjectRefreshKeepsIdentityAndPassesExplicitSharedPolicy(t *testing.T) {
+	f := setup(t)
+	policy := filepath.Join(f.dir, "shared-policy.md")
+	if err := os.WriteFile(policy, []byte("Fixture shared policy: preserve the original checkout and run compiler checks.\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var refreshed core.Project
+	f.run(t, 0, &refreshed, "projects", "register", "--name", "refreshed fixture", "--path", f.repo, "--base-ref", "master", "--instruction-files", policy, "--operation-id", "refresh-project")
+	if refreshed.ID != f.project.ID || !refreshed.CreatedAt.Equal(f.project.CreatedAt) || len(refreshed.InstructionFiles) != 1 {
+		t.Fatal("configuration refresh changed project identity")
+	}
+	_, attempt := f.task(t)
+	f.runtime.Mu.Lock()
+	session := f.runtime.Sessions[attempt.SessionRef]
+	delivered := false
+	for _, prompt := range session.Prompts {
+		if strings.Contains(prompt, "Fixture shared policy: preserve the original checkout and run compiler checks.") {
+			delivered = true
+		}
+	}
+	f.runtime.Mu.Unlock()
+	// The emitted runtime prompt is the intentional data-transfer interface. This
+	// assertion does not claim that a model followed the policy.
+	if !delivered {
+		t.Fatal("shared policy content was not delivered to the worker")
+	}
+	private := filepath.Join(f.repo, ".env")
+	if err := os.WriteFile(private, []byte("FIXTURE_SECRET=never-copy-this-fixture-canary"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.clients[0].Do(f.ctx, http.MethodPost, "/v1/projects", "reject-env-instruction", core.RegisterProject{Name: "fixture", Path: f.repo, BaseRef: "master", InstructionFiles: []string{private}}, nil); err == nil {
+		t.Fatal("environment file accepted as instructions")
+	}
+}
+
 func TestTaskCleanupResolvesOwnedAttempt(t *testing.T) {
 	f := setup(t)
 	task, attempt := f.task(t)
@@ -184,8 +219,15 @@ func TestTaskCleanupResolvesOwnedAttempt(t *testing.T) {
 	if err := os.WriteFile(artifact, []byte("retain until explicitly resolved"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.clients[1].Do(f.ctx, http.MethodPost, "/v1/tasks/"+task.ID+"/cleanup", "cleanup", nil, nil); err == nil {
-		t.Fatal("HTTP cleanup removed a dirty worktree")
+	var receipt core.Workspace
+	f.do(t, 1, http.MethodPost, "/v1/tasks/"+task.ID+"/cleanup", "cleanup", nil, &receipt)
+	if !receipt.Allocated {
+		t.Fatal("request claimed cleanup before reconciliation")
+	}
+	f.tick(t)
+	refused := f.snapshot(t, 1).Attempts[attempt.ID]
+	if refused.Phase != "cleanup_pending" || refused.Error == "" {
+		t.Fatal("dirty cleanup was not visibly refused", refused)
 	}
 	if data, err := os.ReadFile(artifact); err != nil || string(data) != "retain until explicitly resolved" {
 		t.Fatalf("refused cleanup lost fixture data: %q (%v)", data, err)
@@ -195,8 +237,13 @@ func TestTaskCleanupResolvesOwnedAttempt(t *testing.T) {
 	}
 	var cleaned core.Workspace
 	f.run(t, 1, &cleaned, "tasks", "cleanup", task.ID, "--operation-id", "cleanup")
-	if cleaned.Owner != attempt.ID || cleaned.Allocated {
+	if cleaned != receipt || cleaned.Owner != attempt.ID {
 		t.Fatalf("cleanup affected wrong ownership: %+v", cleaned)
+	}
+	f.tick(t)
+	observed := f.snapshot(t, 1).Attempts[attempt.ID]
+	if observed.Phase != "cleaned" || observed.Workspace.Allocated {
+		t.Fatal("cleanup did not converge", observed)
 	}
 	if _, err := os.Stat(attempt.Workspace.Path); !os.IsNotExist(err) {
 		t.Fatalf("clean checkout still exists: %v", err)
@@ -215,6 +262,25 @@ func TestCLIResultRequiresExplicitGeneration(t *testing.T) {
 	f.run(t, 1, &result, "tasks", "result", task.ID, "--attempt", attempt.ID, "--generation", "1", "--summary", "verified", "--evidence", `[{"name":"test","reference":"artifact://result","passed":true}]`, "--operation-id", "cli-result")
 	if result.Generation != 1 || result.Late {
 		t.Fatalf("CLI omitted generation: %+v", result)
+	}
+}
+
+func TestRetryCannotForkAnAlreadyResumedFailedAttempt(t *testing.T) {
+	f := setup(t)
+	task, attempt := f.task(t)
+	f.runtime.SetState(attempt.SessionRef, "failed")
+	f.tick(t)
+	var followed core.Task
+	f.run(t, 0, &followed, "tasks", "followup", task.ID, "--text", "Correct the failure in this existing attempt", "--operation-id", "followup-failed")
+	f.tick(t)
+	var retry core.Task
+	if err := f.clients[1].Do(f.ctx, http.MethodPost, "/v1/tasks/"+task.ID+"/control", "unsafe-retry", core.Control{Action: "retry"}, &retry); err == nil {
+		t.Fatal("retry forked a failed attempt whose continuation was already running")
+	}
+	f.tick(t)
+	snapshot := f.snapshot(t, 1)
+	if len(snapshot.Attempts) != 1 || snapshot.Tasks[task.ID].AttemptID != attempt.ID {
+		t.Fatal("continuation was replaced by a duplicate worker")
 	}
 }
 
@@ -325,7 +391,7 @@ func TestAnotherClientAnswersDecisionAndAcceptsCurrentGeneration(t *testing.T) {
 		t.Fatal("waiting decision absent from API status")
 	}
 	var reply core.Decision
-	f.run(t, 1, &reply, "decisions", "reply", decisions[0].ID, "--answer", `{"reply":"reject"}`, "--operation-id", "reply-other-client")
+	f.run(t, 1, &reply, "decisions", "reply", decisions[0].ID, "--answer", `{"decision":"reject"}`, "--operation-id", "reply-other-client")
 	if reply.Status != "reply_pending" {
 		t.Fatal("decision intent was not persisted")
 	}
