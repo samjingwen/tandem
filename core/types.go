@@ -50,6 +50,7 @@ type Attempt struct {
 }
 
 type Workspace struct {
+	Allocator string `json:"allocator"`
 	Owner     string `json:"owner"`
 	Path      string `json:"path"`
 	Branch    string `json:"branch"`
@@ -66,6 +67,7 @@ type Command struct {
 	Text       string `json:"text"`
 	Status     string `json:"status"`
 	Generation int    `json:"generation"`
+	Sequence   int64  `json:"sequence"`
 }
 
 type Decision struct {
@@ -87,13 +89,14 @@ type Evidence struct {
 }
 
 type Result struct {
-	TaskID    string     `json:"taskId"`
-	AttemptID string     `json:"attemptId"`
-	Summary   string     `json:"summary"`
-	Evidence  []Evidence `json:"evidence"`
-	Accepted  bool       `json:"accepted"`
-	Late      bool       `json:"late"`
-	CreatedAt time.Time  `json:"createdAt"`
+	TaskID     string     `json:"taskId"`
+	AttemptID  string     `json:"attemptId"`
+	Generation int        `json:"generation"`
+	Summary    string     `json:"summary"`
+	Evidence   []Evidence `json:"evidence"`
+	Accepted   bool       `json:"accepted"`
+	Late       bool       `json:"late"`
+	CreatedAt  time.Time  `json:"createdAt"`
 }
 
 type Operation struct {
@@ -200,9 +203,10 @@ type Control struct {
 	Cascade bool   `json:"cascade"`
 }
 type SubmitResult struct {
-	AttemptID string     `json:"attemptId"`
-	Summary   string     `json:"summary"`
-	Evidence  []Evidence `json:"evidence"`
+	AttemptID  string     `json:"attemptId"`
+	Generation int        `json:"generation"`
+	Summary    string     `json:"summary"`
+	Evidence   []Evidence `json:"evidence"`
 }
 type ReplyDecision struct {
 	Answer json.RawMessage `json:"answer"`
