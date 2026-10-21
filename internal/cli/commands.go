@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/samjingwen/tandem/core"
@@ -164,7 +165,7 @@ func (runner Runner) tasks(command string, args []string) (request, error) {
 			query.Set("state", opts["state"])
 		}
 		return request{method: http.MethodGet, path: withQuery("/v1/tasks", query), table: "tasks"}, nil
-	case "show", "followup", "pause", "resume", "cancel", "accept", "cleanup", "result":
+	case "show", "followup", "pause", "resume", "cancel", "retry", "accept", "cleanup", "result":
 		return runner.taskAction(command, args)
 	default:
 		return request{}, errors.New("unknown tasks command; use --help")
@@ -204,10 +205,10 @@ func (runner Runner) taskAction(command string, args []string) (request, error) 
 	switch command {
 	case "followup":
 		values = "text"
-	case "pause", "resume", "cancel":
+	case "pause", "resume", "cancel", "retry":
 		booleans = "cascade"
 	case "result":
-		values = "attempt summary evidence"
+		values = "attempt generation summary evidence"
 	}
 	opts, ids, err := parse(args, values, booleans)
 	if err != nil {
@@ -226,7 +227,7 @@ func (runner Runner) taskAction(command string, args []string) (request, error) 
 		}
 		text, err := runner.text(opts["text"])
 		return request{method: http.MethodPost, path: path + "/followup", body: core.Followup{Text: text}}, err
-	case "pause", "resume", "cancel":
+	case "pause", "resume", "cancel", "retry":
 		return request{method: http.MethodPost, path: path + "/control", body: core.Control{Action: command, Cascade: opts["cascade"] == "true"}}, nil
 	case "accept", "cleanup":
 		return request{method: http.MethodPost, path: path + "/" + command, body: struct{}{}}, nil
@@ -234,8 +235,12 @@ func (runner Runner) taskAction(command string, args []string) (request, error) 
 		if len(opts) == 0 {
 			return request{method: http.MethodGet, path: path + "/results"}, nil
 		}
-		if err := required(opts, "attempt", "summary"); err != nil {
+		if err := required(opts, "attempt", "generation", "summary"); err != nil {
 			return request{}, err
+		}
+		generation, err := strconv.Atoi(opts["generation"])
+		if err != nil || generation < 1 {
+			return request{}, errors.New("--generation must be a positive integer")
 		}
 		evidence := []core.Evidence{}
 		if value, ok := opts["evidence"]; ok {
@@ -252,7 +257,7 @@ func (runner Runner) taskAction(command string, args []string) (request, error) 
 				return request{}, errors.New("--evidence must contain exactly one JSON array")
 			}
 		}
-		return request{method: http.MethodPost, path: path + "/results", body: core.SubmitResult{AttemptID: opts["attempt"], Summary: opts["summary"], Evidence: evidence}}, nil
+		return request{method: http.MethodPost, path: path + "/results", body: core.SubmitResult{AttemptID: opts["attempt"], Generation: generation, Summary: opts["summary"], Evidence: evidence}}, nil
 	}
 }
 

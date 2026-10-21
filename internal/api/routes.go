@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -15,6 +16,7 @@ type TaskDetail struct {
 	Commands  []core.Command  `json:"commands"`
 	Decisions []core.Decision `json:"decisions"`
 	Result    *core.Result    `json:"result,omitempty"`
+	Results   []core.Result   `json:"results"`
 }
 
 // Diagnostics does not interpret session idleness as task completion.
@@ -49,7 +51,7 @@ func (h *handler) route(w http.ResponseWriter, r *http.Request) {
 func routeMethods(parts []string) string {
 	if len(parts) == 1 {
 		switch parts[0] {
-		case "health", "ready", "version", "runtime", "doctor", "snapshot", "events", "decisions":
+		case "health", "ready", "version", "runtime", "doctor", "snapshot", "events", "decisions", "openapi.json":
 			return "GET"
 		case "projects", "tasks":
 			return "GET, POST"
@@ -79,6 +81,10 @@ func routeMethods(parts []string) string {
 func (h *handler) read(w http.ResponseWriter, r *http.Request, parts []string) {
 	path := strings.Join(parts, "/")
 	switch path {
+	case "openapi.json":
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(openAPIDocument)
+		return
 	case "health":
 		writeJSON(w, http.StatusOK, struct {
 			Status string `json:"status"`
@@ -149,7 +155,7 @@ func (h *handler) read(w http.ResponseWriter, r *http.Request, parts []string) {
 			return
 		}
 		if len(parts) == 3 {
-			result, exists := state.Results[task.ID]
+			result, exists := currentResult(state, task)
 			if !exists {
 				serviceError(w, core.NotFound("task result not found"))
 				return
@@ -162,7 +168,7 @@ func (h *handler) read(w http.ResponseWriter, r *http.Request, parts []string) {
 }
 
 func detail(state core.State, task core.Task) TaskDetail {
-	value := TaskDetail{Task: task, Attempts: []core.Attempt{}, Commands: []core.Command{}, Decisions: []core.Decision{}}
+	value := TaskDetail{Task: task, Attempts: []core.Attempt{}, Commands: []core.Command{}, Decisions: []core.Decision{}, Results: []core.Result{}}
 	for _, attempt := range state.Attempts {
 		if attempt.TaskID == task.ID {
 			value.Attempts = append(value.Attempts, attempt)
@@ -179,12 +185,33 @@ func detail(state core.State, task core.Task) TaskDetail {
 		}
 	}
 	sort.Slice(value.Attempts, func(i, j int) bool { return value.Attempts[i].ID < value.Attempts[j].ID })
-	sort.Slice(value.Commands, func(i, j int) bool { return value.Commands[i].ID < value.Commands[j].ID })
+	sort.Slice(value.Commands, func(i, j int) bool {
+		if value.Commands[i].Sequence == value.Commands[j].Sequence {
+			return value.Commands[i].ID < value.Commands[j].ID
+		}
+		return value.Commands[i].Sequence < value.Commands[j].Sequence
+	})
 	sort.Slice(value.Decisions, func(i, j int) bool { return value.Decisions[i].ID < value.Decisions[j].ID })
-	if result, ok := state.Results[task.ID]; ok {
+	for _, result := range state.Results {
+		if result.TaskID == task.ID {
+			value.Results = append(value.Results, result)
+		}
+	}
+	sort.Slice(value.Results, func(i, j int) bool {
+		if value.Results[i].Generation == value.Results[j].Generation {
+			return value.Results[i].AttemptID < value.Results[j].AttemptID
+		}
+		return value.Results[i].Generation < value.Results[j].Generation
+	})
+	if result, ok := currentResult(state, task); ok {
 		value.Result = &result
 	}
 	return value
+}
+
+func currentResult(state core.State, task core.Task) (core.Result, bool) {
+	result, ok := state.Results[fmt.Sprintf("%s/%d", task.AttemptID, task.Generation)]
+	return result, ok && task.AttemptID != "" && result.TaskID == task.ID && result.AttemptID == task.AttemptID && result.Generation == task.Generation
 }
 
 func (h *handler) diagnostics(w http.ResponseWriter, r *http.Request) {
@@ -262,12 +289,34 @@ func (h *handler) taskMutation(w http.ResponseWriter, r *http.Request, op, id, a
 				value, err := h.service.Accept(r.Context(), op, id)
 				respond(w, value, err)
 			} else {
-				value, err := h.service.Cleanup(r.Context(), op, id)
-				respond(w, value, err)
+				h.cleanup(w, r, op, id)
 			}
 		}
 	default:
 		return false
 	}
 	return true
+}
+
+func (h *handler) cleanup(w http.ResponseWriter, r *http.Request, op, taskID string) {
+	state, err := h.service.Snapshot(r.Context())
+	if err != nil {
+		serviceError(w, err)
+		return
+	}
+	task, ok := state.Tasks[taskID]
+	if !ok {
+		serviceError(w, core.NotFound("task not found"))
+		return
+	}
+	attempt, ok := state.Attempts[task.AttemptID]
+	if !ok || attempt.ID == "" || attempt.ID != task.AttemptID || attempt.TaskID != taskID {
+		writeError(w, http.StatusConflict, "attempt_unavailable", "task has no current owned attempt to clean up")
+		return
+	}
+	// Core rechecks terminal state, runtime quiescence, workspace ownership,
+	// and the operation fingerprint before any external cleanup. Never retry a
+	// rejected binding with a replacement attempt or a new operation ID.
+	value, err := h.service.Cleanup(r.Context(), op, attempt.ID)
+	respond(w, value, err)
 }

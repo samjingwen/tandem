@@ -159,7 +159,7 @@ func globalOptions(args []string) (map[string]string, []string, error) {
 
 func commandValueOption(name string) bool {
 	switch name {
-	case "name", "path", "base-ref", "instructions", "project", "title", "role", "parent", "depends-on", "text", "attempt", "summary", "evidence", "task", "status", "answer", "state":
+	case "name", "path", "base-ref", "instructions", "project", "title", "role", "parent", "depends-on", "text", "attempt", "generation", "summary", "evidence", "task", "status", "answer", "state":
 		return true
 	default:
 		return false
@@ -213,10 +213,10 @@ tasks create --project ID --title TITLE --instructions TEXT [--role ROLE] [--par
 tasks list [--project ID] [--state STATE]
 tasks show ID
 tasks followup ID --text TEXT
-tasks pause|resume|cancel ID [--cascade]
+tasks pause|resume|cancel|retry ID [--cascade]
 tasks accept|cleanup ID
 tasks result ID
-tasks result ID --attempt ID --summary TEXT [--evidence JSON_ARRAY]
+tasks result ID --attempt ID --generation N --summary TEXT [--evidence JSON_ARRAY]
 decisions list [--task ID] [--status STATUS]
 decisions reply ID --answer JSON
 snapshot

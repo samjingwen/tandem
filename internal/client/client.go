@@ -43,14 +43,14 @@ func New(options Options) (*Client, error) {
 	}
 	base, err := url.Parse(options.URL)
 	if err != nil || (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
-		return nil, errors.New("Tandem URL must be an http(s) server URL without credentials, query, or fragment")
+		return nil, errors.New("tandem URL must be an http(s) server URL without credentials, query, or fragment")
 	}
 	if base.Path != "" && base.Path != "/" {
-		return nil, errors.New("Tandem URL must not include a path")
+		return nil, errors.New("tandem URL must not include a path")
 	}
 	base.Path = ""
 	if strings.ContainsAny(options.Token, "\r\n") {
-		return nil, errors.New("Tandem token must not contain line breaks")
+		return nil, errors.New("tandem token must not contain line breaks")
 	}
 	httpClient := http.Client{Timeout: 35 * time.Second}
 	if options.HTTPClient != nil {
@@ -89,7 +89,7 @@ func (e *TransportError) Error() string {
 	if e.Uncertain {
 		return "request failed; mutation outcome may be unknown; retry only with the same operation ID and body"
 	}
-	return "Tandem request failed"
+	return "tandem request failed"
 }
 
 func (e *TransportError) Unwrap() error { return e.Cause }
@@ -109,7 +109,7 @@ func ValidateOperationID(id string) error {
 // Path must be a root-relative /v1/ API path and may include a query string.
 func (c *Client) Do(ctx context.Context, method, path, operationID string, input, output any) error {
 	if method != http.MethodGet && method != http.MethodPost {
-		return errors.New("Tandem client supports only GET and POST")
+		return errors.New("tandem client supports only GET and POST")
 	}
 	mutation := method == http.MethodPost
 	if mutation {
@@ -144,7 +144,7 @@ func (c *Client) Do(ctx context.Context, method, path, operationID string, input
 	endpoint := c.base.ResolveReference(rel)
 	req, err := http.NewRequestWithContext(ctx, method, endpoint.String(), body)
 	if err != nil {
-		return errors.New("Tandem request could not be constructed")
+		return errors.New("tandem request could not be constructed")
 	}
 	// Remove GetBody to prevent a caller's transport from replaying a mutation.
 	// The standard transport does not retry a non-idempotent POST.

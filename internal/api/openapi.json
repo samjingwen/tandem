@@ -1,0 +1,271 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Tandem coordination API",
+    "version": "0.1.0",
+    "description": "Versioned v1 single-user coordination contract. Bearer authentication protects every route when configured by the server. Every mutation requires a caller-stable operation ID. No timeout, disconnect, or runtime idleness implies completion or authorizes a speculative mutation retry. Dynamic engine limits default to 128 tasks, depth 3, two workers, and one coordinator; configured limits remain authoritative."
+  },
+  "servers": [{"url": "/"}],
+  "security": [{"bearerAuth": []}],
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Process liveness, not runtime or task completion",
+        "responses": {"200": {"description": "Process is serving", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Health"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/ready": {
+      "get": {
+        "operationId": "readiness",
+        "summary": "Check durable snapshot access and runtime compatibility",
+        "responses": {
+          "200": {"description": "Ready", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Diagnostics"}}}},
+          "503": {"description": "Incompatible runtime or unavailable service", "content": {"application/json": {"schema": {"oneOf": [{"$ref": "#/components/schemas/Diagnostics"}, {"$ref": "#/components/schemas/ErrorResponse"}]}}}},
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/v1/version": {
+      "get": {
+        "operationId": "version",
+        "summary": "Get engine and wire API versions",
+        "responses": {"200": {"description": "Version", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Version"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/runtime": {
+      "get": {
+        "operationId": "runtimeInfo",
+        "summary": "Get runtime compatibility diagnostics",
+        "responses": {"200": {"description": "Runtime information", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuntimeInfo"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/doctor": {
+      "get": {
+        "operationId": "doctor",
+        "summary": "Inspect instance and runtime, including incompatible runtime details",
+        "responses": {"200": {"description": "Diagnostics; ready may be false", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Diagnostics"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/openapi.json": {
+      "get": {
+        "operationId": "openAPI",
+        "summary": "Get the embedded OpenAPI contract for this executable revision",
+        "responses": {"200": {"description": "OpenAPI 3.1 document", "content": {"application/json": {"schema": {"type": "object", "required": ["openapi", "info", "paths", "components"]}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/projects": {
+      "get": {
+        "operationId": "listProjects",
+        "summary": "List projects sorted by ID",
+        "responses": {"200": {"description": "Projects", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Project"}}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      },
+      "post": {
+        "operationId": "registerProject",
+        "summary": "Register a repository without allocating a workspace",
+        "parameters": [{"$ref": "#/components/parameters/OperationID"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RegisterProject"}}}},
+        "responses": {"200": {"description": "Registered project or original operation receipt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Project"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/tasks": {
+      "get": {
+        "operationId": "listTasks",
+        "summary": "List tasks sorted by ID with optional exact filters",
+        "parameters": [{"name": "projectId", "in": "query", "schema": {"type": "string"}}, {"name": "state", "in": "query", "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Tasks", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Task"}}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      },
+      "post": {
+        "operationId": "createTask",
+        "summary": "Persist a bounded task; only the daemon scheduler may dispatch it",
+        "parameters": [{"$ref": "#/components/parameters/OperationID"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreateTask"}}}},
+        "responses": {"200": {"description": "Task or original operation receipt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Task"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/tasks/{taskId}": {
+      "parameters": [{"$ref": "#/components/parameters/TaskID"}],
+      "get": {
+        "operationId": "taskDetail",
+        "summary": "Read task, sequenced commands, current result, and all retained results",
+        "responses": {"200": {"description": "Task detail", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TaskDetail"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/tasks/{taskId}/followup": {
+      "parameters": [{"$ref": "#/components/parameters/TaskID"}],
+      "post": {
+        "operationId": "followupTask",
+        "summary": "Advance the instruction generation and persist a followup command",
+        "parameters": [{"$ref": "#/components/parameters/OperationID"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Followup"}}}},
+        "responses": {"200": {"description": "Task or original operation receipt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Task"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/tasks/{taskId}/control": {
+      "parameters": [{"$ref": "#/components/parameters/TaskID"}],
+      "post": {
+        "operationId": "controlTask",
+        "summary": "Persist desired control state, not confirmation of settled interruption",
+        "parameters": [{"$ref": "#/components/parameters/OperationID"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Control"}}}},
+        "responses": {"200": {"description": "Task or original operation receipt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Task"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/tasks/{taskId}/results": {
+      "parameters": [{"$ref": "#/components/parameters/TaskID"}],
+      "get": {
+        "operationId": "currentTaskResult",
+        "summary": "Get the result matching the task's current attempt and generation, or 404",
+        "responses": {"200": {"description": "Current result, including its explicit late/accepted flags", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Result"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      },
+      "post": {
+        "operationId": "submitTaskResult",
+        "summary": "Retain explicit attempt/generation evidence; stale or late results cannot complete newer work",
+        "parameters": [{"$ref": "#/components/parameters/OperationID"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SubmitResult"}}}},
+        "responses": {"200": {"description": "Retained result or original operation receipt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Result"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/tasks/{taskId}/accept": {
+      "parameters": [{"$ref": "#/components/parameters/TaskID"}],
+      "post": {
+        "operationId": "acceptTask",
+        "summary": "Accept current evidence after core verifies quiescence and decisions; never merge or publish",
+        "parameters": [{"$ref": "#/components/parameters/OperationID"}],
+        "requestBody": {"required": false, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EmptyCommand"}}}},
+        "responses": {"200": {"description": "Task or original operation receipt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Task"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/tasks/{taskId}/cleanup": {
+      "parameters": [{"$ref": "#/components/parameters/TaskID"}],
+      "post": {
+        "operationId": "cleanupTask",
+        "summary": "Resolve the task's current owned attempt, then delegate guarded cleanup to core",
+        "description": "Core requires terminal task state, proven runtime ownership/quiescence, and a clean owned worktree. The operation receipt is bound to the resolved attempt, not a replacement attempt. A changed binding may conflict on retry; never substitute a new operation ID.",
+        "parameters": [{"$ref": "#/components/parameters/OperationID"}],
+        "requestBody": {"required": false, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EmptyCommand"}}}},
+        "responses": {"200": {"description": "Cleaned workspace or original operation receipt; retained branch is not deleted", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Workspace"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/decisions": {
+      "get": {
+        "operationId": "listDecisions",
+        "summary": "List durable runtime decisions sorted by safe decision ID",
+        "parameters": [{"name": "taskId", "in": "query", "schema": {"type": "string"}}, {"name": "status", "in": "query", "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Decisions", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Decision"}}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/decisions/{decisionId}/reply": {
+      "parameters": [{"$ref": "#/components/parameters/DecisionID"}],
+      "post": {
+        "operationId": "replyDecision",
+        "summary": "Persist reply intent for the owned attempt; the scheduler handles runtime delivery",
+        "parameters": [{"$ref": "#/components/parameters/OperationID"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReplyDecision"}}}},
+        "responses": {"200": {"description": "Decision or original operation receipt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Decision"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/snapshot": {
+      "get": {
+        "operationId": "snapshot",
+        "summary": "Read authoritative coordination state, excluding the operation journal and runtime transcripts",
+        "responses": {"200": {"description": "Snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/State"}}}}, "default": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/v1/events": {
+      "get": {
+        "operationId": "liveRevisions",
+        "summary": "Subscribe to live-only revision hints for at most 30 seconds",
+        "description": "Immediately emits the current instance/revision, then polls once per second. Revisions may coalesce. There are no SSE id fields, Last-Event-ID is ignored, and no replay is promised. Reconnect and fetch /v1/snapshot for authoritative state. Closing a client does not stop workers.",
+        "responses": {
+          "200": {"description": "SSE event: revision, whose data is a RevisionNotification JSON object", "headers": {"X-Tandem-Events": {"schema": {"type": "string", "enum": ["live-only"]}}}, "content": {"text/event-stream": {"schema": {"type": "string"}, "example": "event: revision\ndata: {\"instanceId\":\"example\",\"revision\":7}\n\n"}}},
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "description": "Required for every route when a token is configured. Configure TLS/network protection separately for remote use."}},
+    "parameters": {
+      "OperationID": {"name": "X-Operation-ID", "in": "header", "required": true, "description": "Caller-stable mutation ID. Retain it before dispatch and reuse only for the identical request. Never automatically retry an ambiguous mutation with a new ID.", "schema": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}},
+      "TaskID": {"name": "taskId", "in": "path", "required": true, "schema": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._:-]+$"}},
+      "DecisionID": {"name": "decisionId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^dec_[0-9a-f]{32}$"}}
+    },
+    "responses": {
+      "Error": {"description": "Typed failure. 400 invalid request/operation ID, 401 unauthorized, 403 cross-origin/forbidden, 404 absent, 405 method, 408 cancellation, 409 uncertainty/conflict, 413 body over 1 MiB, 415 media type, 500 internal, 503 unavailable, 504 timeout. Backend internals are not exposed. Mutation outcome may require reconciliation.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+    },
+    "schemas": {
+      "Health": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"type": "string", "enum": ["ok"]}}},
+      "Version": {"type": "object", "additionalProperties": false, "required": ["version", "api"], "properties": {"version": {"type": "string"}, "api": {"type": "string", "enum": ["v1"]}}},
+      "RuntimeInfo": {"type": "object", "additionalProperties": false, "required": ["id", "version", "compatible"], "properties": {"id": {"type": "string"}, "version": {"type": "string"}, "compatible": {"type": "boolean"}, "detail": {"type": "string"}}},
+      "Diagnostics": {"type": "object", "additionalProperties": false, "required": ["ready", "version", "instanceId", "revision", "runtime"], "properties": {"ready": {"type": "boolean"}, "version": {"type": "string"}, "instanceId": {"type": "string"}, "revision": {"type": "integer", "format": "int64", "minimum": 0}, "runtime": {"$ref": "#/components/schemas/RuntimeInfo"}}},
+      "Project": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "path", "baseRef", "instructions", "createdAt"],
+        "properties": {"id": {"type": "string"}, "name": {"type": "string"}, "path": {"type": "string"}, "baseRef": {"type": "string"}, "instructions": {"type": "string"}, "createdAt": {"type": "string", "format": "date-time"}}
+      },
+      "Task": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "projectId", "dependencies", "title", "instructions", "role", "desired", "state", "generation", "createdAt", "updatedAt"],
+        "properties": {
+          "id": {"type": "string"}, "projectId": {"type": "string"}, "parentId": {"type": "string"}, "dependencies": {"type": "array", "items": {"type": "string"}},
+          "title": {"type": "string"}, "instructions": {"type": "string"}, "role": {"type": "string", "enum": ["worker", "coordinator"]},
+          "desired": {"type": "string", "enum": ["active", "paused", "cancelled"]}, "state": {"type": "string", "enum": ["queued", "dispatching", "running", "waiting_for_input", "paused", "ready_for_review", "completed", "failed", "cancelled", "recovering"]},
+          "generation": {"type": "integer", "minimum": 1}, "attemptId": {"type": "string"}, "error": {"type": "string"}, "createdAt": {"type": "string", "format": "date-time"}, "updatedAt": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Workspace": {
+        "type": "object", "additionalProperties": false,
+        "required": ["allocator", "owner", "path", "branch", "baseRef", "baseSha", "allocated"],
+        "properties": {"allocator": {"type": "string", "enum": ["git", "worktrunk"]}, "owner": {"type": "string"}, "path": {"type": "string"}, "branch": {"type": "string"}, "baseRef": {"type": "string"}, "baseSha": {"type": "string"}, "allocated": {"type": "boolean"}}
+      },
+      "Attempt": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "taskId", "runtimeId", "sessionRef", "workspace", "phase", "observed", "generation", "createdAt", "updatedAt"],
+        "properties": {
+          "id": {"type": "string"}, "taskId": {"type": "string"}, "runtimeId": {"type": "string"}, "sessionRef": {"type": "string"}, "workspace": {"$ref": "#/components/schemas/Workspace"},
+          "phase": {"type": "string", "enum": ["workspace_pending", "session_pending", "session_bound", "executing", "failed", "cleaned"]}, "observed": {"type": "string", "enum": ["running", "idle", "failed", "disconnected", "unknown"]},
+          "generation": {"type": "integer", "minimum": 1}, "error": {"type": "string"}, "createdAt": {"type": "string", "format": "date-time"}, "updatedAt": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Command": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "taskId", "attemptId", "kind", "text", "status", "generation", "sequence"],
+        "properties": {"id": {"type": "string"}, "taskId": {"type": "string"}, "attemptId": {"type": "string"}, "kind": {"type": "string"}, "text": {"type": "string"}, "status": {"type": "string"}, "generation": {"type": "integer", "minimum": 1}, "sequence": {"type": "integer", "format": "int64", "minimum": 0}}
+      },
+      "Decision": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "taskId", "attemptId", "runtimeRef", "kind", "prompt", "status"],
+        "properties": {"id": {"type": "string", "pattern": "^dec_[0-9a-f]{32}$"}, "taskId": {"type": "string"}, "attemptId": {"type": "string"}, "runtimeRef": {"type": "string"}, "kind": {"type": "string"}, "prompt": {"type": "string"}, "details": {}, "status": {"type": "string", "enum": ["pending", "reply_pending", "answered", "uncertain", "expired"]}, "reply": {}}
+      },
+      "Evidence": {"type": "object", "additionalProperties": false, "required": ["name", "reference", "passed"], "properties": {"name": {"type": "string", "minLength": 1}, "reference": {"type": "string", "minLength": 1}, "passed": {"type": "boolean"}}},
+      "Result": {
+        "type": "object", "additionalProperties": false,
+        "required": ["taskId", "attemptId", "generation", "summary", "evidence", "accepted", "late", "createdAt"],
+        "properties": {"taskId": {"type": "string"}, "attemptId": {"type": "string"}, "generation": {"type": "integer", "minimum": 1}, "summary": {"type": "string"}, "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/components/schemas/Evidence"}}, "accepted": {"type": "boolean"}, "late": {"type": "boolean"}, "createdAt": {"type": "string", "format": "date-time"}}
+      },
+      "TaskDetail": {
+        "type": "object", "additionalProperties": false,
+        "required": ["task", "attempts", "commands", "decisions", "results"],
+        "properties": {"task": {"$ref": "#/components/schemas/Task"}, "attempts": {"type": "array", "items": {"$ref": "#/components/schemas/Attempt"}}, "commands": {"type": "array", "items": {"$ref": "#/components/schemas/Command"}, "description": "Sorted by durable sequence, then ID"}, "decisions": {"type": "array", "items": {"$ref": "#/components/schemas/Decision"}}, "result": {"$ref": "#/components/schemas/Result", "description": "Only the result matching the current attempt ID and instruction generation; omitted if absent"}, "results": {"type": "array", "items": {"$ref": "#/components/schemas/Result"}, "description": "All retained task results, including stale/late results, sorted by generation then attempt ID"}}
+      },
+      "State": {
+        "type": "object", "additionalProperties": false,
+        "required": ["instanceId", "revision", "projects", "tasks", "attempts", "commands", "decisions", "results"],
+        "properties": {"instanceId": {"type": "string"}, "revision": {"type": "integer", "format": "int64", "minimum": 0}, "projects": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Project"}}, "tasks": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Task"}}, "attempts": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Attempt"}}, "commands": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Command"}}, "decisions": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Decision"}}, "results": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Result"}, "description": "Map keyed by attempt ID + '/' + generation, not task ID. Operation journal is never exposed."}}
+      },
+      "RegisterProject": {"type": "object", "additionalProperties": false, "required": ["name", "path", "baseRef"], "properties": {"name": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1}, "baseRef": {"type": "string", "minLength": 1}, "instructions": {"type": "string"}}},
+      "CreateTask": {
+        "type": "object", "additionalProperties": false, "required": ["projectId", "title", "instructions"],
+        "properties": {"projectId": {"type": "string", "minLength": 1}, "parentId": {"type": "string", "minLength": 1}, "dependencies": {"type": "array", "items": {"type": "string", "minLength": 1}}, "title": {"type": "string", "minLength": 1, "maxLength": 500, "description": "Core also enforces the 500 UTF-8 byte budget"}, "instructions": {"type": "string", "minLength": 1, "maxLength": 131072, "description": "Core also enforces the 128 KiB UTF-8 byte budget"}, "role": {"type": "string", "enum": ["worker", "coordinator"], "default": "worker"}}
+      },
+      "Followup": {"type": "object", "additionalProperties": false, "required": ["text"], "properties": {"text": {"type": "string", "minLength": 1, "maxLength": 131072, "description": "Core also enforces a 128 KiB UTF-8 byte budget"}}},
+      "Control": {"type": "object", "additionalProperties": false, "required": ["action"], "properties": {"action": {"type": "string", "enum": ["pause", "resume", "cancel", "retry"]}, "cascade": {"type": "boolean", "default": false}}},
+      "SubmitResult": {"type": "object", "additionalProperties": false, "required": ["attemptId", "generation", "summary", "evidence"], "properties": {"attemptId": {"type": "string", "minLength": 1}, "generation": {"type": "integer", "minimum": 1}, "summary": {"type": "string", "minLength": 1}, "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/components/schemas/Evidence"}}}},
+      "ReplyDecision": {"type": "object", "additionalProperties": false, "required": ["answer"], "properties": {"answer": {}}},
+      "EmptyCommand": {"type": "object", "additionalProperties": false, "properties": {}},
+      "RevisionNotification": {"type": "object", "additionalProperties": false, "required": ["instanceId", "revision"], "properties": {"instanceId": {"type": "string"}, "revision": {"type": "integer", "format": "int64", "minimum": 0}}},
+      "ErrorResponse": {"type": "object", "additionalProperties": false, "required": ["error"], "properties": {"error": {"type": "object", "additionalProperties": false, "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}}}}}
+    }
+  }
+}

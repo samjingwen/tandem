@@ -35,12 +35,12 @@ func newService() *fakeService {
 	s := core.NewState()
 	s.InstanceID, s.Revision = "instance", 7
 	s.Projects["p"] = core.Project{ID: "p", Name: "project", Path: "/repo", BaseRef: "master"}
-	s.Tasks["t"] = core.Task{ID: "t", ProjectID: "p", Title: "task", State: "review", Desired: "run", AttemptID: "a"}
-	s.Tasks["z"] = core.Task{ID: "z", ProjectID: "other", State: "blocked", Desired: "pause"}
+	s.Tasks["t"] = core.Task{ID: "t", ProjectID: "p", Title: "task", State: "ready_for_review", Desired: "active", AttemptID: "a", Generation: 1}
+	s.Tasks["z"] = core.Task{ID: "z", ProjectID: "other", State: "paused", Desired: "paused", Generation: 1}
 	s.Attempts["a"] = core.Attempt{ID: "a", TaskID: "t", Phase: "observing", Observed: "idle", SessionRef: "runtime-ref"}
 	s.Commands["c"] = core.Command{ID: "c", TaskID: "t", Status: "uncertain"}
 	s.Decisions["d"] = core.Decision{ID: "d", TaskID: "t", Status: "pending", Kind: "permission", Details: json.RawMessage(`{"reason":"test"}`)}
-	s.Results["t"] = core.Result{TaskID: "t", AttemptID: "a", Summary: "ready for review", Evidence: []core.Evidence{{Name: "tests", Reference: "artifact://check", Passed: false}}, Late: true}
+	s.Results["a/1"] = core.Result{TaskID: "t", AttemptID: "a", Generation: 1, Summary: "ready for review", Evidence: []core.Evidence{{Name: "tests", Reference: "artifact://check", Passed: false}}, Late: true}
 	s.Operations["private-op"] = core.Operation{ID: "private-op", Fingerprint: "private-fingerprint", Outcome: json.RawMessage(`{"secret":"private-outcome"}`)}
 	return &fakeService{state: s, runtime: core.RuntimeInfo{ID: "fake", Version: "test", Compatible: true}}
 }
@@ -87,7 +87,7 @@ func (f *fakeService) Reply(ctx context.Context, op, id string, body core.ReplyD
 }
 
 func (f *fakeService) SubmitResult(ctx context.Context, op, id string, body core.SubmitResult) (core.Result, error) {
-	return core.Result{TaskID: id, AttemptID: body.AttemptID, Evidence: body.Evidence}, f.record(ctx, "result", op, id, body)
+	return core.Result{TaskID: id, AttemptID: body.AttemptID, Generation: body.Generation, Evidence: body.Evidence}, f.record(ctx, "result", op, id, body)
 }
 
 func (f *fakeService) Accept(ctx context.Context, op, id string) (core.Task, error) {
@@ -121,9 +121,9 @@ func TestMutationContract(t *testing.T) {
 		{"/v1/tasks", `{"projectId":"p","title":"Build","instructions":"Do it","role":"worker","parentId":"parent","dependencies":["dependency"]}`, "create", "", core.CreateTask{ProjectID: "p", Title: "Build", Instructions: "Do it", Role: "worker", ParentID: "parent", Dependencies: []string{"dependency"}}},
 		{"/v1/tasks/t/followup", `{"text":"continue"}`, "followup", "t", core.Followup{Text: "continue"}},
 		{"/v1/tasks/t/control", `{"action":"pause","cascade":true}`, "control", "t", core.Control{Action: "pause", Cascade: true}},
-		{"/v1/tasks/t/results", `{"attemptId":"a","summary":"review","evidence":[{"name":"tests","reference":"artifact://report","passed":false}]}`, "result", "t", core.SubmitResult{AttemptID: "a", Summary: "review", Evidence: []core.Evidence{{Name: "tests", Reference: "artifact://report", Passed: false}}}},
+		{"/v1/tasks/t/results", `{"attemptId":"a","generation":1,"summary":"review","evidence":[{"name":"tests","reference":"artifact://report","passed":false}]}`, "result", "t", core.SubmitResult{AttemptID: "a", Generation: 1, Summary: "review", Evidence: []core.Evidence{{Name: "tests", Reference: "artifact://report", Passed: false}}}},
 		{"/v1/tasks/t/accept", `{}`, "accept", "t", nil},
-		{"/v1/tasks/t/cleanup", ``, "cleanup", "t", nil},
+		{"/v1/tasks/t/cleanup", ``, "cleanup", "a", nil},
 		{"/v1/decisions/d/reply", `{"answer":{"permission":"once"}}`, "reply", "d", core.ReplyDecision{Answer: json.RawMessage(`{"permission":"once"}`)}},
 	}
 	for _, test := range tests {
@@ -157,7 +157,7 @@ func TestMutationContract(t *testing.T) {
 
 func TestAuthenticationProtectsEveryV1Route(t *testing.T) {
 	h := New(newService(), Options{Token: "private-token"})
-	for _, path := range []string{"health", "ready", "version", "runtime", "doctor", "projects", "tasks", "tasks/t", "tasks/t/results", "decisions", "snapshot", "events", "unknown"} {
+	for _, path := range []string{"health", "ready", "version", "runtime", "doctor", "projects", "tasks", "tasks/t", "tasks/t/results", "decisions", "snapshot", "events", "openapi.json", "unknown"} {
 		w := exchange(h, http.MethodGet, "/v1/"+path, "", nil)
 		if w.Code != http.StatusUnauthorized || w.Header().Get("WWW-Authenticate") == "" {
 			t.Errorf("%s not protected: %d", path, w.Code)
@@ -284,10 +284,54 @@ func TestMethodsDoNotFallThroughToMutations(t *testing.T) {
 	}
 }
 
+func TestRetainedResultsAreNotConfusedWithCurrentResult(t *testing.T) {
+	s := newService()
+	task := s.state.Tasks["t"]
+	task.Generation = 3
+	s.state.Tasks[task.ID] = task
+	s.state.Results["a/2"] = core.Result{TaskID: "t", AttemptID: "a", Generation: 2, Late: true}
+	s.state.Results["old/1"] = core.Result{TaskID: "t", AttemptID: "old", Generation: 1, Late: true}
+	s.state.Results["other/4"] = core.Result{TaskID: "other-task", AttemptID: "other", Generation: 4}
+	s.state.Commands["z-first"] = core.Command{ID: "z-first", TaskID: "t", Sequence: 1}
+	s.state.Commands["a-last"] = core.Command{ID: "a-last", TaskID: "t", Sequence: 3}
+	s.state.Commands["c"] = core.Command{ID: "c", TaskID: "t", Sequence: 2}
+	h := New(s, Options{})
+	if w := exchange(h, http.MethodGet, "/v1/tasks/t/results", "", nil); w.Code != 404 {
+		t.Fatal("old result was selected as current")
+	}
+	w := exchange(h, http.MethodGet, "/v1/tasks/t", "", nil)
+	var value TaskDetail
+	if err := json.Unmarshal(w.Body.Bytes(), &value); err != nil {
+		t.Fatal(err)
+	}
+	if value.Result != nil || len(value.Results) != 3 || value.Results[2].Generation != 2 {
+		t.Fatalf("incorrect retained history: %+v", value)
+	}
+	if value.Commands[0].ID != "z-first" || value.Commands[2].ID != "a-last" {
+		t.Fatal("commands sorted by ID instead of durable sequence")
+	}
+}
+
+func TestCleanupRejectsMissingOrUnownedAttemptBeforeMutation(t *testing.T) {
+	for _, mutate := range []func(*core.State){
+		func(s *core.State) { delete(s.Tasks, "t") },
+		func(s *core.State) { delete(s.Attempts, "a") },
+		func(s *core.State) { a := s.Attempts["a"]; a.TaskID = "other"; s.Attempts["a"] = a },
+		func(s *core.State) { a := s.Attempts["a"]; a.ID = "other"; s.Attempts["a"] = a },
+	} {
+		s := newService()
+		mutate(&s.state)
+		w := exchange(New(s, Options{}), http.MethodPost, "/v1/tasks/t/cleanup", `{}`, mutationHeaders())
+		if (w.Code != 404 && w.Code != 409) || len(s.calls) != 0 {
+			t.Fatalf("unsafe cleanup delegation: status %d calls %+v", w.Code, s.calls)
+		}
+	}
+}
+
 func TestReadContracts(t *testing.T) {
 	s := newService()
 	h := New(s, Options{})
-	for _, path := range []string{"health", "ready", "version", "runtime", "doctor", "projects", "tasks", "tasks/t", "tasks/t/results", "decisions", "snapshot"} {
+	for _, path := range []string{"health", "ready", "version", "runtime", "doctor", "projects", "tasks", "tasks/t", "tasks/t/results", "decisions", "snapshot", "openapi.json"} {
 		w := exchange(h, http.MethodGet, "/v1/"+path, "", nil)
 		if w.Code != http.StatusOK || !json.Valid(w.Body.Bytes()) || w.Header().Get("Cache-Control") != "no-store" {
 			t.Fatalf("%s: %d: %s", path, w.Code, w.Body.String())
@@ -301,13 +345,13 @@ func TestReadContracts(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Task.State != "review" || detail.Attempts[0].Observed != "idle" || detail.Commands[0].Status != "uncertain" || detail.Decisions[0].Status != "pending" {
+	if detail.Task.State != "ready_for_review" || detail.Attempts[0].Observed != "idle" || detail.Commands[0].Status != "uncertain" || detail.Decisions[0].Status != "pending" {
 		t.Fatalf("status/evidence transformed: %+v", detail)
 	}
 	if detail.Result.Accepted || !detail.Result.Late || detail.Result.Evidence[0].Passed || detail.Result.Evidence[0].Reference != "artifact://check" {
 		t.Fatalf("result/evidence transformed: %+v", detail.Result)
 	}
-	w = exchange(h, http.MethodGet, "/v1/tasks?projectId=p&state=review", "", nil)
+	w = exchange(h, http.MethodGet, "/v1/tasks?projectId=p&state=ready_for_review", "", nil)
 	var tasks []core.Task
 	if err := json.Unmarshal(w.Body.Bytes(), &tasks); err != nil || len(tasks) != 1 || tasks[0].ID != "t" {
 		t.Fatalf("task filtering: %s (%v)", w.Body.String(), err)
@@ -322,7 +366,7 @@ func TestReadContracts(t *testing.T) {
 			t.Errorf("%s: %d", path, w.Code)
 		}
 	}
-	delete(s.state.Results, "t")
+	delete(s.state.Results, "a/1")
 	if w := exchange(h, http.MethodGet, "/v1/tasks/t/results", "", nil); w.Code != http.StatusNotFound {
 		t.Fatal("missing result is not 404")
 	}

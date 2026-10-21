@@ -34,9 +34,10 @@ func newService() *service {
 	state := core.NewState()
 	state.InstanceID = "cli-test"
 	state.Projects["p"] = core.Project{ID: "p", Name: "Demo", Path: "/repo", BaseRef: "master"}
-	state.Tasks["t"] = core.Task{ID: "t", ProjectID: "p", Title: "Task\x1b[31m\nunsafe", State: "running", Desired: "run"}
+	state.Tasks["t"] = core.Task{ID: "t", ProjectID: "p", Title: "Task\x1b[31m\nunsafe", State: "running", Desired: "active", AttemptID: "a", Generation: 1}
+	state.Attempts["a"] = core.Attempt{ID: "a", TaskID: "t", Generation: 1}
 	state.Decisions["d"] = core.Decision{ID: "d", TaskID: "t", Kind: "question", Prompt: "Continue?", Status: "pending"}
-	state.Results["t"] = core.Result{TaskID: "t", AttemptID: "a", Summary: "needs review", Evidence: []core.Evidence{{Name: "tests", Reference: "artifact://tests", Passed: true}}}
+	state.Results["a/1"] = core.Result{TaskID: "t", AttemptID: "a", Generation: 1, Summary: "needs review", Evidence: []core.Evidence{{Name: "tests", Reference: "artifact://tests", Passed: true}}}
 	return &service{state: state}
 }
 
@@ -73,7 +74,7 @@ func (s *service) Reply(_ context.Context, op, id string, body core.ReplyDecisio
 }
 
 func (s *service) SubmitResult(_ context.Context, op, id string, body core.SubmitResult) (core.Result, error) {
-	return core.Result{TaskID: id, AttemptID: body.AttemptID, Summary: body.Summary, Evidence: body.Evidence}, s.record("result", op, id, body)
+	return core.Result{TaskID: id, AttemptID: body.AttemptID, Generation: body.Generation, Summary: body.Summary, Evidence: body.Evidence}, s.record("result", op, id, body)
 }
 
 func (s *service) Accept(_ context.Context, op, id string) (core.Task, error) {
@@ -114,9 +115,10 @@ func TestCLIMutationsThroughHTTP(t *testing.T) {
 		{[]string{"tasks", "pause", "t", "--cascade"}, "control", "t", core.Control{Action: "pause", Cascade: true}},
 		{[]string{"tasks", "resume", "t"}, "control", "t", core.Control{Action: "resume"}},
 		{[]string{"tasks", "cancel", "--cascade=false", "t"}, "control", "t", core.Control{Action: "cancel"}},
+		{[]string{"tasks", "retry", "t"}, "control", "t", core.Control{Action: "retry"}},
 		{[]string{"tasks", "accept", "t"}, "accept", "t", nil},
-		{[]string{"tasks", "cleanup", "t"}, "cleanup", "t", nil},
-		{[]string{"tasks", "result", "t", "--attempt", "a", "--summary", "Review", "--evidence", `[{"name":"tests","reference":"artifact://tests","passed":false}]`}, "result", "t", core.SubmitResult{AttemptID: "a", Summary: "Review", Evidence: []core.Evidence{{Name: "tests", Reference: "artifact://tests", Passed: false}}}},
+		{[]string{"tasks", "cleanup", "t"}, "cleanup", "a", nil},
+		{[]string{"tasks", "result", "t", "--attempt", "a", "--generation", "1", "--summary", "Review", "--evidence", `[{"name":"tests","reference":"artifact://tests","passed":false}]`}, "result", "t", core.SubmitResult{AttemptID: "a", Generation: 1, Summary: "Review", Evidence: []core.Evidence{{Name: "tests", Reference: "artifact://tests", Passed: false}}}},
 		{[]string{"decisions", "reply", "d", "--answer", `{"choice":"yes"}`}, "reply", "d", core.ReplyDecision{Answer: json.RawMessage(`{"choice":"yes"}`)}},
 	}
 	for _, test := range tests {
@@ -257,7 +259,7 @@ func TestInputAndInvalidCommands(t *testing.T) {
 		{[]string{"tasks", "followup", "t", "--text", "--json"}, ""},
 		{[]string{"tasks", "create", "--project", "p", "--title", "From stdin", "--instructions", "-"}, "stdin instructions\n"},
 		{[]string{"decisions", "reply", "d", "--answer", "-"}, `{"answer":"stdin"}`},
-		{[]string{"tasks", "result", "t", "--attempt", "a", "--summary", "Review", "--evidence", "-"}, `[{"name":"test","reference":"artifact://stdin","passed":true}]`},
+		{[]string{"tasks", "result", "t", "--attempt", "a", "--generation", "1", "--summary", "Review", "--evidence", "-"}, `[{"name":"test","reference":"artifact://stdin","passed":true}]`},
 	} {
 		runner := cli.Runner{In: strings.NewReader(test.input), Getenv: func(string) string { return "" }}
 		args := append(test.args, "--url", server.URL)
@@ -272,7 +274,12 @@ func TestInputAndInvalidCommands(t *testing.T) {
 		{"serve"}, {"tasks", "create"}, {"tasks", "show"}, {"tasks", "show", "../other"},
 		{"tasks", "accept", "t", "--force"}, {"tasks", "pause", "t", "--cascade=bad"},
 		{"tasks", "result", "t", "--summary", "Missing attempt"},
-		{"tasks", "result", "t", "--attempt", "a", "--summary", "x", "--evidence", `[{"unknown":true}]`},
+		{"tasks", "result", "t", "--attempt", "a", "--generation", "1", "--summary", "x", "--evidence", `[{"unknown":true}]`},
+		{"tasks", "result", "t", "--attempt", "a", "--summary", "x"},
+		{"tasks", "result", "t", "--attempt", "a", "--generation", "0", "--summary", "x"},
+		{"tasks", "result", "t", "--attempt", "a", "--generation", "-1", "--summary", "x"},
+		{"tasks", "result", "t", "--attempt", "a", "--generation", "1.5", "--summary", "x"},
+		{"tasks", "result", "t", "--attempt", "a", "--generation", "bad", "--summary", "x"},
 		{"decisions", "reply", "d", "--answer", "not-json"},
 		{"tasks", "followup", "t", "--text", "a", "--text", "b"},
 		{"snapshot", "--operation-id", "read-op"}, {"snapshot", "--json=invalid"},

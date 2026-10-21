@@ -20,6 +20,10 @@ Tests and embedding callers can use `cli.Runner{In: reader, Getenv: lookup, HTTP
 The exported entrypoint reads standard input and the named environment variables, but never environment files or authentication caches.
 Main remains responsible for server startup and displaying a returned CLI error.
 
+The hand-authored OpenAPI 3.1 contract is `internal/api/openapi.json`.
+The authenticated `GET /v1/openapi.json` route serves that embedded contract from the executable, independent of the working directory.
+It describes v1 routes, request/response objects, required operation IDs, positive result generations, evidence fields, core input budgets, and live-only event semantics.
+
 ## Authentication and request safety
 
 When `Options.Token` is configured, every `/v1/` route requires `Authorization: Bearer TOKEN`, including health, version, readiness, diagnostics, events, and unknown routes.
@@ -61,14 +65,15 @@ List responses are ID-sorted JSON arrays, including `[]` when empty.
 | GET | `/version` | None | `{"version":"0.1.0","api":"v1"}` |
 | GET | `/runtime` | None | Core `RuntimeInfo` |
 | GET | `/doctor` | None | Diagnostics, including `ready: false` and runtime details |
+| GET | `/openapi.json` | None | Embedded OpenAPI 3.1 contract |
 | GET | `/projects` | None | Core `Project[]` |
 | POST | `/projects` | `RegisterProject` | Core `Project` |
 | GET | `/tasks` | Optional `projectId`, `state` | Core `Task[]` |
 | POST | `/tasks` | `CreateTask` | Core `Task` |
 | GET | `/tasks/{id}` | None | Task detail described below |
 | POST | `/tasks/{id}/followup` | `{"text":"..."}` | Core `Task` |
-| POST | `/tasks/{id}/control` | `{"action":"pause|resume|cancel","cascade":false}` | Core `Task` |
-| GET | `/tasks/{id}/results` | None | Core `Result`, or 404 if absent |
+| POST | `/tasks/{id}/control` | `{"action":"pause","cascade":false}` | Core `Task` |
+| GET | `/tasks/{id}/results` | None | Current attempt/generation `Result`, or 404 if absent |
 | POST | `/tasks/{id}/results` | `SubmitResult` | Core `Result` |
 | POST | `/tasks/{id}/accept` | Empty or `{}` | Core `Task` |
 | POST | `/tasks/{id}/cleanup` | Empty or `{}` | Core `Workspace` |
@@ -79,14 +84,26 @@ List responses are ID-sorted JSON arrays, including `[]` when empty.
 
 `RegisterProject` contains `name`, `path`, `baseRef`, and optional `instructions`.
 `CreateTask` contains `projectId`, `title`, `instructions`, optional `role`, optional `parentId`, and optional `dependencies` (an ID array).
-`SubmitResult` contains `attemptId`, `summary`, and `evidence`.
+`SubmitResult` requires `attemptId`, a positive integer `generation`, `summary`, and nonempty `evidence`.
 Each evidence record contains `name`, `reference`, and `passed`.
 An evidence reference is a reference, not a fetched transcript or proof fabricated by the transport.
 
-Task detail contains `task`, ID-sorted `attempts`, `commands`, `decisions`, and optional `result`.
+Task titles have a 500-byte UTF-8 budget, and task instructions/followups have a 128 KiB UTF-8 budget.
+Roles are `worker` (default) or `coordinator`.
+The engine's configured task/decomposition/concurrency limits remain authoritative; defaults are 128 tasks, depth 3, two workers, and one active coordinator.
+Controls support `pause`, `resume`, `cancel`, and `retry`; retry requires a conclusively failed task.
+
+Task detail contains `task`, ID-sorted `attempts` and `decisions`, `commands` sorted by durable sequence then ID, optional current `result`, and all retained `results` sorted by generation then attempt ID.
+The current result matches both `task.attemptId` and `task.generation`.
+Older attempts or generations remain visible in `results` but never become the current result or acceptance evidence for newer work.
+Snapshot result maps use the key `attemptId + "/" + generation`, not the task ID.
+Decision IDs are safe `dec_` plus hexadecimal IDs; runtime request references remain opaque data, not URL path components.
 The API preserves desired/observed state, command uncertainty, decision status, result acceptance, late-result flags, and evidence status exactly as supplied by core.
 An idle runtime session does not become a completed or accepted task.
 Accept does not imply merge or publication, and cleanup remains subject to core ownership checks.
+Task cleanup resolves and verifies the task's current owned attempt from a snapshot, then passes the attempt ID to core.
+Core rechecks terminal task state, runtime ownership/quiescence, clean checkout, and operation fingerprint before changing a workspace.
+The cleanup receipt binds the resolved attempt; a later changed task binding can conflict on retry rather than silently cleaning a replacement attempt.
 
 Diagnostics contain `ready`, `version`, `instanceId`, `revision`, and `runtime`.
 Readiness requires a successful durable snapshot and compatible runtime information.
@@ -175,10 +192,10 @@ tasks create --project ID --title TITLE --instructions TEXT [--role ROLE] [--par
 tasks list [--project ID] [--state STATE]
 tasks show ID
 tasks followup ID --text TEXT
-tasks pause|resume|cancel ID [--cascade]
+tasks pause|resume|cancel|retry ID [--cascade]
 tasks accept|cleanup ID
 tasks result ID
-tasks result ID --attempt ID --summary TEXT [--evidence JSON_ARRAY]
+tasks result ID --attempt ID --generation N --summary TEXT [--evidence JSON_ARRAY]
 decisions list [--task ID] [--status STATUS]
 decisions reply ID --answer JSON
 snapshot
@@ -187,7 +204,8 @@ version
 ```
 
 `tasks result ID` reads a result.
-Supplying result submission options requires both `--attempt` and `--summary` and performs a mutation.
+Supplying result submission options requires `--attempt`, `--generation`, and `--summary` and performs a mutation.
+`--generation` must be an integer greater than or equal to 1 and must identify the instruction generation actually verified, not merely the latest task generation observed later.
 `--evidence` accepts an array such as `[{"name":"tests","reference":"artifact://report","passed":true}]`.
 `--answer` accepts any valid JSON value; core/runtime validation remains authoritative.
 `--instructions -`, `--text -`, `--answer -`, and `--evidence -` read bounded stdin without opening a file.
@@ -195,6 +213,9 @@ Unknown and duplicate options fail before dispatch.
 
 ## Verification boundary
 
-The API, client, and CLI tests exercise the HTTP contract through fake `core.Service` implementations and disposable `httptest` servers.
+The API/client/CLI unit tests exercise the transport contract through fake `core.Service` implementations and disposable `httptest` servers.
 They cover operation-ID propagation, auth, browser mutation rejection, strict bounded JSON, typed errors, preserved statuses/evidence, live notifications, CLI dispatch receipts, stdin, redirects, and ambiguous disconnects without mutation retries.
-They do not establish acceptance against a real OpenCode runtime, persistent engine, native Worktrunk allocation, or production server.
+`internal/integration` additionally runs real engine commands through two independent HTTP/CLI clients against SQLite and disposable Git repositories/worktrees, with only the runtime simulated.
+It verifies concurrent duplicate creation yields one attempt/session/worktree, client disconnects do not stop workers, closing/reopening SQLite and recreating the server preserves the instance/session/worktree and retained files, another client can answer a decision, and only the current verified generation can be accepted.
+It also reproduces and covers result lookup and task-to-attempt cleanup routing, and uses a typed OpenAPI consumer to validate references, mutation requirements, real response payloads, and invalid generation inputs against the served schema.
+These tests do not establish acceptance against real OpenCode, native Worktrunk allocation, or a production listener.
