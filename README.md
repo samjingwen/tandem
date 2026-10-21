@@ -122,6 +122,7 @@ When an outcome is uncertain, the task remains recovering and reserves capacity.
 - [Architecture and state/recovery decisions](docs/ARCHITECTURE.md)
 - [Operation, cancellation, permissions, cleanup, and security](docs/OPERATIONS.md)
 - [OpenCode release contract and plugin](docs/OPENCODE.md)
+- [Acceptance cases and fake/native/model verification boundaries](docs/VERIFICATION.md)
 
 The intended Tenaxe path is Angular mobile web -> Tenaxe Spring backend -> Tandem API -> OpenCode.
 The browser must not receive runtime/provider credentials or an unrestricted execution proxy.
