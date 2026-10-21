@@ -31,6 +31,8 @@ Stopping Tandem releases the scheduling owner but does not automatically cancel 
 The next owner reconciles the same session references and worktrees.
 Stopping OpenCode itself is a separate, explicit runtime operation and may terminate execution.
 Never restart a shared runtime merely to repair one task.
+The initial adapter reconnects to its configured endpoint and does not automatically retarget credentials or unfinished bindings to another URL.
+Use a stable explicitly provisioned runtime endpoint for unattended operation; an endpoint/binding change requires operator reconciliation rather than speculative worker replacement.
 
 ## Runtime pairing
 
