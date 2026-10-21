@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -47,7 +48,7 @@ func writeJSON(w http.ResponseWriter, value any) {
 }
 func writeData(w http.ResponseWriter, value any) { writeJSON(w, map[string]any{"data": value}) }
 func ownedSession(spec core.SessionSpec) session {
-	return session{ID: spec.Reference, Metadata: owner(spec, ""), Location: location{spec.Directory}}
+	return session{ID: spec.Reference, Metadata: owner(spec, ""), Location: location{spec.Directory}, Permissions: sessionPermissions(spec)}
 }
 func requireError(t *testing.T, err, want error) {
 	t.Helper()
@@ -109,20 +110,25 @@ func TestEnsureExactWireAndRecovery(t *testing.T) {
 			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 				t.Error(err)
 			}
-			if len(body) != 6 || body["parentID"] != nil {
+			if len(body) != 7 || body["parentID"] != nil {
 				t.Errorf("wrong create wire: %v", body)
 			}
 			var id, agent string
 			var loc location
 			var md metadata
 			var model Model
+			var permissions []permissionRule
 			_ = json.Unmarshal(body["id"], &id)
 			_ = json.Unmarshal(body["agent"], &agent)
 			_ = json.Unmarshal(body["location"], &loc)
 			_ = json.Unmarshal(body["metadata"], &md)
 			_ = json.Unmarshal(body["model"], &model)
+			_ = json.Unmarshal(body["permissions"], &permissions)
 			if id != spec.Reference || agent != "build" || loc.Directory != spec.Directory || md != owner(spec, "") || model.ID != "model" || model.ProviderID != "provider" {
 				t.Error("wrong create payload")
+			}
+			if !slices.Equal(permissions, sessionPermissions(spec)) {
+				t.Error("session creation omitted the pinned permission policy")
 			}
 			s := ownedSession(spec)
 			saved = &s
@@ -154,6 +160,99 @@ func TestEnsureExactWireAndRecovery(t *testing.T) {
 	}
 	if posts != 1 {
 		t.Fatalf("speculatively retried create: %d", posts)
+	}
+}
+
+func TestUnsafeOwnedSessionPolicyFailsClosedWithoutRewriting(t *testing.T) {
+	spec := testSpec()
+	writes := 0
+	r := testRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != "GET" {
+			writes++
+			w.WriteHeader(500)
+			return
+		}
+		s := ownedSession(spec)
+		s.Permissions = nil
+		writeData(w, s)
+	})
+	requireError(t, r.Ensure(t.Context(), spec), ErrOwnership)
+	got, err := r.Inspect(t.Context(), spec)
+	if err != nil || !got.Exists || got.Owned || writes != 0 {
+		t.Fatalf("unsafe policy adopted or rewritten: %+v writes=%d err=%v", got, writes, err)
+	}
+}
+
+func TestReplyRejectionClassificationAndRacingMissingDecisions(t *testing.T) {
+	spec := testSpec()
+	d := core.Decision{TaskID: spec.TaskID, AttemptID: spec.AttemptID, Kind: "form", RuntimeRef: "form_1"}
+	for _, code := range []int{400, 401, 403, 404, 408, 409, 500} {
+		t.Run(fmt.Sprint(code), func(t *testing.T) {
+			r := testRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+				if req.URL.Path == sessionPath(spec) {
+					writeData(w, ownedSession(spec))
+					return
+				}
+				if req.Method == "POST" {
+					w.WriteHeader(code)
+					return
+				}
+				if strings.HasSuffix(req.URL.Path, "/form") {
+					writeData(w, []any{map[string]string{"id": "form_1", "sessionID": spec.Reference}})
+					return
+				}
+				writeData(w, []any{})
+			})
+			err := r.Reply(t.Context(), spec, d, json.RawMessage(`{"answer":{"field":"invalid for this native field type"}}`))
+			if code == 400 || code == 401 || code == 403 {
+				if !KnownRejected(err) {
+					t.Fatalf("deterministic rejection not classified: %v", err)
+				}
+				if code == 400 {
+					var invalid *core.Error
+					if !errors.As(err, &invalid) || invalid.Code != "invalid_request" {
+						t.Fatalf("native 400 not mapped to core.Invalid: %v", err)
+					}
+				}
+			} else {
+				requireError(t, err, core.ErrUncertain)
+				if KnownRejected(err) {
+					t.Fatal("uncertainty classified as rejection")
+				}
+			}
+		})
+	}
+	if KnownRejected(errors.Join(core.Invalid("local"), core.ErrUncertain)) {
+		t.Fatal("wrapped uncertainty classified as deterministic")
+	}
+}
+
+func TestReplyCannotTargetReusedIDWithChangedRequestDetails(t *testing.T) {
+	spec := testSpec()
+	posts := 0
+	r := testRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == "POST" {
+			posts++
+			w.WriteHeader(204)
+			return
+		}
+		if req.URL.Path == sessionPath(spec) {
+			writeData(w, ownedSession(spec))
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/permission") {
+			writeData(w, []any{map[string]any{"id": "per_same", "sessionID": spec.Reference, "action": "shell", "resources": []string{"different command"}}})
+			return
+		}
+		writeData(w, []any{})
+	})
+	d := core.Decision{TaskID: spec.TaskID, AttemptID: spec.AttemptID, Kind: "permission", RuntimeRef: "per_same", Details: json.RawMessage(`{"id":"per_same","sessionID":"ses_test","action":"shell","resources":["original command"]}`)}
+	requireError(t, r.Reply(t.Context(), spec, d, json.RawMessage(`{"decision":"once"}`)), core.ErrUncertain)
+	if posts != 0 {
+		t.Fatal("changed native request received a stale answer")
+	}
+	if !sameRequest(json.RawMessage(`{"a":1,"b":true}`), json.RawMessage(`{"b":true,"a":1}`)) {
+		t.Fatal("JSON key ordering must not change request identity")
 	}
 }
 

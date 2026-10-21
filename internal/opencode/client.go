@@ -132,6 +132,17 @@ func statusIs(err error, code int) bool {
 	return errors.As(err, &e) && e.status == code
 }
 
+// KnownRejected identifies deterministic validation/authentication rejection.
+// Missing/settled decisions, timeouts, malformed successes, and server failures
+// are deliberately excluded, even if wrapped with another error.
+func KnownRejected(err error) bool {
+	if errors.Is(err, core.ErrUncertain) {
+		return false
+	}
+	var rejection *core.Error
+	return (errors.As(err, &rejection) && rejection.Code == "invalid_request") || statusIs(err, http.StatusUnauthorized) || statusIs(err, http.StatusForbidden)
+}
+
 // request never retries. Transport, server, and malformed-success failures on writes
 // preserve uncertainty; response bodies and credentials are deliberately not logged.
 func (r *Runtime) request(ctx context.Context, method, path string, input, output any) error {
@@ -166,6 +177,9 @@ func (r *Runtime) request(ctx context.Context, method, path string, input, outpu
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		if write && (response.StatusCode >= 500 || response.StatusCode < 400 || response.StatusCode == http.StatusRequestTimeout) {
 			return core.ErrUncertain
+		}
+		if write && response.StatusCode == http.StatusBadRequest {
+			return core.Invalid("OpenCode rejected the request body")
 		}
 		return &httpError{status: response.StatusCode}
 	}

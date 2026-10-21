@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"regexp"
+	"slices"
 
 	"github.com/samjingwen/tandem/core"
 )
@@ -24,10 +26,11 @@ type location struct {
 	Directory string `json:"directory"`
 }
 type session struct {
-	ID       string   `json:"id"`
-	Metadata metadata `json:"metadata"`
-	Location location `json:"location"`
-	Outcome  string   `json:"outcome"`
+	ID          string           `json:"id"`
+	Metadata    metadata         `json:"metadata"`
+	Location    location         `json:"location"`
+	Outcome     string           `json:"outcome"`
+	Permissions []permissionRule `json:"permissions"`
 }
 
 var sessionID = regexp.MustCompile(`^ses_[a-zA-Z0-9]+$`)
@@ -36,6 +39,9 @@ func validate(spec core.SessionSpec) error {
 	if !sessionID.MatchString(spec.Reference) || spec.TaskID == "" || spec.AttemptID == "" || spec.InstanceID == "" || !filepath.IsAbs(spec.Directory) {
 		return core.Invalid("session requires a valid preallocated reference, ownership, and absolute directory")
 	}
+	if spec.Role != "" && spec.Role != "worker" && spec.Role != "coordinator" {
+		return core.Invalid("managed session role must be worker or coordinator")
+	}
 	return nil
 }
 
@@ -43,7 +49,7 @@ func owner(spec core.SessionSpec, command string) metadata {
 	return metadata{Tandem: ownership{InstanceID: spec.InstanceID, TaskID: spec.TaskID, AttemptID: spec.AttemptID, CommandID: command}}
 }
 func owned(s session, spec core.SessionSpec) bool {
-	return s.ID == spec.Reference && s.Metadata == owner(spec, "") && s.Location.Directory == spec.Directory
+	return s.ID == spec.Reference && s.Metadata == owner(spec, "") && s.Location.Directory == spec.Directory && slices.Equal(s.Permissions, sessionPermissions(spec))
 }
 
 func (r *Runtime) owned(ctx context.Context, spec core.SessionSpec) error {
@@ -81,13 +87,14 @@ func (r *Runtime) Ensure(ctx context.Context, spec core.SessionSpec) error {
 		return err
 	}
 	input := struct {
-		ID       string   `json:"id"`
-		Title    string   `json:"title"`
-		Agent    string   `json:"agent,omitempty"`
-		Model    *Model   `json:"model,omitempty"`
-		Location location `json:"location"`
-		Metadata metadata `json:"metadata"`
-	}{spec.Reference, spec.Title, r.agent, r.model, location{spec.Directory}, owner(spec, "")}
+		ID          string           `json:"id"`
+		Title       string           `json:"title"`
+		Agent       string           `json:"agent,omitempty"`
+		Model       *Model           `json:"model,omitempty"`
+		Location    location         `json:"location"`
+		Metadata    metadata         `json:"metadata"`
+		Permissions []permissionRule `json:"permissions"`
+	}{spec.Reference, spec.Title, r.agent, r.model, location{spec.Directory}, owner(spec, ""), sessionPermissions(spec)}
 	var result envelope[session]
 	if err := r.request(ctx, http.MethodPost, "/api/session", input, &result); err != nil {
 		return err
@@ -327,6 +334,9 @@ func (r *Runtime) Reply(ctx context.Context, spec core.SessionSpec, decision cor
 		return ErrOwnership
 	}
 	if err := r.owned(ctx, spec); err != nil {
+		if statusIs(err, http.StatusNotFound) {
+			return core.ErrUncertain
+		}
 		return err
 	}
 	if err := validateAnswer(decision.Kind, answer); err != nil {
@@ -334,14 +344,29 @@ func (r *Runtime) Reply(ctx context.Context, spec core.SessionSpec, decision cor
 	}
 	pending, err := r.decisions(ctx, spec)
 	if err != nil {
+		if statusIs(err, http.StatusNotFound) {
+			return core.ErrUncertain
+		}
 		return err
 	}
 	for _, item := range pending {
 		if item.RuntimeRef == decision.RuntimeRef && item.Kind == decision.Kind {
-			return r.request(ctx, http.MethodPost, sessionPath(spec)+"/"+decision.Kind+"/"+url.PathEscape(decision.RuntimeRef)+"/reply", answer, nil)
+			if len(decision.Details) > 0 && !sameRequest(decision.Details, item.Details) {
+				return core.ErrUncertain
+			}
+			err := r.request(ctx, http.MethodPost, sessionPath(spec)+"/"+decision.Kind+"/"+url.PathEscape(decision.RuntimeRef)+"/reply", answer, nil)
+			if statusIs(err, http.StatusNotFound) || statusIs(err, http.StatusConflict) {
+				return core.ErrUncertain
+			}
+			return err
 		}
 	}
 	return core.ErrUncertain
+}
+
+func sameRequest(original, current json.RawMessage) bool {
+	var before, after any
+	return json.Unmarshal(original, &before) == nil && json.Unmarshal(current, &after) == nil && reflect.DeepEqual(before, after)
 }
 
 func validateAnswer(kind string, raw json.RawMessage) error {

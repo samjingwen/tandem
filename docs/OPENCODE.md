@@ -11,7 +11,7 @@ In particular, do not copy their generic Bearer-authentication or Promise-client
 The available options are `URL`, `Password`, `ExpectedVersion`, optional `Model *opencode.Model`, and optional native `Agent`.
 `Model` contains `ID`, `ProviderID`, and optional `Variant`.
 `ExpectedVersion` defaults to `2.1.0`; changing it does not enable an unverified runtime version.
-The task's descriptive role is not automatically interpreted as a native OpenCode agent name.
+The task's `worker` or `coordinator` role selects its managed capability profile, not a native OpenCode agent name.
 
 Supply the endpoint and password through an approved handoff or explicit configuration.
 An empty `Password` uses the explicitly provided `OPENCODE_PASSWORD` environment variable.
@@ -34,10 +34,38 @@ Only HTTP 404 authoritatively permits creation with that same preallocated ident
 Creation includes an explicit `location.directory` and `metadata.tandem` containing `instanceId`, `taskId`, and `attemptId`, with no native `parentID`.
 OpenCode's duplicate-create behavior returns an existing session without comparing the new payload, so both existing and create responses are checked for reference, metadata ownership, and the exact directory.
 No session is moved, relabeled, adopted, or overwritten to resolve a collision.
+The exact pinned session permission list is also checked on every ownership verification.
+An older owned session without this policy, or a session whose rules were edited externally, fails closed instead of being silently rewritten.
 
 A lost create response returns `core.ErrUncertain`, even if the server created the session.
 Recovery gets the same reference and verifies ownership rather than allocating a fresh identifier.
 The adapter maintains no in-memory admission ledger, so this recovery also works after an adapter-process restart.
+
+### Managed native capabilities
+
+Session creation supplies an explicit deny-by-default `permissions` list.
+Workers can read and edit ordinary paths inside their assigned Location; coordinators can read but cannot use native edit/write/patch tools.
+Absolute external paths, `..` paths into other checkouts, `external_directory`, unmanaged `subagent` delegation, and unspecified actions are denied.
+Private `.env` files are excluded; `.env.example` remains available inside the workspace.
+Only the required Tandem tool names, Code Mode, native file operations, filename search, planning questions, and interactive shell/content-search checks are enabled.
+There are no granted MCP, provider-management, native session-management, or worktree-administration capabilities.
+
+These names/resources were checked against pinned [`file-access.ts`](https://github.com/anomalyco/opencode/blob/60c68d145a14127ce633e26aa5fdfb882a7baa6d/packages/core/src/file-access.ts), [`permission.ts`](https://github.com/anomalyco/opencode/blob/60c68d145a14127ce633e26aa5fdfb882a7baa6d/packages/core/src/permission.ts), and the built-in tool sources, not inferred from newer documentation.
+Internal read/edit resources are Location-relative, including `../` resources for neighboring paths inside the same native project.
+Shell resources are scanner-produced commands, while grep/glob resources are search patterns rather than search paths.
+
+**Load and verify this thin plugin at the assigned Location before dispatching managed model work.**
+Session rules alone do not close every 2.1.0 permission gap.
+Saved native project approvals can override an `ask`, so the plugin forces a fresh ask for managed shell commands and native grep content searches.
+Grep requires confirmation because it authorizes a regular expression rather than each returned file; filename globbing does not read matching contents.
+The plugin validates canonical paths, including symlinks and search roots, before native access and checks pending new-file parents.
+It blocks model mutation of `.opencode`, native configuration documents, `.git` administration, and the loaded plugin package.
+Its native tool-entrypoint allowlist also blocks worktree removal, which the pinned runtime advertises under the broader `edit` permission instead of its own tool name.
+The parent bootstrap owns installing/loading the approved package; this adapter does not modify a runtime's configuration automatically.
+
+Worktrees, these rules, and these hooks are **not OS security sandboxes**.
+Approved shell commands still execute with the host user's filesystem, process, and network authority.
+Other trusted plugins and concurrent filesystem changes are outside this model-level boundary; use a separately authorized OS sandbox when stronger containment is required.
 
 ### Prompt admission, pause, and cancellation
 
@@ -91,7 +119,11 @@ Form replies use typed keys rather than positional arrays:
 ```
 
 `Reply` receives those complete native bodies as `json.RawMessage`, verifies the decision belongs to the current task and attempt, and checks that it is pending before posting.
+Saved request details must still match the native pending request, so a reused ID with different contents cannot receive a stale answer.
 A missing decision after an uncertain reply is not evidence of the same answer being applied and returns `core.ErrUncertain` without another write.
+Native HTTP 400 write rejection is mapped to `core.Invalid`, allowing invalid form answers to be corrected instead of being stuck as uncertain sends.
+`KnownRejected(err)` additionally classifies deterministic validation/authentication rejection without exposing native response bodies.
+Timeouts, missing or already-settled replies, and ambiguous server outcomes remain uncertain and never count as known rejection.
 Permission approvals do not authorize publication, merging, or cleanup in Tandem.
 
 ### Events
@@ -107,7 +139,7 @@ There is no replay cursor or automatic reconnect in this adapter.
 
 The package lives in `plugin/`, deliberately outside automatic `.opencode/plugins/` discovery.
 It pins `@opencode/plugin` and `@opencode/client` to `2.1.0` with an npm-generated lockfile.
-It uses `Plugin.define`, `ctx.tool.transform`, native execution cancellation, and `ctx.shell.hook("create.before", ...)`.
+It uses `Plugin.define`, `ctx.tool.transform`, the pinned native permission assertion/evaluation hooks, native execution cancellation, and `ctx.shell.hook("create.before", ...)`.
 It does not start a scheduler, create native child sessions, or own session transcripts.
 
 Build before configuring an explicitly approved OpenCode instance:
@@ -125,19 +157,39 @@ Load the package directory explicitly in the intended instance's configuration:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["/absolute/path/to/tandem/plugin"]
+  "plugins": [
+    {
+      "package": "/absolute/path/to/tandem/plugin",
+      "options": {
+        "url": "http://127.0.0.1:7777",
+        "tokenFile": "/absolute/private/runtime/path/tandem-token"
+      }
+    }
+  ]
 }
 ```
 
 This is a configuration example, not an instruction to change or restart a personal shared service.
-Provide `TANDEM_URL` and `TANDEM_TOKEN` to that instance through an approved environment handoff.
+Optional `ctx.options.url` and `ctx.options.tokenFile` support location-scoped loading on an already-running runtime without changing its global service environment or restarting it.
+Do not confuse configuration scope with the pinned `/api/location/reload` endpoint: that endpoint rebuilds every loaded location and cancels pending permissions/forms.
+It must not be used as an allegedly targeted reload on a shared runtime without explicit approval for those broader effects.
+An omitted URL uses `TANDEM_URL`; an omitted token-file option uses `TANDEM_TOKEN`.
+An explicitly supplied but unsafe/unreadable token file fails setup instead of falling back to an environment token.
+No auth file or cache is discovered automatically.
+
+The token file is plain token text with an optional trailing newline, at an explicit absolute path outside the plugin Location and managed workspace.
+It must be a readable regular file owned by the current POSIX user, with no group/other permissions and only one hardlink.
+`0600` and `0400` are suitable modes.
+Symlink files and symlink parent aliases are rejected; the loader uses no-follow/nonblocking open, checks the opened inode/owner/mode, and bounds reads to 16 KiB.
+Keep the credential and runtime state outside Git, and create them only through the approved bootstrap or credential handoff.
+Tests load only owned temporary fixtures, never real private token files.
 The plugin requires HTTPS for non-loopback Tandem endpoints and uses Tandem's Bearer token, not OpenCode's Basic-auth password.
 Do not put either credential into Git or plugin configuration examples.
 The shell hook clears the inherited `TANDEM_TOKEN` value before native non-interactive shell execution.
 This reduces accidental credential exposure; it is not a sandbox or protection against other trusted plugins, arbitrary code execution, PTYs, or access to the service process.
 
 The registered tools are `tandem_create`, `tandem_status`, `tandem_followup`, `tandem_decision`, and `tandem_result`.
-Every mutation requires an explicit stable `operationId`, sent as `X-Operation-ID`.
+Every mutation requires an explicit stable `operationId`, sent as `X-Operation-ID`, matching `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$` with a maximum length of 128 characters.
 On an uncertain transport or response outcome, preserve that ID and the exact payload rather than inventing another ID.
 The client never retries mutations itself.
 
@@ -149,18 +201,37 @@ Tools use these service routes:
 - `POST /v1/tasks/{id}/results`
 - `POST /v1/decisions/{id}/reply`
 
-Worker task proposals are parented to their current Tandem task and constrained to its project; the service remains authoritative for project and parent validation.
+Managed task proposals are parented to their current Tandem task and constrained to its project, including dependencies.
+Ordinary workers cannot propose a coordinator role as a privilege escalation.
+The service remains authoritative for project, parent, role, and dependency validation.
+Managed status responses contain only the owned project's projects/tasks/attempts/commands/decisions/results, preserving composite attempt/generation result keys while dropping unknown global extensions.
+Unbound trusted development coordinators may read the complete snapshot.
+Missing, stale, or conflicting managed native metadata never falls back to unbound coordinator authority.
+Ordinary workers can follow up only their own task and answer only their own non-permission planning forms.
+Managed coordinators can route followups and decisions only within their owned project.
+Unbound sessions cannot use the decision tool; they must first acquire an explicit current project-bound coordination task or use the human-facing service client.
+
+**The model cannot approve native permissions merely because the plugin has a service token.**
+Ordinary managed workers cannot answer their own or another worker's permission requests, including rejection replies.
+For every coordinator permission-kind reply, the plugin first awaits `ctx.permission.assert` with action `tandem.permission.reply`, original request details, the exact cloned answer, operation ID, and native tool-call source metadata.
+The permission evaluation hook forces a fresh user ask even under a broad native allow or saved approval; no saved pattern is proposed.
+Nothing is forwarded until that assertion succeeds, and native user rejection propagates unchanged.
+After confirmation, coordinator ownership/project scope and the pending decision are checked again; cancellation or a stale binding cannot reuse an earlier ask to forward a reply.
+This gate is separate from the original runtime request and does not grant accept, merge, publication, or cleanup authority.
+
 Results derive task/attempt IDs from `context.sessionID`, the current snapshot's `attempts[].sessionRef`, and the task's current `attemptId`.
-They additionally verify native session metadata against the service instance, task, and attempt.
+All tools verify native session metadata against the service instance, task, and attempt before treating a session as managed.
 Unknown sessions, stale attempts, duplicate mappings, and metadata collisions cannot submit another worker's result.
 Result inputs do not select a target task or attempt.
+Result inputs must explicitly supply an integer `generation >= 1` from the instructions whose evidence is being reported.
+That generation is forwarded unchanged, never inferred or upgraded from a newer snapshot, so the engine can reject stale evidence and keep results keyed by attempt/generation.
 The plugin exposes no accept, merge, publication, or workspace-cleanup tools.
-It is a trusted service client, not a replacement for server authorization or human-review policy.
+The plugin is a model privilege boundary layered over the single-user administrative service API, not a replacement for server validation, OS containment, or human-review policy.
 
 ## Verification
 
 The Go tests use `httptest` to cover exact envelopes, Basic auth, version rejection, ownership collisions, lost-response recovery across fresh adapter instances, prompt read/delivery races, decisions, interrupt/cancellation semantics, malformed responses, and bounded SSE parsing.
-The plugin tests exercise service routes, operation IDs, token handling, proposal scoping, and result ownership checks.
+The plugin tests exercise service routes, exact operation-ID constraints, secure owned token fixtures, project filtering across every map, role escalation, generation forwarding, proposal/followup scope, result ownership, and blocking/rejected native confirmations.
 Executable quality probes verify that representative formatter, ESLint, and TypeScript violations fail while conforming fixtures pass.
 
 ```sh
@@ -183,8 +254,13 @@ TANDEM_OPENCODE_SMOKE_PLUGIN=/absolute/path/to/tandem/plugin \
 go test -v ./internal/opencode -run TestLiveIsolated210 -count=1
 ```
 
-The smoke test checks exact runtime version, session creation/recovery, owned observation, parked prompt recovery without waking, interruption, owned pending-input cancellation, typed form replies, and SSE cancellation.
-When the optional built plugin path is supplied, it also verifies real plugin activation and runs a native shell command proving the inherited Tandem token was cleared.
+The smoke test checks exact runtime version, session creation/recovery, owned observation, parked prompt recovery without waking, interruption, owned pending-input cancellation, typed form replies, deterministic invalid-answer rejection, and SSE cancellation.
+When the optional built plugin path is supplied, it starts without that plugin and hot-loads the package from an owned explicit config using URL/token-file options, without inheriting a service URL or restarting/changing the process environment.
+The all-location reload used for this proof is limited to the test's single disposable runtime, after its earlier pending work has been settled.
+It then runs a harmless native shell command proving the inherited token sentinel was cleared.
+Native permission evaluations then check worker/coordinator read/edit scope, symlink/search-root escapes, denial of native delegation/MCP/admin actions, and fresh shell asks after saved approval, without executing those tools or commands.
+A disposable prompt-admission fixture calls the compiled production confirmation helper against the real pinned `ctx.permission.assert` API with model execution disabled.
+It verifies that broad native allows and saved approvals still produce a pending user ask with original request/answer metadata, and that admission remains blocked until an explicit native reply.
 The subprocess exits when its private stdin closes; only that owned subprocess is force-terminated if graceful shutdown fails.
 Live model execution is explicitly skipped because the isolated environment intentionally has no model credentials.
 No model-provider success, external coding-work acceptance, personal-service compatibility beyond the exact pin, or publication authority is claimed by this smoke test.

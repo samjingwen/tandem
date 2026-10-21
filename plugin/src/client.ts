@@ -1,11 +1,27 @@
-export interface Task {
+export interface Task extends Record<string, unknown> {
   id: string
   projectId: string
   attemptId?: string
   state: string
+  role: string
+  // Informational snapshot value, never a default for submitted evidence.
+  generation?: number
 }
 
-export interface Attempt {
+export interface Evidence {
+  name: string
+  reference: string
+  passed: boolean
+}
+
+export interface SubmitResult {
+  attemptId: string
+  generation: number
+  summary: string
+  evidence: Evidence[]
+}
+
+export interface Attempt extends Record<string, unknown> {
   id: string
   taskId: string
   sessionRef: string
@@ -15,6 +31,16 @@ export interface Snapshot {
   instanceId: string
   tasks: Record<string, Task>
   attempts: Record<string, Attempt>
+  raw: Record<string, unknown>
+}
+
+export const operationPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u
+
+export function operationID(value: unknown): string {
+  if (typeof value !== "string" || !operationPattern.test(value)) {
+    throw new Error("Mutations require a stable operationId matching [A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+  }
+  return value
 }
 
 export function object(value: unknown): Record<string, unknown> {
@@ -29,6 +55,13 @@ export function text(value: unknown, name: string): string {
   return value
 }
 
+function taskGeneration(value: unknown): number | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1)
+    throw new Error("Invalid snapshot task generation")
+  return value
+}
+
 function snapshot(value: unknown): Snapshot {
   const data = object(value)
   const tasks: Record<string, Task> = Object.create(null) as Record<string, Task>
@@ -36,11 +69,15 @@ function snapshot(value: unknown): Snapshot {
   for (const [key, value] of Object.entries(object(data.tasks))) {
     const task = object(value)
     const id = text(task.id, "task.id")
+    const generation = taskGeneration(task.generation)
     if (id !== key) throw new Error("Invalid Tandem task map")
     tasks[key] = {
+      ...task,
       id,
       projectId: text(task.projectId, "task.projectId"),
       state: text(task.state, "task.state"),
+      role: typeof task.role === "string" ? task.role : "worker",
+      ...(generation === undefined ? {} : { generation }),
       ...(task.attemptId ? { attemptId: text(task.attemptId, "task.attemptId") } : {}),
     }
   }
@@ -49,12 +86,13 @@ function snapshot(value: unknown): Snapshot {
     const id = text(attempt.id, "attempt.id")
     if (id !== key) throw new Error("Invalid Tandem attempt map")
     attempts[key] = {
+      ...attempt,
       id,
       taskId: text(attempt.taskId, "attempt.taskId"),
-      sessionRef: text(attempt.sessionRef, "attempt.sessionRef"),
+      sessionRef: typeof attempt.sessionRef === "string" ? attempt.sessionRef : "",
     }
   }
-  return { instanceId: text(data.instanceId, "instanceId"), tasks, attempts }
+  return { instanceId: text(data.instanceId, "instanceId"), tasks, attempts, raw: data }
 }
 
 export class TandemClient {
@@ -63,13 +101,17 @@ export class TandemClient {
   readonly #fetch: typeof fetch
 
   constructor(url: string, token: string, request: typeof fetch = fetch) {
-    this.#url = new URL(url)
+    try {
+      this.#url = new URL(url)
+    } catch {
+      throw new Error("Invalid explicit Tandem HTTP(S) URL")
+    }
     if (
       !["http:", "https:"].includes(this.#url.protocol) ||
       this.#url.username ||
       this.#url.password ||
-      this.#url.search ||
-      this.#url.hash ||
+      this.#url.href.includes("?") ||
+      this.#url.href.includes("#") ||
       !token
     ) {
       throw new Error("Tandem requires an HTTP(S) URL without embedded credentials and a token")
@@ -87,10 +129,7 @@ export class TandemClient {
       Accept: "application/json",
     }
     if (body !== undefined) {
-      if (!operationId || operationId.length > 200 || /[\r\n]/u.test(operationId)) {
-        throw new Error("Mutations require a stable operationId (at most 200 characters)")
-      }
-      headers["X-Operation-ID"] = operationId
+      headers["X-Operation-ID"] = operationID(operationId)
       headers["Content-Type"] = "application/json"
     }
     const url = `${this.#url.href.replace(/\/$/u, "")}${path}`
