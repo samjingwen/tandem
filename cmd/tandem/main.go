@@ -117,6 +117,8 @@ func serve(ctx context.Context, args []string, out, errOut io.Writer) error {
 	workers := flags.Int("concurrency", 2, "maximum concurrent worker executions")
 	maxTasks := flags.Int("max-tasks", 128, "maximum retained tasks in this MVP instance")
 	allocator := flags.String("allocator", "worktrunk", "checkout allocator: worktrunk or git")
+	modelReference := flags.String("model", "", "optional existing OpenCode provider/model#variant; omitted uses native configuration")
+	agent := flags.String("agent", "", "optional existing native agent ID; logical Tandem roles remain independent")
 	allowRemote := flags.Bool("allow-remote", false, "explicitly enable authenticated non-loopback listening")
 	cert := flags.String("tls-cert", "", "TLS certificate path")
 	key := flags.String("tls-key", "", "TLS private key path")
@@ -169,11 +171,15 @@ func serve(ctx context.Context, args []string, out, errOut io.Writer) error {
 	if connection.Password == "" {
 		return errors.New("an authenticated OpenCode connection is required")
 	}
-	runtimeClient, err := opencode.New(opencode.Options{URL: connection.URL, Password: connection.Password, ExpectedVersion: "2.1.0"})
+	model, err := opencode.ParseModelReference(*modelReference)
 	if err != nil {
 		return err
 	}
-	hash := sha256.Sum256([]byte(connection.URL + "\x002.1.0"))
+	runtimeClient, err := opencode.New(opencode.Options{URL: connection.URL, Password: connection.Password, ExpectedVersion: "2.1.0", Model: model, Agent: *agent})
+	if err != nil {
+		return err
+	}
+	hash := sha256.Sum256([]byte(connection.URL + "\x002.1.0\x00" + *modelReference + "\x00" + *agent))
 	runtimeID := "opencode:" + hex.EncodeToString(hash[:16])
 	root, err := filepath.Abs(*directory)
 	if err != nil {

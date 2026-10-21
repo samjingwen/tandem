@@ -68,6 +68,7 @@ go test -v ./internal/integration -run '^TestLiveDaemonProcessOwnershipAndClient
 ```
 
 The separate delegation evaluation spends configured model capacity and requires a fresh, nonexistent output directory.
+Set optional `TANDEM_LIVE_MODEL=provider/model#variant` to select an already-configured eligible model instead of the native default.
 It submits conversational intake through the actual standalone CLI process, lets that process exit, and uses another client to inspect and continue the same task/coordinator session.
 A real coordinator dispatches two bounded modifying workers through Tandem tools into different owned worktrees.
 The harness performs a narrow safety preflight on generated arithmetic-only demo artifacts and runs independent Go test oracles without injected control/provider environment variables or module-network access.
@@ -84,6 +85,8 @@ go test -v ./internal/integration -run '^TestLiveCoordinatorDelegationAcceptance
 
 Missing/failed model access, pending permission requests, timeout, or incomplete evidence is not a passing evaluation.
 The test never approves permission requests merely to obtain a green result.
+For deliberate operator-reviewed execution, set `TANDEM_LIVE_MANUAL_DECISIONS=1` and use the owner-only `client-handoff.json` metadata to connect a separate CLI while the evaluation waits.
+Inspect the actual request and generated fixture code before making an explicit once/reject decision; the harness itself never answers it.
 
 ## External application boundary
 

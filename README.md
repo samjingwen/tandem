@@ -58,6 +58,9 @@ Keep the daemon running independently of task clients; for terminal-independent 
 There is no automatic global service installation.
 
 Alternatively, supply an already-authorized runtime endpoint through `OPENCODE_URL` and `OPENCODE_PASSWORD`.
+Use `serve --model provider/model#variant` to select an existing configured model when the native default is unsuitable for service-driven work.
+For example, some free-tier providers reject API-driven sessions; that rejection is not proof of expired credentials.
+No particular vendor is required, and Tandem never copies provider credentials or implements model inference itself.
 The service refuses unauthenticated runtime connections.
 Do not place either runtime grants or provider credentials in a repository or task instructions.
 

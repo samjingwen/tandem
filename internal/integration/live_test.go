@@ -51,7 +51,11 @@ func TestLiveCoordinatorDelegationAcceptance(t *testing.T) {
 	if err != nil {
 		t.Fatal("load explicit Tandem-owned connection configuration", err)
 	}
-	runtime, err := opencode.New(opencode.Options{URL: connection.URL, Password: connection.Password})
+	model, err := opencode.ParseModelReference(os.Getenv("TANDEM_LIVE_MODEL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := opencode.New(opencode.Options{URL: connection.URL, Password: connection.Password, Model: model})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,6 +126,25 @@ func TestLiveCoordinatorDelegationAcceptance(t *testing.T) {
 	if err = json.Unmarshal(intakeOut.Bytes(), &parent); err != nil {
 		t.Fatal("invalid standalone CLI task receipt", err)
 	}
+	initialState, err := engine.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoff, err := json.Marshal(struct {
+		URL        string `json:"url"`
+		InstanceID string `json:"instanceId"`
+		ProjectID  string `json:"projectId"`
+		TaskID     string `json:"taskId"`
+		TokenFile  string `json:"tokenFile"`
+	}{server.URL, initialState.InstanceID, project.ID, parent.ID, filepath.Join(stateDir, "client.token")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, "client-handoff.json"), handoff, 0600); err != nil {
+		t.Fatal(err)
+	}
+	manualDecisions := os.Getenv("TANDEM_LIVE_MANUAL_DECISIONS") == "1"
+	reportedDecisions := map[string]bool{}
 	runCtx, stop := context.WithCancel(ctx)
 	done := make(chan error, 1)
 	go func() { done <- engine.Run(runCtx, 250*time.Millisecond) }()
@@ -167,7 +190,13 @@ func TestLiveCoordinatorDelegationAcceptance(t *testing.T) {
 		}
 		for _, d := range snapshot.Decisions {
 			if d.Status == "pending" {
-				t.Fatalf("live evaluation requires a user decision, not auto-approval: task=%s decision=%s kind=%s; fixture retained at %s", d.TaskID, d.ID, d.Kind, root)
+				if !manualDecisions {
+					t.Fatalf("live evaluation requires a user decision, not auto-approval: task=%s decision=%s kind=%s; fixture retained at %s", d.TaskID, d.ID, d.Kind, root)
+				}
+				if !reportedDecisions[d.ID] {
+					t.Logf("external operator review required: task=%s decision=%s kind=%s; use retained client-handoff.json with a separate CLI", d.TaskID, d.ID, d.Kind)
+					reportedDecisions[d.ID] = true
+				}
 			}
 		}
 		select {
