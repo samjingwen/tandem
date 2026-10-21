@@ -1,0 +1,12 @@
+/.worktrees/
+/bin/
+/.tmp/
+/.lavish/
+*.db
+*.db-shm
+*.db-wal
+*.lock
+.env
+.env.*
+!.env.example
+node_modules/
