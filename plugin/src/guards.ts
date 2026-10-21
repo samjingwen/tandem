@@ -2,7 +2,14 @@ import { realpath } from "node:fs/promises"
 import path from "node:path"
 import type { PermissionEvaluation } from "@opencode/plugin/promise/permission"
 import { Error as ToolError } from "@opencode/plugin/promise/tool"
-import { claim, permissionReplyAction, type NativeSession, type SessionLookup } from "./authority.ts"
+import {
+  assignment,
+  isHub,
+  permissionReplyAction,
+  type Assignment,
+  type NativeSession,
+  type SessionLookup,
+} from "./authority.ts"
 import { object, text } from "./client.ts"
 
 const allowedTools = new Set([
@@ -22,15 +29,6 @@ const allowedTools = new Set([
   "tandem_result",
   "tandem_control",
 ])
-
-function managed(session: NativeSession): boolean {
-  const owner = claim(session)
-  if (!owner) return false
-  text(owner.instanceId, "native instanceId")
-  text(owner.taskId, "native taskId")
-  text(owner.attemptId, "native attemptId")
-  return true
-}
 
 function within(root: string, file: string): boolean {
   const relative = path.relative(root, file)
@@ -75,7 +73,8 @@ async function workspacePath(
     throw new Error("Unsupported workspace path")
   const candidate = path.resolve(root, normalized)
   if (!within(root, candidate)) throw new Error("Path is outside the assigned workspace")
-  const [base, target] = await Promise.all([canonical(root), canonical(candidate)])
+  const [base, target] = await Promise.all([realpath(root), canonical(candidate)])
+  if (base !== root) throw new Error("Assigned directory is no longer canonical")
   if (!within(base, target)) throw new Error("Symlink target is outside the assigned workspace")
   if (mutation && controlMutation(candidate, target, protectedRoot))
     throw new Error("Runtime configuration and loaded plugins are outside model mutation authority")
@@ -92,21 +91,31 @@ function privateEnvironment(target: string) {
 
 // Pinned Core read/edit resources are relative paths. Grep/glob resources are
 // patterns, so their search root must instead be checked from native metadata.
-export function permissionGuard(lookup: SessionLookup, tokenFile?: string, protectedRoot?: string) {
+export function permissionGuard(
+  lookup: SessionLookup,
+  tokenFile?: string,
+  protectedRoot?: string,
+  coordinatorDirectory?: string,
+) {
   return async (event: PermissionEvaluation) => {
     if (event.effect === "deny") return
-    if (event.action === permissionReplyAction) {
-      event.effect = "ask"
-      event.message = "Confirm forwarding this exact Tandem permission answer."
-      return
-    }
-    const session = await lookup(event.sessionID)
-    if (!managed(session)) return
     try {
+      const session = await lookup(event.sessionID)
+      const binding = assignment(session, event.sessionID)
+      if (event.action === permissionReplyAction) {
+        event.effect = confirmationEffect(binding, session, coordinatorDirectory)
+        event.message = "Confirm forwarding this exact Tandem permission answer."
+        return
+      }
+      if (!binding) return
+      if (event.action === "edit" && binding.role === "coordinator") {
+        event.effect = "deny"
+        return
+      }
       if (event.action === "read" || event.action === "edit") {
         for (const resource of event.resources)
           await workspacePath(
-            session.location.directory,
+            binding.directory,
             resource,
             tokenFile,
             false,
@@ -115,13 +124,21 @@ export function permissionGuard(lookup: SessionLookup, tokenFile?: string, prote
           )
       } else if (event.action === "grep" || event.action === "glob") {
         const directory = event.metadata?.path ?? "."
-        await workspacePath(session.location.directory, text(directory, "search path"), tokenFile, true)
+        await workspacePath(binding.directory, text(directory, "search path"), tokenFile, true)
       }
     } catch {
       event.effect = "deny"
       event.message = "Tandem confines native file access to the assigned workspace and excludes credentials."
     }
   }
+}
+
+function confirmationEffect(
+  binding: Assignment | undefined,
+  session: NativeSession,
+  coordinatorDirectory?: string,
+): "ask" | "deny" {
+  return (binding ? binding.role === "coordinator" : isHub(session, coordinatorDirectory)) ? "ask" : "deny"
 }
 
 interface BeforeTool {
@@ -148,19 +165,40 @@ function targets(tool: string, input: Record<string, unknown>): string[] {
 // A tool can advertise permission:"edit" instead of its own name. In 2.1.0
 // worktree_remove does exactly this, so session wildcard rules alone cannot
 // exclude every administrative/delegation entrypoint from an editing worker.
-export function toolGuard(lookup: SessionLookup, tokenFile?: string, protectedRoot?: string) {
+export function toolGuard(
+  lookup: SessionLookup,
+  tokenFile?: string,
+  protectedRoot?: string,
+  coordinatorDirectory?: string,
+) {
   return async (event: BeforeTool) => {
     const session = await lookup(event.sessionID)
-    if (!managed(session)) return
+    let binding
+    try {
+      binding = assignment(session, event.sessionID)
+    } catch {
+      throw new ToolError({ message: "Malformed or moved managed session assignment" })
+    }
+    if (!binding) {
+      if (event.tool.startsWith("tandem_") && !isHub(session, coordinatorDirectory))
+        throw new ToolError({
+          message: "Unbound Tandem tools require the explicitly configured coordinator directory",
+        })
+      return
+    }
     if (!allowedTools.has(event.tool))
       throw new ToolError({
         message:
           "Managed Tandem sessions cannot invoke unmanaged delegation, MCP, or runtime/provider/worktree administration",
       })
+    if (binding.role === "worker" && ["tandem_control", "tandem_decision"].includes(event.tool))
+      throw new ToolError({ message: "Ordinary workers cannot control tasks or answer decisions" })
+    if (binding.role === "coordinator" && ["edit", "write", "patch"].includes(event.tool))
+      throw new ToolError({ message: "Managed coordinators cannot edit project files" })
     try {
       for (const target of targets(event.tool, object(event.input))) {
         await workspacePath(
-          session.location.directory,
+          binding.directory,
           target,
           tokenFile,
           event.tool === "grep" || event.tool === "glob",

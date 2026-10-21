@@ -3,7 +3,7 @@ import { chmod, link, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "n
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { test } from "node:test"
-import { loadTokenFile, settings } from "../src/credentials.ts"
+import { loadTokenFile, settings, validateCoordinatorDirectory } from "../src/credentials.ts"
 
 async function fixture() {
   const root = await mkdtemp(path.join(await realpath(tmpdir()), "tandem-token-test-"))
@@ -27,7 +27,12 @@ await test("explicit owner-only token file and URL options work without shared s
     assert.equal(configured.token, "test-fixture-token")
     assert.deepEqual(
       await settings({}, { TANDEM_URL: "http://localhost:7777", TANDEM_TOKEN: "explicit-env" }),
-      { url: "http://localhost:7777", token: "explicit-env", tokenFile: undefined },
+      {
+        url: "http://localhost:7777",
+        token: "explicit-env",
+        tokenFile: undefined,
+        coordinatorDirectory: undefined,
+      },
     )
     await assert.rejects(
       settings(
@@ -37,6 +42,27 @@ await test("explicit owner-only token file and URL options work without shared s
       ),
       /outside/u,
     )
+  } finally {
+    await f.cleanup()
+  }
+})
+
+await test("coordinatorDirectory is an explicit canonical existing directory, never an inherited prefix grant", async () => {
+  const f = await fixture()
+  try {
+    const hub = path.join(f.root, "hub")
+    await mkdir(hub, { mode: 0o700 })
+    assert.equal(await validateCoordinatorDirectory(hub), hub)
+    const configured = await settings(
+      { url: "http://127.0.0.1:7777", tokenFile: f.file, coordinatorDirectory: hub },
+      { TANDEM_URL: undefined, TANDEM_TOKEN: undefined },
+      hub,
+    )
+    assert.equal(configured.coordinatorDirectory, hub)
+    const alias = path.join(f.root, "hub-alias")
+    await symlink(hub, alias)
+    for (const value of ["relative/hub", hub + "/", alias, path.join(f.root, "missing"), f.file, null, ""])
+      await assert.rejects(validateCoordinatorDirectory(value))
   } finally {
     await f.cleanup()
   }

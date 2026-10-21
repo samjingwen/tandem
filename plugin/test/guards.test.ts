@@ -21,7 +21,15 @@ async function fixture() {
       id,
       metadata:
         id === "ses_managed"
-          ? { tandem: { instanceId: "instance", taskId: "task", attemptId: "attempt" } }
+          ? {
+              tandem: {
+                instanceId: "instance",
+                taskId: "task",
+                attemptId: "attempt",
+                directory: work,
+                role: "worker",
+              },
+            }
           : {},
       location: { directory: work },
     })
@@ -45,7 +53,7 @@ function evaluation(
 await test("managed paths are canonicalized, including new files and search roots, without executing native tools", async () => {
   const f = await fixture()
   try {
-    const guard = permissionGuard(f.lookup, undefined, f.plugin)
+    const guard = permissionGuard(f.lookup, undefined, f.plugin, f.work)
     for (const [action, resource] of [
       ["read", "README.md"],
       ["edit", "new/nested/file.go"],
@@ -94,7 +102,7 @@ await test("managed paths are canonicalized, including new files and search root
     assert.equal(
       gate.effect,
       "ask",
-      "even unbound sessions must not auto-approve Tandem permission forwarding",
+      "the explicitly opted-in hub still needs confirmation before forwarding a permission",
     )
   } finally {
     await f.cleanup()
@@ -139,6 +147,33 @@ await test("native delegation/admin/MCP tool names and outside mutation targets 
   }
 })
 
+await test("moving a managed native session cannot redefine its assigned workspace", async () => {
+  const f = await fixture()
+  try {
+    const moved: SessionLookup = async (id) => {
+      const session = await f.lookup(id)
+      return {
+        ...session,
+        metadata: {
+          tandem: {
+            instanceId: "instance",
+            taskId: "task",
+            attemptId: "attempt",
+            directory: f.work,
+            role: "worker",
+          },
+        },
+        location: { directory: path.join(f.root, "other-workspace") },
+      }
+    }
+    await assert.rejects(
+      toolGuard(moved)({ tool: "read", sessionID: "ses_managed", input: { path: "private.txt" } }),
+    )
+  } finally {
+    await f.cleanup()
+  }
+})
+
 await test("fresh approval requirements never relax an existing runtime deny", async () => {
   const f = await fixture()
   try {
@@ -149,6 +184,87 @@ await test("fresh approval requirements never relax an existing runtime deny", a
       await guard(event)
       assert.equal(event.effect, "deny", "an explicit deny must not become an ask")
     }
+  } finally {
+    await f.cleanup()
+  }
+})
+
+await test("unbound inherited hook calls are denied outside the explicit hub", async () => {
+  const f = await fixture()
+  try {
+    const outside: SessionLookup = async (id) => ({
+      ...(await f.lookup(id)),
+      metadata: {},
+      location: { directory: path.join(f.root, "other-workspace") },
+    })
+    await assert.rejects(
+      toolGuard(
+        outside,
+        undefined,
+        undefined,
+        f.work,
+      )({ tool: "tandem_status", sessionID: "ses_unbound", input: {} }),
+      /explicitly configured coordinator directory/u,
+    )
+    const gate = {
+      ...evaluation("tandem.permission.reply", ["answer"]),
+      sessionID: "ses_unbound" as PermissionEvaluation["sessionID"],
+    }
+    await permissionGuard(outside, undefined, undefined, f.work)(gate)
+    assert.equal(gate.effect, "deny")
+    await toolGuard(
+      f.lookup,
+      undefined,
+      undefined,
+      f.work,
+    )({ tool: "tandem_status", sessionID: "ses_unbound", input: {} })
+  } finally {
+    await f.cleanup()
+  }
+})
+
+await test("native guards reject malformed bindings and moved permission roots without a Tandem lookup", async () => {
+  const f = await fixture()
+  try {
+    for (const change of [
+      { directory: null },
+      { role: null },
+      { role: "admin" },
+      { directory: path.join(f.root, "other-workspace") },
+    ]) {
+      const lookup: SessionLookup = async (id) => {
+        const session = await f.lookup(id)
+        return {
+          ...session,
+          metadata: {
+            tandem: {
+              instanceId: "instance",
+              taskId: "task",
+              attemptId: "attempt",
+              directory: f.work,
+              role: "worker",
+              ...change,
+            },
+          },
+        }
+      }
+      await assert.rejects(
+        toolGuard(lookup)({ tool: "read", sessionID: "ses_managed", input: { path: "private.txt" } }),
+        /Malformed or moved/u,
+      )
+      const event = evaluation("read", ["private.txt"])
+      await permissionGuard(lookup)(event)
+      assert.equal(event.effect, "deny")
+    }
+    await toolGuard(f.lookup)({ tool: "write", sessionID: "ses_managed", input: { path: "offline-work.go" } })
+    const event = evaluation("edit", ["offline-work.go"])
+    await permissionGuard(f.lookup)(event)
+    assert.equal(event.effect, "allow")
+    for (const tool of ["tandem_control", "tandem_decision"])
+      await assert.rejects(
+        toolGuard(f.lookup)({ tool, sessionID: "ses_managed", input: {} }),
+        /Ordinary workers/u,
+      )
   } finally {
     await f.cleanup()
   }

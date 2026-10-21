@@ -106,6 +106,36 @@ function proposal(input: Record<string, unknown>, state: Snapshot, owner?: Task)
   }
 }
 
+type Authority = Awaited<ReturnType<typeof authority>>
+
+function coordinatorTask(view: Authority, taskId: string): Task {
+  if (!view.hub && view.owned?.task.role !== "coordinator")
+    throw new Error(
+      "Only managed coordinators or the explicitly opted-in hub can control tasks or answer decisions",
+    )
+  return scopedTask(view.state, taskId, view.owned?.task)
+}
+
+function childTask(state: Snapshot, taskId: string, parentId: string): boolean {
+  const visited = new Set<string>()
+  let current = state.tasks[taskId]
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id)
+    if (current.parentId === parentId) return true
+    current = typeof current.parentId === "string" ? state.tasks[current.parentId] : undefined
+  }
+  return false
+}
+
+function controlInput(input: Record<string, unknown>) {
+  if (
+    !["pause", "resume", "cancel", "retry"].includes(text(input.action, "control action")) ||
+    typeof input.cascade !== "boolean"
+  )
+    throw new Error("Control requires pause, resume, cancel, or retry and an explicit cascade boolean")
+  return { action: input.action, cascade: input.cascade }
+}
+
 async function recheckPermissionAuthority(
   client: TandemClient,
   native: NativeAccess,
@@ -116,9 +146,7 @@ async function recheckPermissionAuthority(
   details: unknown,
 ) {
   const latest = await authority(client, native, context)
-  if (!latest.owned || latest.owned.task.role !== "coordinator")
-    throw new Error("Coordinator authority changed while awaiting user confirmation")
-  scopedTask(latest.state, taskId, latest.owned.task)
+  coordinatorTask(latest, taskId)
   const current = decisionRequest(id, records(latest.state.raw.decisions)[id])
   if (
     current.status !== "pending" ||
@@ -195,7 +223,7 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
     {
       name: "decision",
       description:
-        "Reply within the owned project. Ordinary workers can answer only their own planning forms, never permissions. Coordinators must obtain fresh native user confirmation before forwarding any permission answer.",
+        "Coordinators may answer child forms, never their own user questions. The explicitly opted-in hub can route decisions. Forwarding any permission answer requires fresh native user confirmation. Ordinary workers cannot answer decisions.",
       input: schema({ operationId, decisionId: string, answer: { type: "object" } }, [
         "operationId",
         "decisionId",
@@ -204,17 +232,15 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
       options,
       async execute(raw, context) {
         const input = object(raw)
-        const { state, owned } = await authority(client, native, context)
-        if (!owned) throw new Error("Decision replies require a current project-bound Tandem session")
+        const view = await authority(client, native, context)
+        const { state, owned } = view
         const id = text(input.decisionId, "decisionId")
         const decision = decisionRequest(id, records(state.raw.decisions)[id])
         if (decision.status !== "pending") throw new Error("Decision is not pending")
-        scopedTask(state, decision.taskId, owned.task)
+        coordinatorTask(view, decision.taskId)
         const answer = structuredClone(object(input.answer))
         const operation = operationID(input.operationId)
         if (decision.kind === "permission") {
-          if (owned.task.role !== "coordinator")
-            throw new Error("Ordinary workers cannot answer permission requests")
           await confirmPermissionReply(native.assert, context, state.instanceId, decision, answer, operation)
           await recheckPermissionAuthority(
             client,
@@ -227,6 +253,11 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
           )
         } else if (decision.kind !== "form") {
           throw new Error("Unsupported decision kind")
+        } else if (
+          owned &&
+          (decision.taskId === owned.task.id || !childTask(state, decision.taskId, owned.task.id))
+        ) {
+          throw new Error("Managed coordinators may answer only child forms, never their own user questions")
         }
         return output(
           await client.request(
@@ -280,6 +311,35 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
             `/v1/tasks/${encodeURIComponent(owned.task.id)}/results`,
             context.signal,
             result,
+            operationID(input.operationId),
+          ),
+        )
+      },
+    },
+    {
+      name: "control",
+      description:
+        "Pause, resume, cancel, or retry a persistent task. Only managed coordinators in their own project or the explicitly opted-in hub may control tasks; cascade must be explicit.",
+      input: schema(
+        {
+          operationId,
+          taskId: string,
+          action: { type: "string", enum: ["pause", "resume", "cancel", "retry"] },
+          cascade: { type: "boolean" },
+        },
+        ["operationId", "taskId", "action", "cascade"],
+      ),
+      options,
+      async execute(raw, context) {
+        const input = object(raw)
+        const body = controlInput(input)
+        const view = await authority(client, native, context)
+        const target = coordinatorTask(view, text(input.taskId, "taskId"))
+        return output(
+          await client.request(
+            `/v1/tasks/${encodeURIComponent(target.id)}/control`,
+            context.signal,
+            body,
             operationID(input.operationId),
           ),
         )

@@ -59,16 +59,38 @@ export async function settings(
   directory?: string,
 ) {
   const input = object(options)
-  if (Object.keys(input).some((key) => key !== "url" && key !== "tokenFile"))
+  if (Object.keys(input).some((key) => !["url", "tokenFile", "coordinatorDirectory"].includes(key)))
     throw new Error("Unsupported Tandem plugin option")
   const url = input.url === undefined ? env.TANDEM_URL : text(input.url, "Tandem url option")
   const tokenFile =
     input.tokenFile === undefined ? undefined : text(input.tokenFile, "Tandem tokenFile option")
+  const coordinatorDirectory =
+    input.coordinatorDirectory === undefined
+      ? undefined
+      : await validateCoordinatorDirectory(input.coordinatorDirectory)
   if (tokenFile !== undefined && directory !== undefined) await credentialPlacement(directory, tokenFile)
   const token = tokenFile === undefined ? env.TANDEM_TOKEN : await loadTokenFile(tokenFile)
   if (!url || !token)
     throw new Error("Provide Tandem url/tokenFile options or explicit TANDEM_URL/TANDEM_TOKEN")
-  return { url, token, tokenFile: tokenFile === undefined ? undefined : path.resolve(tokenFile) }
+  return {
+    url,
+    token,
+    tokenFile: tokenFile === undefined ? undefined : path.resolve(tokenFile),
+    coordinatorDirectory,
+  }
+}
+
+export async function validateCoordinatorDirectory(value: unknown): Promise<string> {
+  const directory = text(value, "coordinatorDirectory")
+  if (!path.isAbsolute(directory) || path.resolve(directory) !== directory)
+    throw new Error("coordinatorDirectory must be a canonical absolute existing directory")
+  try {
+    const [info, resolved] = await Promise.all([lstat(directory), realpath(directory)])
+    if (!info.isDirectory() || resolved !== directory) throw new Error("Not a canonical directory")
+  } catch {
+    throw new Error("coordinatorDirectory must be a canonical absolute existing directory")
+  }
+  return directory
 }
 
 async function credentialPlacement(directory: string, file: string) {

@@ -17,7 +17,9 @@ const state = {
       generation: 3,
     },
   },
-  attempts: { attempt: { id: "attempt", taskId: "task", sessionRef: "ses_worker" } },
+  attempts: {
+    attempt: { id: "attempt", taskId: "task", sessionRef: "ses_worker", workspace: { path: "/work/task" } },
+  },
   decisions: {
     decision: { id: "decision", taskId: "task", attemptId: "attempt", kind: "form", status: "pending" },
   },
@@ -33,7 +35,11 @@ function context(sessionID = "ses_worker") {
   }
 }
 
-function fixture(snapshot: unknown = state, assertion: AssertPermission = () => Promise.resolve()) {
+function fixture(
+  snapshot: unknown = state,
+  assertion: AssertPermission = () => Promise.resolve(),
+  options: { role?: "worker" | "coordinator"; coordinatorDirectory?: string; directory?: string } = {},
+) {
   const calls: { path: string; headers: Headers; body: unknown; signal: AbortSignal | null | undefined }[] =
     []
   const request: typeof fetch = (input, init) => {
@@ -53,11 +59,22 @@ function fixture(snapshot: unknown = state, assertion: AssertPermission = () => 
         id,
         metadata:
           id === "ses_worker"
-            ? { tandem: { instanceId: "instance", taskId: "task", attemptId: "attempt" } }
+            ? {
+                tandem: {
+                  instanceId: "instance",
+                  taskId: "task",
+                  attemptId: "attempt",
+                  directory: "/work/task",
+                  role: options.role ?? "worker",
+                },
+              }
             : {},
-        location: { directory: "/work/task" },
+        location: { directory: options.directory ?? "/work/task" },
       }),
     assert: assertion,
+    ...(options.coordinatorDirectory === undefined
+      ? {}
+      : { coordinatorDirectory: options.coordinatorDirectory }),
   }
   const registered = tools(client, native)
   function tool(name: string) {
@@ -69,7 +86,7 @@ function fixture(snapshot: unknown = state, assertion: AssertPermission = () => 
 }
 
 await test("client uses versioned service routes, bearer auth, stable operation IDs, and cancellation", async () => {
-  const { tool, calls, registered } = fixture()
+  const { tool, calls, registered } = fixture(state, undefined, { coordinatorDirectory: "/work/task" })
   await tool("followup").execute({ operationId: "op_1", taskId: "task", text: "continue" }, context())
   const followup = calls.find((call) => call.path.endsWith("/followup"))
   assert.ok(followup)
@@ -80,14 +97,14 @@ await test("client uses versioned service routes, bearer auth, stable operation 
   assert.ok(followup.signal)
   await tool("decision").execute(
     { operationId: "op_2", decisionId: "decision", answer: { answer: { approved: true } } },
-    context(),
+    context("ses_explicit_hub"),
   )
   const reply = calls.find((call) => call.path.endsWith("/reply"))
   assert.equal(reply?.path, "/v1/decisions/decision/reply")
   assert.deepEqual(reply.body, { answer: { answer: { approved: true } } })
   assert.deepEqual(
     registered.map((item) => item.name),
-    ["create", "status", "followup", "decision", "result"],
+    ["create", "status", "followup", "decision", "result", "control"],
   )
   assert.ok(registered.every((item) => !/accept|merge|cleanup/u.test(item.name)))
 })
@@ -113,8 +130,8 @@ await test("worker proposals are parented to their current task and cannot chang
   assert.equal(calls.filter((call) => call.path === "/v1/tasks").length, 1)
 })
 
-await test("coordinator may create an unparented root task", async () => {
-  const { tool, calls } = fixture()
+await test("explicitly opted-in hub may create an unparented root task", async () => {
+  const { tool, calls } = fixture(state, undefined, { coordinatorDirectory: "/work/task" })
   await tool("create").execute(
     { operationId: "op", projectId: "project", title: "root", instructions: "plan" },
     context("ses_coordinator"),
@@ -143,7 +160,7 @@ await test("structured result derives task/attempt only from current native owne
       { operationId: "bad", generation: 2, summary: "done", evidence },
       context("ses_foreign"),
     ),
-    /not a Tandem worker/u,
+    /explicitly configured coordinator directory/u,
   )
   assert.equal(calls.filter((call) => call.path.endsWith("/results")).length, 1)
 })
@@ -162,7 +179,15 @@ await test("stale, ambiguous, malformed, and native metadata collisions reject r
     session: (id) =>
       Promise.resolve({
         id,
-        metadata: { tandem: { instanceId: "foreign", taskId: "task", attemptId: "attempt" } },
+        metadata: {
+          tandem: {
+            instanceId: "foreign",
+            taskId: "task",
+            attemptId: "attempt",
+            directory: "/work/task",
+            role: "worker",
+          },
+        },
         location: { directory: "/work/task" },
       }),
     assert: () => Promise.resolve(),
@@ -272,7 +297,7 @@ await test("project filtering covers every task-bearing map and drops unknown gl
     },
     futureGlobalExtension: "PRIVATE OTHER PROJECT",
   }
-  const f = fixture(snapshot)
+  const f = fixture(snapshot, undefined, { coordinatorDirectory: "/work/task" })
   const managed = await f.tool("status").execute({}, context())
   assert.ok(!managed.content.includes("PRIVATE OTHER PROJECT"))
   assert.ok(managed.content.includes("OWN PROJECT"))
@@ -334,7 +359,7 @@ await test("ordinary workers cannot escalate roles, cross project dependencies, 
       f
         .tool("decision")
         .execute({ operationId: "op", decisionId: "permission", answer: { decision } }, context()),
-      /cannot answer permission/u,
+      /Only managed coordinators/u,
     )
   }
   assert.equal(assertions, 0)
@@ -376,11 +401,15 @@ await test("managed coordinators can steer only their project and must await nat
     started = resolve
   })
   const assertions: Parameters<AssertPermission>[0][] = []
-  const f = fixture(coordinator, (input) => {
-    assertions.push(input)
-    started()
-    return waiting
-  })
+  const f = fixture(
+    coordinator,
+    (input) => {
+      assertions.push(input)
+      started()
+      return waiting
+    },
+    { role: "coordinator" },
+  )
   await f.tool("followup").execute({ operationId: "follow", taskId: "peer", text: "route" }, context())
   await assert.rejects(
     f.tool("followup").execute({ operationId: "bad", taskId: "foreign", text: "route" }, context()),
@@ -427,6 +456,7 @@ await test("native rejection propagates without forwarding; unbound coordinators
       },
     },
     () => Promise.reject(denied),
+    { role: "coordinator" },
   )
   await assert.rejects(
     f
@@ -441,7 +471,7 @@ await test("native rejection propagates without forwarding; unbound coordinators
         { operationId: "unbound", decisionId: "approval", answer: { decision: "once" } },
         context("ses_dev_coordinator"),
       ),
-    /project-bound/u,
+    /explicitly configured coordinator directory/u,
   )
   assert.equal(f.calls.filter((call) => call.path.endsWith("/reply")).length, 0)
 })
@@ -460,10 +490,14 @@ await test("a canceled native call or stale coordinator cannot forward after use
       },
     },
   }
-  const f = fixture(stateDuringAsk, () => {
-    stateDuringAsk.tasks.task.attemptId = "replacement"
-    return Promise.resolve()
-  })
+  const f = fixture(
+    stateDuringAsk,
+    () => {
+      stateDuringAsk.tasks.task.attemptId = "replacement"
+      return Promise.resolve()
+    },
+    { role: "coordinator" },
+  )
   await assert.rejects(
     f
       .tool("decision")
@@ -482,6 +516,7 @@ await test("a canceled native call or stale coordinator cannot forward after use
       signal.abort()
       return Promise.resolve()
     },
+    { role: "coordinator" },
   )
   await assert.rejects(
     canceled
@@ -509,10 +544,14 @@ await test("changed request details cannot reuse an earlier native confirmation"
       },
     },
   }
-  const f = fixture(changed, () => {
-    changed.decisions.approval.details.resources = ["different"]
-    return Promise.resolve()
-  })
+  const f = fixture(
+    changed,
+    () => {
+      changed.decisions.approval.details.resources = ["different"]
+      return Promise.resolve()
+    },
+    { role: "coordinator" },
+  )
   await assert.rejects(
     f
       .tool("decision")
@@ -520,4 +559,14 @@ await test("changed request details cannot reuse an earlier native confirmation"
     /Decision changed/u,
   )
   assert.equal(f.calls.filter((call) => call.path.endsWith("/reply")).length, 0)
+})
+
+await test("unbound descendant sessions cannot fetch a global snapshot without an explicit hub opt-in", async () => {
+  const f = fixture()
+  await assert.rejects(f.tool("status").execute({}, context("ses_unregistered_child")))
+  assert.equal(
+    f.calls.length,
+    0,
+    "unauthorized unbound sessions must be rejected before fetching global state",
+  )
 })

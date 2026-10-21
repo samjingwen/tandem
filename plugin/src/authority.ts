@@ -3,6 +3,7 @@ import type { Plugin } from "@opencode/plugin"
 import type { OpenCodeClient } from "@opencode/client"
 import type { ToolContext } from "@opencode/plugin/promise/tool"
 import { currentWorker, object, TandemClient, text } from "./client.ts"
+import path from "node:path"
 
 export const permissionReplyAction = "tandem.permission.reply"
 export type NativeSession = Pick<
@@ -15,6 +16,15 @@ export type AssertPermission = Plugin.Context["permission"]["assert"]
 export interface NativeAccess {
   session: SessionLookup
   assert: AssertPermission
+  readonly coordinatorDirectory?: string
+}
+
+export interface Assignment {
+  instanceId: string
+  taskId: string
+  attemptId: string
+  directory: string
+  role: "worker" | "coordinator"
 }
 
 export function claim(session: NativeSession): Record<string, unknown> | undefined {
@@ -22,23 +32,56 @@ export function claim(session: NativeSession): Record<string, unknown> | undefin
   return metadata.tandem === undefined ? undefined : object(metadata.tandem)
 }
 
-export async function authority(client: TandemClient, native: NativeAccess, context: Context) {
-  const state = await client.snapshot(context.signal)
-  const session = await native.session(context.sessionID, context.signal)
-  if (session.id !== context.sessionID) throw new Error("Native session identity mismatch")
-  const owned = currentWorker(state, context.sessionID)
+// This check uses only native session data, so ordinary local work does not
+// depend on Tandem availability. Never derive the assignment from a moved location.
+export function assignment(session: NativeSession, expectedID?: string): Assignment | undefined {
+  if (expectedID !== undefined && session.id !== expectedID)
+    throw new Error("Native session identity mismatch")
   const metadata = claim(session)
+  if (metadata === undefined) return undefined
+  const directory = text(metadata.directory, "immutable assigned directory")
+  const role = metadata.role
+  if (role !== "worker" && role !== "coordinator") throw new Error("Invalid immutable managed role")
+  if (
+    !path.isAbsolute(directory) ||
+    path.normalize(directory) !== directory ||
+    session.location.directory !== directory
+  )
+    throw new Error("Native location does not match the immutable assigned directory")
+  return {
+    instanceId: text(metadata.instanceId, "native instanceId"),
+    taskId: text(metadata.taskId, "native taskId"),
+    attemptId: text(metadata.attemptId, "native attemptId"),
+    directory,
+    role,
+  }
+}
+
+export function isHub(session: NativeSession, coordinatorDirectory?: string): boolean {
+  return coordinatorDirectory !== undefined && session.location.directory === coordinatorDirectory
+}
+
+export async function authority(client: TandemClient, native: NativeAccess, context: Context) {
+  const session = await native.session(context.sessionID, context.signal)
+  const metadata = assignment(session, context.sessionID)
+  const hub = metadata === undefined && isHub(session, native.coordinatorDirectory)
+  if (metadata === undefined && !hub)
+    throw new Error("Unbound session is outside the explicitly configured coordinator directory")
+  const state = await client.snapshot(context.signal)
+  const owned = currentWorker(state, context.sessionID)
   if (!owned && metadata) throw new Error("Managed native session is not a current Tandem attempt")
   if (
     owned &&
     (!metadata ||
       metadata.instanceId !== state.instanceId ||
       metadata.taskId !== owned.task.id ||
-      metadata.attemptId !== owned.attempt.id)
+      metadata.attemptId !== owned.attempt.id ||
+      metadata.directory !== object(owned.attempt.workspace).path ||
+      metadata.role !== (owned.task.role || "worker"))
   ) {
     throw new Error("Native session metadata does not match Tandem ownership")
   }
-  return { state, owned }
+  return { state, owned, hub }
 }
 
 export interface DecisionRequest {

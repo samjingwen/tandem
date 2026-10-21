@@ -184,6 +184,36 @@ func TestUnsafeOwnedSessionPolicyFailsClosedWithoutRewriting(t *testing.T) {
 	}
 }
 
+func TestEnsureRejectsChangedAssignedDirectoryAndRoleMetadata(t *testing.T) {
+	spec := testSpec()
+	r := testRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+		writeData(w, map[string]any{"id": spec.Reference, "location": location{spec.Directory}, "permissions": sessionPermissions(spec), "metadata": map[string]any{"tandem": map[string]string{"instanceId": spec.InstanceID, "taskId": spec.TaskID, "attemptId": spec.AttemptID, "directory": "/another-project", "role": "coordinator"}}})
+	})
+	requireError(t, r.Ensure(t.Context(), spec), ErrOwnership)
+}
+
+func TestOwnerPinsNormalizedRoleAndDirectoryOnSessionAndAdmission(t *testing.T) {
+	spec := testSpec()
+	spec.Role = ""
+	for _, command := range []string{"", "command"} {
+		metadata := owner(spec, command).Tandem
+		if metadata.Role != "worker" || metadata.Directory != spec.Directory || metadata.CommandID != command {
+			t.Fatalf("incomplete immutable assignment: %+v", metadata)
+		}
+	}
+	for _, change := range []func(*session){func(s *session) { s.Metadata.Tandem.Role = "coordinator" }, func(s *session) { s.Metadata.Tandem.Role = "" }, func(s *session) { s.Metadata.Tandem.Directory = "" }, func(s *session) { s.Metadata.Tandem.Directory = "/different-project" }, func(s *session) { s.Location.Directory = "/different-project" }} {
+		s := ownedSession(spec)
+		change(&s)
+		r := testRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+			if req.Method != "GET" {
+				t.Error("binding mismatch must never be rewritten")
+			}
+			writeData(w, s)
+		})
+		requireError(t, r.Ensure(t.Context(), spec), ErrOwnership)
+	}
+}
+
 func TestReplyRejectionClassificationAndRacingMissingDecisions(t *testing.T) {
 	spec := testSpec()
 	d := core.Decision{TaskID: spec.TaskID, AttemptID: spec.AttemptID, Kind: "form", RuntimeRef: "form_1"}

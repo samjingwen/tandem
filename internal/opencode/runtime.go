@@ -18,6 +18,8 @@ type ownership struct {
 	TaskID     string `json:"taskId"`
 	AttemptID  string `json:"attemptId"`
 	CommandID  string `json:"commandId,omitempty"`
+	Directory  string `json:"directory"`
+	Role       string `json:"role"`
 }
 type metadata struct {
 	Tandem ownership `json:"tandem"`
@@ -36,7 +38,7 @@ type session struct {
 var sessionID = regexp.MustCompile(`^ses_[a-zA-Z0-9]+$`)
 
 func validate(spec core.SessionSpec) error {
-	if !sessionID.MatchString(spec.Reference) || spec.TaskID == "" || spec.AttemptID == "" || spec.InstanceID == "" || !filepath.IsAbs(spec.Directory) {
+	if !sessionID.MatchString(spec.Reference) || spec.TaskID == "" || spec.AttemptID == "" || spec.InstanceID == "" || !filepath.IsAbs(spec.Directory) || filepath.Clean(spec.Directory) != spec.Directory {
 		return core.Invalid("session requires a valid preallocated reference, ownership, and absolute directory")
 	}
 	if spec.Role != "" && spec.Role != "worker" && spec.Role != "coordinator" {
@@ -46,7 +48,11 @@ func validate(spec core.SessionSpec) error {
 }
 
 func owner(spec core.SessionSpec, command string) metadata {
-	return metadata{Tandem: ownership{InstanceID: spec.InstanceID, TaskID: spec.TaskID, AttemptID: spec.AttemptID, CommandID: command}}
+	role := spec.Role
+	if role == "" {
+		role = "worker"
+	}
+	return metadata{Tandem: ownership{InstanceID: spec.InstanceID, TaskID: spec.TaskID, AttemptID: spec.AttemptID, CommandID: command, Directory: spec.Directory, Role: role}}
 }
 func owned(s session, spec core.SessionSpec) bool {
 	return s.ID == spec.Reference && s.Metadata == owner(spec, "") && s.Location.Directory == spec.Directory && slices.Equal(s.Permissions, sessionPermissions(spec))

@@ -31,11 +31,13 @@ Ordinary requests have a 30-second deadline; the event stream has no overall cli
 Persist the attempt and reference before allocating a workspace or calling the runtime.
 `Ensure` first gets the exact session reference.
 Only HTTP 404 authoritatively permits creation with that same preallocated identifier.
-Creation includes an explicit `location.directory` and `metadata.tandem` containing `instanceId`, `taskId`, and `attemptId`, with no native `parentID`.
+Creation includes an explicit `location.directory` and `metadata.tandem` containing `instanceId`, `taskId`, `attemptId`, the immutable assigned `directory`, and the logical `role`, with no native `parentID`.
+An empty role is normalized to `worker`, and prompt admissions carry the same directory/role binding alongside their command ID.
 OpenCode's duplicate-create behavior returns an existing session without comparing the new payload, so both existing and create responses are checked for reference, metadata ownership, and the exact directory.
 No session is moved, relabeled, adopted, or overwritten to resolve a collision.
 The exact pinned session permission list is also checked on every ownership verification.
 An older owned session without this policy, or a session whose rules were edited externally, fails closed instead of being silently rewritten.
+Missing or changed assignment metadata, a role collision, or a native move to another directory likewise fails closed without rewriting or adopting the session.
 
 A lost create response returns `core.ErrUncertain`, even if the server created the session.
 Recovery gets the same reference and verifies ownership rather than allocating a fresh identifier.
@@ -56,11 +58,13 @@ Shell resources are scanner-produced commands, while grep/glob resources are sea
 
 **Load and verify this thin plugin at the assigned Location before dispatching managed model work.**
 Session rules alone do not close every 2.1.0 permission gap.
-Shell/content-search profiles initially ask, and the runtime's explicit saved decisions remain authoritative.
-The plugin never auto-answers those requests, and it does not relax a deny.
-Content-search permissions authorize patterns rather than every returned file in this release, so they are not an OS sandbox or a per-file confidentiality boundary.
-Grep requires confirmation because it authorizes a regular expression rather than each returned file; filename globbing does not read matching contents.
+Native shell and grep profiles initially ask, and the native user's real saved `always` choices remain authoritative.
+The plugin does not force another shell/grep ask after the user saved an approval and never relaxes an existing native `deny` into an ask.
+Grep initially asks because it authorizes a regular expression rather than each returned file; filename globbing does not read matching contents.
+Content-search permissions are not an OS sandbox or a per-file confidentiality boundary.
 The plugin validates canonical paths, including symlinks and search roots, before native access and checks pending new-file parents.
+Guards anchor to immutable assignment metadata, not the current native location, and reject a moved or malformed binding before execution.
+They use native session data rather than fetching Tandem state for each file operation, so valid local work can continue during a coordination-service outage.
 It blocks model mutation of `.opencode`, native configuration documents, `.git` administration, and the loaded plugin package.
 Its native tool-entrypoint allowlist also blocks worktree removal, which the pinned runtime advertises under the broader `edit` permission instead of its own tool name.
 The parent bootstrap owns installing/loading the approved package; this adapter does not modify a runtime's configuration automatically.
@@ -172,12 +176,20 @@ Load the package directory explicitly in the intended instance's configuration:
 ```
 
 This is a configuration example, not an instruction to change or restart a personal shared service.
-Optional `ctx.options.url` and `ctx.options.tokenFile` support location-scoped loading on an already-running runtime without changing its global service environment or restarting it.
+Optional `ctx.options.url`, `ctx.options.tokenFile`, and `ctx.options.coordinatorDirectory` support explicit location configuration on an already-running runtime without changing its global service environment or restarting it.
 Do not confuse configuration scope with the pinned `/api/location/reload` endpoint: that endpoint rebuilds every loaded location and cancels pending permissions/forms.
 It must not be used as an allegedly targeted reload on a shared runtime without explicit approval for those broader effects.
 An omitted URL uses `TANDEM_URL`; an omitted token-file option uses `TANDEM_TOKEN`.
 An explicitly supplied but unsafe/unreadable token file fails setup instead of falling back to an environment token.
 No auth file or cache is discovered automatically.
+
+The default is **managed-only**, not implicit global coordinator access for every unbound native session.
+For a trusted development hub, explicitly set `coordinatorDirectory` to that hub's canonical absolute existing directory, such as the canonical path corresponding to the user's `~/code/dev`.
+Only an unbound session whose actual native location equals that exact directory receives global hub authority.
+Ancestor configuration inheritance does not grant those rights to descendant project locations, and symlink aliases, relative paths, missing directories, and prefix matching are not accepted.
+An unbound session outside the configured hub is rejected from Tandem tools before the plugin fetches the global snapshot.
+Managed or malformed/stale/foreign metadata never falls back to hub authority, even at the hub location.
+Omit this option when no global conversational hub is desired.
 
 The token file is plain token text with an optional trailing newline, at an explicit absolute path outside the plugin Location and managed workspace.
 It must be a readable regular file owned by the current POSIX user, with no group/other permissions and only one hardlink.
@@ -190,7 +202,7 @@ Do not put either credential into Git or plugin configuration examples.
 The shell hook clears the inherited `TANDEM_TOKEN` value before native non-interactive shell execution.
 This reduces accidental credential exposure; it is not a sandbox or protection against other trusted plugins, arbitrary code execution, PTYs, or access to the service process.
 
-The registered tools are `tandem_create`, `tandem_status`, `tandem_followup`, `tandem_decision`, and `tandem_result`.
+The registered tools are `tandem_create`, `tandem_status`, `tandem_followup`, `tandem_decision`, `tandem_result`, and `tandem_control`.
 Every mutation requires an explicit stable `operationId`, sent as `X-Operation-ID`, matching `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$` with a maximum length of 128 characters.
 On an uncertain transport or response outcome, preserve that ID and the exact payload rather than inventing another ID.
 The client never retries mutations itself.
@@ -200,6 +212,7 @@ Tools use these service routes:
 - `GET /v1/snapshot`
 - `POST /v1/tasks`
 - `POST /v1/tasks/{id}/followup`
+- `POST /v1/tasks/{id}/control`
 - `POST /v1/tasks/{id}/results`
 - `POST /v1/decisions/{id}/reply`
 
@@ -207,16 +220,21 @@ Managed task proposals are parented to their current Tandem task and constrained
 Ordinary workers cannot propose a coordinator role as a privilege escalation.
 The service remains authoritative for project, parent, role, and dependency validation.
 Managed status responses contain only the owned project's projects/tasks/attempts/commands/decisions/results, preserving composite attempt/generation result keys while dropping unknown global extensions.
-Unbound trusted development coordinators may read the complete snapshot.
+Only an explicitly opted-in unbound hub may read the complete snapshot or create unparented root tasks.
 Missing, stale, or conflicting managed native metadata never falls back to unbound coordinator authority.
-Ordinary workers can follow up only their own task and answer only their own non-permission planning forms.
-Managed coordinators can route followups and decisions only within their owned project.
-Unbound sessions cannot use the decision tool; they must first acquire an explicit current project-bound coordination task or use the human-facing service client.
+API authority verifies the native binding before fetching state, then checks its assigned directory against persisted `attempt.workspace.path` and its logical role against the task role.
+Ordinary workers can follow up only their own task and cannot answer any decisions, including their own planning form/question.
+Managed coordinators can route followups and control tasks only within their owned project, and can answer descendant task forms but never their own user questions.
+The explicitly opted-in hub can route decisions and controls across projects; other unbound sessions cannot use these tools.
+Controls send a body such as `{ "action": "pause", "cascade": false }` to the task control route, with an explicit action, cascade boolean, and stable operation ID.
+The allowed actions are `pause`, `resume`, `cancel`, and `retry`.
+Ordinary workers cannot pause, resume, cancel, or retry tasks through the plugin.
 
 **The model cannot approve native permissions merely because the plugin has a service token.**
 Ordinary managed workers cannot answer their own or another worker's permission requests, including rejection replies.
 For every coordinator permission-kind reply, the plugin first awaits `ctx.permission.assert` with action `tandem.permission.reply`, original request details, the exact cloned answer, operation ID, and native tool-call source metadata.
-The permission evaluation hook forces a fresh user ask even under a broad native allow or saved approval; no saved pattern is proposed.
+For this separate permission-forwarding action, the evaluation hook requires a fresh user ask even under a broad native allow or saved approval; no saved pattern is proposed.
+Existing native denial remains denial, and ordinary workers cannot invoke the forwarding gate.
 Nothing is forwarded until that assertion succeeds, and native user rejection propagates unchanged.
 After confirmation, coordinator ownership/project scope and the pending decision are checked again; cancellation or a stale binding cannot reuse an earlier ask to forward a reply.
 This gate is separate from the original runtime request and does not grant accept, merge, publication, or cleanup authority.
@@ -233,7 +251,7 @@ The plugin is a model privilege boundary layered over the single-user administra
 ## Verification
 
 The Go tests use `httptest` to cover exact envelopes, Basic auth, version rejection, ownership collisions, lost-response recovery across fresh adapter instances, prompt read/delivery races, decisions, interrupt/cancellation semantics, malformed responses, and bounded SSE parsing.
-The plugin tests exercise service routes, exact operation-ID constraints, secure owned token fixtures, project filtering across every map, role escalation, generation forwarding, proposal/followup scope, result ownership, and blocking/rejected native confirmations.
+The plugin tests exercise service routes, exact operation-ID constraints, secure owned token fixtures, explicit hub opt-in and descendant denial before snapshot fetch, project filtering across every map, immutable role/directory bindings, controls, self-answer denial, generation forwarding, result ownership, and blocking/rejected native confirmations.
 Executable quality probes verify that representative formatter, ESLint, and TypeScript violations fail while conforming fixtures pass.
 
 ```sh
@@ -260,7 +278,7 @@ The smoke test checks exact runtime version, session creation/recovery, owned ob
 When the optional built plugin path is supplied, it starts without that plugin and hot-loads the package from an owned explicit config using URL/token-file options, without inheriting a service URL or restarting/changing the process environment.
 The all-location reload used for this proof is limited to the test's single disposable runtime, after its earlier pending work has been settled.
 It then runs a harmless native shell command proving the inherited token sentinel was cleared.
-Native permission evaluations then check worker/coordinator read/edit scope, symlink/search-root escapes, denial of native delegation/MCP/admin actions, and preservation of explicit saved permission choices, without executing those tools or commands.
+Native permission evaluations then check worker/coordinator read/edit scope, moved/malformed bindings, symlink/search-root escapes, denial of native delegation/MCP/admin actions, preservation of explicit denial, and preservation of saved shell approval, without executing those tools or commands.
 A disposable prompt-admission fixture calls the compiled production confirmation helper against the real pinned `ctx.permission.assert` API with model execution disabled.
 It verifies that broad native allows and saved approvals still produce a pending user ask with original request/answer metadata, and that admission remains blocked until an explicit native reply.
 The subprocess exits when its private stdin closes; only that owned subprocess is force-terminated if graceful shutdown fails.

@@ -74,7 +74,7 @@ func TestLiveIsolated210(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertFixture := nativeAssertFixture(t, root, plugin)
-		config, err := json.Marshal(map[string]any{"plugins": []any{map[string]any{"package": plugin, "options": map[string]any{"url": service.URL, "tokenFile": tokenFile}}, assertFixture}})
+		config, err := json.Marshal(map[string]any{"plugins": []any{map[string]any{"package": plugin, "options": map[string]any{"url": service.URL, "tokenFile": tokenFile, "coordinatorDirectory": work}}, assertFixture}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -310,6 +310,21 @@ func testLivePermissionPolicy(t *testing.T, ctx context.Context, r *Runtime, wor
 	if err := os.Symlink(outside, filepath.Join(worker.Directory, "escape-fixture")); err != nil {
 		t.Fatal(err)
 	}
+	// A managed session's stored assignment must not be re-rooted by its current
+	// native location, including after a move to a different project/location.
+	moved := worker
+	moved.Reference = r.Reference("moved-native-fixture")
+	moved.AttemptID = "moved-native-fixture"
+	moved.TaskID = "moved-native-fixture"
+	var movedSession envelope[session]
+	if err := r.request(ctx, "POST", "/api/session", map[string]any{"id": moved.Reference, "location": location{outside}, "metadata": owner(moved, ""), "permissions": sessionPermissions(moved)}, &movedSession); err != nil {
+		t.Fatal(err)
+	}
+	waitLivePlugin(t, ctx, r, "/api/plugin?"+url.Values{"location[directory]": []string{outside}}.Encode())
+	_, effect := nativePermission(t, ctx, r, moved, "read", []string{"file-in-other-project"}, nil, nil)
+	if effect != "deny" {
+		t.Fatal("moved native location redefined the assigned directory")
+	}
 	coordinator := worker
 	coordinator.Reference = r.Reference("smoke-coordinator")
 	coordinator.AttemptID = "smoke-coordinator"
@@ -425,7 +440,7 @@ func testLiveNativeAssertion(t *testing.T, ctx context.Context, r *Runtime, dire
 	t.Fatal("native assertion did not create a pending user confirmation")
 }
 
-func testLivePlugin(t *testing.T, ctx context.Context, r *Runtime) {
+func waitLivePlugin(t *testing.T, ctx context.Context, r *Runtime, route string) {
 	t.Helper()
 	type pluginInfo struct {
 		ID     string          `json:"id"`
@@ -437,7 +452,7 @@ func testLivePlugin(t *testing.T, ctx context.Context, r *Runtime) {
 	}
 	active := false
 	for range 100 {
-		plugins, err := getData[[]pluginInfo](r, ctx, "/api/plugin")
+		plugins, err := getData[[]pluginInfo](r, ctx, route)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -461,6 +476,11 @@ func testLivePlugin(t *testing.T, ctx context.Context, r *Runtime) {
 	if !active {
 		t.Fatal("built Tandem plugin did not activate in isolated OpenCode")
 	}
+}
+
+func testLivePlugin(t *testing.T, ctx context.Context, r *Runtime) {
+	t.Helper()
+	waitLivePlugin(t, ctx, r, "/api/plugin")
 	// An actual native shell command checks the hook, without printing the token.
 	var created envelope[struct {
 		ID string `json:"id"`
