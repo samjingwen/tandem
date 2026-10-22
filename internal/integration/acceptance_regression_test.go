@@ -86,7 +86,8 @@ func TestDaemonFixtureLeavesPopulatedSourceUntouched(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "tandem")
 	buildCtx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
-	build := exec.CommandContext(buildCtx, "go", "build", "-o", binary, "./cmd/tandem")
+	// This fixture exercises daemon behavior, not checkout-dependent VCS metadata.
+	build := exec.CommandContext(buildCtx, "go", "build", "-buildvcs=false", "-o", binary, "./cmd/tandem")
 	build.Dir = "../.."
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build production daemon: %v: %s", err, output)
