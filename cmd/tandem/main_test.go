@@ -41,3 +41,11 @@ func TestLocalVersionDoesNotConnectToService(t *testing.T) {
 		t.Fatal("unexpected local version")
 	}
 }
+
+func TestServeRejectsNativeAgentOverride(t *testing.T) {
+	var out, errOut bytes.Buffer
+	err := run(context.Background(), []string{"serve", "--agent", "build"}, &out, &errOut)
+	if err == nil || !strings.Contains(err.Error(), "flag provided but not defined: -agent") {
+		t.Fatalf("unsupported native agent override was not rejected during argument parsing: %v", err)
+	}
+}

@@ -3,6 +3,8 @@
 Deterministic integration tests use the real engine, SQLite, HTTP API, CLI parsing/client, and disposable Git worktrees.
 Only execution is simulated where a controlled fake runtime is named.
 Fake-runtime success is not evidence of model/provider availability.
+Previously recorded native/model evaluations predate the dispatch, capacity, cleanup, graph, and generation corrections and do not verify those revised paths.
+Native/model revalidation remains opt-in using the commands below; review-phase regression checks use disposable fake-runtime and HTTP fixtures only.
 
 ## Required acceptance cases
 

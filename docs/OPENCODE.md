@@ -8,9 +8,9 @@ In particular, do not copy their generic Bearer-authentication or Promise-client
 ## Go integration
 
 `internal/opencode.New(opencode.Options)` returns `(*opencode.Runtime, error)` implementing `core.Runtime` without non-stdlib adapter dependencies.
-The available options are `URL`, `Password`, `ExpectedVersion`, optional `Model *opencode.Model`, and optional native `Agent`.
+The available options are `URL`, `Password`, and optional `Model *opencode.Model`.
 `Model` contains `ID`, `ProviderID`, and optional `Variant`.
-`ExpectedVersion` defaults to `2.1.0`; changing it does not enable an unverified runtime version.
+The adapter enforces the single supported version `2.1.0` and retains the configured native agent default.
 The task's `worker` or `coordinator` role selects its managed capability profile, not a native OpenCode agent name.
 
 Supply the endpoint and password through an approved handoff or explicit configuration.
@@ -22,7 +22,9 @@ URLs cannot contain embedded credentials, query parameters, or fragments.
 Requests use HTTP Basic authentication with username `opencode` and the supplied password.
 `Info` reads the direct `/api/info` response, reports exact compatibility, and derives a stable runtime ID from the normalized endpoint URL, never the password.
 Every runtime operation checks the live version before using the pinned contract.
-No mutation is automatically retried, and redirects are never followed.
+The HTTP adapter never retries mutations, and redirects are never followed.
+The engine may retry a prompt or decision reply only when the adapter proves non-delivery, such as a failed preflight read or deterministic rejection, within the existing failure budget.
+Possibly delivered writes remain uncertain and are never speculatively reposted.
 Ordinary requests have a 30-second deadline; the event stream has no overall client timeout and ends when its caller cancels it.
 
 ### Session ownership and uncertain creation

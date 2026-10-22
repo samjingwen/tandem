@@ -25,6 +25,7 @@ type Fake struct {
 	EnsureFailures       bool
 	PromptCalls          int
 	PromptRequests       int
+	PromptError          error
 	DeferPromptAdmission bool
 	Interrupts           int
 	Disconnected         bool
@@ -93,6 +94,9 @@ func (f *Fake) Prompt(_ context.Context, s core.SessionSpec, id, text string) er
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	f.PromptRequests++
+	if f.PromptError != nil {
+		return f.PromptError
+	}
 	if f.DeferPromptAdmission {
 		return core.ErrUncertain
 	}

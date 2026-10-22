@@ -95,12 +95,11 @@ func (r *Runtime) Ensure(ctx context.Context, spec core.SessionSpec) error {
 	input := struct {
 		ID          string           `json:"id"`
 		Title       string           `json:"title"`
-		Agent       string           `json:"agent,omitempty"`
 		Model       *Model           `json:"model,omitempty"`
 		Location    location         `json:"location"`
 		Metadata    metadata         `json:"metadata"`
 		Permissions []permissionRule `json:"permissions"`
-	}{spec.Reference, spec.Title, r.agent, r.model, location{spec.Directory}, owner(spec, ""), sessionPermissions(spec)}
+	}{spec.Reference, spec.Title, r.model, location{spec.Directory}, owner(spec, ""), sessionPermissions(spec)}
 	var result envelope[session]
 	if err := r.request(ctx, http.MethodPost, "/api/session", input, &result); err != nil {
 		return err
@@ -187,16 +186,19 @@ func verifyAdmission(a admission, spec core.SessionSpec, id, text string, want m
 // OpenCode's same-ID retry with resume=true would wake a parked session.
 func (r *Runtime) Prompt(ctx context.Context, spec core.SessionSpec, commandID, text string) error {
 	if commandID == "" || text == "" {
-		return core.Invalid("prompt requires command ID and text")
+		return &core.NotDelivered{Err: core.Invalid("prompt requires command ID and text")}
 	}
 	if err := r.owned(ctx, spec); err != nil {
-		return err
+		return &core.NotDelivered{Err: err}
 	}
 	id := "msg_" + digest("tandem/prompt/"+commandID)
 	want := owner(spec, commandID)
 	found, err := r.findPrompt(ctx, spec, id, text, want)
-	if err != nil || found {
-		return err
+	if err != nil {
+		return &core.NotDelivered{Err: err}
+	}
+	if found {
+		return nil
 	}
 	input := struct {
 		ID       string   `json:"id"`
@@ -207,6 +209,9 @@ func (r *Runtime) Prompt(ctx context.Context, spec core.SessionSpec, commandID, 
 	}{id, text, want, "steer", true}
 	var result envelope[admission]
 	if err := r.request(ctx, http.MethodPost, sessionPath(spec)+"/prompt", input, &result); err != nil {
+		if KnownRejected(err) {
+			return &core.NotDelivered{Err: err}
+		}
 		return err
 	}
 	if result.Data == nil {
@@ -337,23 +342,17 @@ func (r *Runtime) decisions(ctx context.Context, spec core.SessionSpec) ([]core.
 // An already missing decision is uncertain, never presumed answered or reissued.
 func (r *Runtime) Reply(ctx context.Context, spec core.SessionSpec, decision core.Decision, answer json.RawMessage) error {
 	if decision.TaskID != spec.TaskID || decision.AttemptID != spec.AttemptID || decision.RuntimeRef == "" || (decision.Kind != "permission" && decision.Kind != "form") {
-		return ErrOwnership
+		return &core.NotDelivered{Err: ErrOwnership}
 	}
 	if err := r.owned(ctx, spec); err != nil {
-		if statusIs(err, http.StatusNotFound) {
-			return core.ErrUncertain
-		}
-		return err
+		return &core.NotDelivered{Err: err}
 	}
 	if err := validateAnswer(decision.Kind, answer); err != nil {
-		return err
+		return &core.NotDelivered{Err: err}
 	}
 	pending, err := r.decisions(ctx, spec)
 	if err != nil {
-		if statusIs(err, http.StatusNotFound) {
-			return core.ErrUncertain
-		}
-		return err
+		return &core.NotDelivered{Err: err}
 	}
 	for _, item := range pending {
 		if item.RuntimeRef == decision.RuntimeRef && item.Kind == decision.Kind {
@@ -363,6 +362,9 @@ func (r *Runtime) Reply(ctx context.Context, spec core.SessionSpec, decision cor
 			err := r.request(ctx, http.MethodPost, sessionPath(spec)+"/"+decision.Kind+"/"+url.PathEscape(decision.RuntimeRef)+"/reply", answer, nil)
 			if statusIs(err, http.StatusNotFound) || statusIs(err, http.StatusConflict) {
 				return core.ErrUncertain
+			}
+			if KnownRejected(err) {
+				return &core.NotDelivered{Err: err}
 			}
 			return err
 		}

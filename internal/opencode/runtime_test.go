@@ -58,14 +58,14 @@ func requireError(t *testing.T, err, want error) {
 }
 
 func TestInfoVersionIdentityAndConfiguration(t *testing.T) {
-	for _, version := range []string{Version, "2.1.2", "1.2.0", ""} {
+	for _, version := range []string{"2.1.0", "2.1.2", "1.2.0", ""} {
 		t.Run(version, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { writeJSON(w, map[string]any{"version": version}) }))
 			defer server.Close()
 			r, _ := New(Options{URL: server.URL + "/", Password: "secret"})
 			other, _ := New(Options{URL: server.URL, Password: "rotated"})
 			info, err := r.Info(t.Context())
-			if err != nil || info.Compatible != (version == Version) || info.ID != other.id || strings.Contains(info.ID, "secret") {
+			if err != nil || info.Compatible != (version == "2.1.0") || info.ID != other.id || strings.Contains(info.ID, "secret") {
 				t.Fatalf("info=%+v err=%v", info, err)
 			}
 			if version != Version {
@@ -111,21 +111,20 @@ func TestEnsureExactWireAndRecovery(t *testing.T) {
 			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 				t.Error(err)
 			}
-			if len(body) != 7 || body["parentID"] != nil {
+			if len(body) != 6 || body["parentID"] != nil || body["agent"] != nil {
 				t.Errorf("wrong create wire: %v", body)
 			}
-			var id, agent string
+			var id string
 			var loc location
 			var md metadata
 			var model Model
 			var permissions []permissionRule
 			_ = json.Unmarshal(body["id"], &id)
-			_ = json.Unmarshal(body["agent"], &agent)
 			_ = json.Unmarshal(body["location"], &loc)
 			_ = json.Unmarshal(body["metadata"], &md)
 			_ = json.Unmarshal(body["model"], &model)
 			_ = json.Unmarshal(body["permissions"], &permissions)
-			if id != spec.Reference || agent != "build" || loc.Directory != spec.Directory || md != owner(spec, "") || model.ID != "model" || model.ProviderID != "provider" {
+			if id != spec.Reference || loc.Directory != spec.Directory || md != owner(spec, "") || model.ID != "model" || model.ProviderID != "provider" {
 				t.Error("wrong create payload")
 			}
 			if !slices.Equal(permissions, sessionPermissions(spec)) {
@@ -149,7 +148,6 @@ func TestEnsureExactWireAndRecovery(t *testing.T) {
 			w.WriteHeader(500)
 		}
 	})
-	r.agent = "build"
 	r.model = &Model{ID: "model", ProviderID: "provider"}
 	requireError(t, r.Ensure(t.Context(), spec), core.ErrUncertain)
 	r, err := New(Options{URL: r.base, Password: r.password})
@@ -236,6 +234,10 @@ func TestReplyRejectionClassificationAndRacingMissingDecisions(t *testing.T) {
 			})
 			err := r.Reply(t.Context(), spec, d, json.RawMessage(`{"answer":{"field":"invalid for this native field type"}}`))
 			if code == 400 || code == 401 || code == 403 {
+				var undelivered *core.NotDelivered
+				if !errors.As(err, &undelivered) {
+					t.Fatal("rejected reply left delivery uncertain")
+				}
 				if !KnownRejected(err) {
 					t.Fatalf("deterministic rejection not classified: %v", err)
 				}
@@ -255,6 +257,151 @@ func TestReplyRejectionClassificationAndRacingMissingDecisions(t *testing.T) {
 	}
 	if KnownRejected(errors.Join(core.Invalid("local"), core.ErrUncertain)) {
 		t.Fatal("wrapped uncertainty classified as deterministic")
+	}
+}
+
+func TestPromptPreflightAndRejectedWritesProveNonDelivery(t *testing.T) {
+	spec := testSpec()
+	for _, stage := range []string{"ownership", "message", "inbox", "post-400", "post-401", "post-403"} {
+		t.Run(stage, func(t *testing.T) {
+			fail := true
+			posts := 0
+			r := testRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+				if req.Method == "POST" {
+					posts++
+					if fail {
+						switch stage {
+						case "post-400":
+							w.WriteHeader(400)
+						case "post-401":
+							w.WriteHeader(401)
+						case "post-403":
+							w.WriteHeader(403)
+						default:
+							t.Error("write followed a failed preflight")
+							w.WriteHeader(500)
+						}
+						return
+					}
+					var input struct {
+						ID       string   `json:"id"`
+						Text     string   `json:"text"`
+						Metadata metadata `json:"metadata"`
+					}
+					if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+						t.Error(err)
+					}
+					writeData(w, admission{ID: input.ID, SessionID: spec.Reference, Type: "user", Payload: promptPayload{Text: input.Text, Metadata: input.Metadata}})
+					return
+				}
+				switch {
+				case req.URL.Path == sessionPath(spec):
+					if fail && stage == "ownership" {
+						w.WriteHeader(503)
+						return
+					}
+					writeData(w, ownedSession(spec))
+				case strings.Contains(req.URL.Path, "/message/"):
+					if fail && stage == "message" {
+						w.WriteHeader(503)
+						return
+					}
+					w.WriteHeader(404)
+				case strings.HasSuffix(req.URL.Path, "/inbox"):
+					if fail && stage == "inbox" {
+						w.WriteHeader(503)
+						return
+					}
+					writeData(w, []admission{})
+				default:
+					t.Errorf("unexpected request %s", req.URL)
+				}
+			})
+			err := r.Prompt(t.Context(), spec, "command", "hello")
+			var undelivered *core.NotDelivered
+			if !errors.As(err, &undelivered) {
+				t.Fatalf("proven non-delivery not identified: %v", err)
+			}
+			wantPosts := 0
+			if strings.HasPrefix(stage, "post-") {
+				wantPosts = 1
+			}
+			if posts != wantPosts {
+				t.Fatal("unexpected writes after failure", posts)
+			}
+			fail = false
+			if err := r.Prompt(t.Context(), spec, "command", "hello"); err != nil || posts != wantPosts+1 {
+				t.Fatalf("known undelivered prompt could not retry: %v, writes=%d", err, posts)
+			}
+		})
+	}
+}
+
+func TestReplyPreflightFailureProvesNonDelivery(t *testing.T) {
+	spec := testSpec()
+	for _, stage := range []string{"ownership", "permission", "form"} {
+		t.Run(stage, func(t *testing.T) {
+			fail := true
+			posts := 0
+			r := testRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+				if req.Method == "POST" {
+					posts++
+					w.WriteHeader(204)
+					return
+				}
+				if req.URL.Path == sessionPath(spec) {
+					if fail && stage == "ownership" {
+						w.WriteHeader(503)
+						return
+					}
+					writeData(w, ownedSession(spec))
+					return
+				}
+				if fail && strings.HasSuffix(req.URL.Path, "/"+stage) {
+					w.WriteHeader(503)
+					return
+				}
+				if strings.HasSuffix(req.URL.Path, "/form") {
+					writeData(w, []any{map[string]string{"id": "form_1", "sessionID": spec.Reference}})
+					return
+				}
+				writeData(w, []any{})
+			})
+			d := core.Decision{TaskID: spec.TaskID, AttemptID: spec.AttemptID, RuntimeRef: "form_1", Kind: "form"}
+			answer := json.RawMessage(`{"answer":{"field":"value"}}`)
+			err := r.Reply(t.Context(), spec, d, answer)
+			var undelivered *core.NotDelivered
+			if !errors.As(err, &undelivered) || posts != 0 {
+				t.Fatalf("preflight failure became uncertain or submitted a reply: %v, writes=%d", err, posts)
+			}
+			fail = false
+			if err := r.Reply(t.Context(), spec, d, answer); err != nil || posts != 1 {
+				t.Fatalf("known undelivered reply could not retry: %v, writes=%d", err, posts)
+			}
+		})
+	}
+}
+
+func TestEnsureRetainsConfiguredNativeDefaults(t *testing.T) {
+	spec := testSpec()
+	posts := 0
+	r := testRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == "GET" {
+			w.WriteHeader(404)
+			return
+		}
+		posts++
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if body["agent"] != nil || body["model"] != nil || body["parentID"] != nil {
+			t.Error("session creation overrode native defaults or created a native child")
+		}
+		writeData(w, ownedSession(spec))
+	})
+	if err := r.Ensure(t.Context(), spec); err != nil || posts != 1 {
+		t.Fatalf("native default creation failed: %v, writes=%d", err, posts)
 	}
 }
 

@@ -202,9 +202,25 @@ func create(s *State, input CreateTask, opts Options) (Task, error) {
 		if !ok || d.ProjectID != input.ProjectID {
 			return Task{}, Invalid("dependency must exist in this project")
 		}
-		for ancestor := input.ParentID; ancestor != ""; ancestor = s.Tasks[ancestor].ParentID {
-			if id == ancestor {
-				return Task{}, Invalid("a subtask cannot depend on an ancestor completing")
+	}
+	if input.ParentID != "" {
+		seen := map[string]bool{}
+		queue := append([]string{}, input.Dependencies...)
+		for len(queue) > 0 {
+			id := queue[0]
+			queue = queue[1:]
+			if id == input.ParentID {
+				return Task{}, Invalid("task completion dependencies must be acyclic")
+			}
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			queue = append(queue, s.Tasks[id].Dependencies...)
+			for _, child := range s.Tasks {
+				if child.ParentID == id {
+					queue = append(queue, child.ID)
+				}
 			}
 		}
 	}
@@ -236,6 +252,9 @@ func (e *Engine) Followup(ctx context.Context, op, id string, input Followup) (T
 		}
 		if t.State == "recovering" {
 			return t, ErrUncertain
+		}
+		if cleanupBarrier(s.Attempts[t.AttemptID]) {
+			return t, Invalid("cleanup prevents continuation of this attempt")
 		}
 		t.Generation++
 		t.UpdatedAt = now()
@@ -334,6 +353,9 @@ func (e *Engine) Control(ctx context.Context, op, id string, input Control) (Tas
 				}
 				continue
 			}
+			if cleanupBarrier(s.Attempts[v.AttemptID]) {
+				return t, Invalid("cleanup prevents controls for this attempt")
+			}
 			v.Generation++
 			v.UpdatedAt = now()
 			v.Error = ""
@@ -359,7 +381,7 @@ func (e *Engine) Control(ctx context.Context, op, id string, input Control) (Tas
 				} else {
 					v.State = "recovering"
 					a := s.Attempts[v.AttemptID]
-					if a.Phase == "executing" || a.Phase == "session_bound" {
+					if a.Phase == "executing" || a.Phase == "session_bound" || a.Phase == "failed" {
 						c := Command{ID: ID("cmd_"), TaskID: v.ID, AttemptID: a.ID, Kind: "prompt", Text: fmt.Sprintf("Resume task %s at generation %d. Reconcile prior artifacts and continue the existing instructions; do not start replacement workers.", v.ID, v.Generation), Status: "pending", Generation: v.Generation, Sequence: s.Revision + 1}
 						s.Commands[c.ID] = c
 					}
@@ -404,6 +426,9 @@ func (e *Engine) Reply(ctx context.Context, op, id string, input ReplyDecision) 
 		if t.AttemptID != d.AttemptID || t.Desired != "active" {
 			return d, Invalid("decision is not owned by an active task attempt")
 		}
+		if cleanupBarrier(s.Attempts[d.AttemptID]) {
+			return d, Invalid("cleanup prevents replies for this attempt")
+		}
 		if d.Status != "pending" {
 			return d, &Error{Code: "conflict", Message: "decision is already answered or being reconciled"}
 		}
@@ -444,15 +469,15 @@ func (e *Engine) SubmitResult(ctx context.Context, op, id string, input SubmitRe
 		if strings.TrimSpace(input.Summary) == "" || len(input.Evidence) == 0 {
 			return Result{}, Invalid("summary and explicit evidence are required; idleness is not evidence")
 		}
-		if input.Generation < 1 {
-			return Result{}, Invalid("result must identify the instruction generation it verifies")
+		if input.Generation < 1 || input.Generation > a.Generation {
+			return Result{}, Invalid("result must identify an issued instruction generation for this attempt")
 		}
 		for _, ev := range input.Evidence {
 			if ev.Name == "" || ev.Reference == "" {
 				return Result{}, Invalid("evidence needs a name and reference")
 			}
 		}
-		r := Result{TaskID: id, AttemptID: a.ID, Generation: input.Generation, Summary: input.Summary, Evidence: input.Evidence, Late: t.Desired != "active" || t.AttemptID != a.ID || t.Generation != input.Generation || t.State == "completed", CreatedAt: now()}
+		r := Result{TaskID: id, AttemptID: a.ID, Generation: input.Generation, Summary: input.Summary, Evidence: input.Evidence, Late: t.Desired != "active" || t.AttemptID != a.ID || t.Generation != input.Generation || t.State == "completed" || cleanupBarrier(a), CreatedAt: now()}
 		key := fmt.Sprintf("%s/%d", a.ID, input.Generation)
 		if _, exists := s.Results[key]; exists {
 			return Result{}, &Error{Code: "conflict", Message: "this attempt generation already has a result; use its original operation ID to retry"}
@@ -569,8 +594,8 @@ func (e *Engine) Cleanup(ctx context.Context, op, id string) (Workspace, error) 
 	if a.Phase == "cleaned" {
 		return a.Workspace, Invalid("workspace is already cleaned; retry its original operation ID for its receipt")
 	}
-	if t.State != "completed" && t.State != "cancelled" && t.State != "failed" {
-		return a.Workspace, Invalid("task must be terminal before cleanup")
+	if !cleanupEligible(&s, a) {
+		return a.Workspace, Invalid("task must be terminal without unsettled dispatch before cleanup")
 	}
 	o, err := e.runtime.Inspect(ctx, spec(s, a))
 	if err != nil {
@@ -588,6 +613,9 @@ func (e *Engine) Cleanup(ctx context.Context, op, id string) (Workspace, error) 
 	}
 	return mutate(ctx, e, op, "workspace.cleanup/"+id, struct{}{}, func(s *State) (Workspace, error) {
 		v := s.Attempts[id]
+		if !cleanupEligible(s, v) {
+			return v.Workspace, Invalid("task must be terminal without unsettled dispatch before cleanup")
+		}
 		v.Phase = "cleanup_pending"
 		s.Attempts[id] = v
 		c := Command{ID: "cleanup_" + id, TaskID: t.ID, AttemptID: id, Kind: "cleanup", Status: "pending", Generation: v.Generation, Sequence: s.Revision + 1}
@@ -667,7 +695,7 @@ func (e *Engine) Tick(ctx context.Context) error {
 	for id, a := range s.Attempts {
 		t := s.Tasks[a.TaskID]
 		terminal := t.State == "completed" || t.State == "failed"
-		if a.Phase == "cleanup_pending" || (t.AttemptID == id && a.Phase != "cleaned" && !(terminal && (a.Observed == "idle" || a.Observed == "failed"))) {
+		if a.Phase == "cleanup_pending" || (t.AttemptID == id && a.Phase != "cleaned" && !(terminal && (a.Observed == "idle" || a.Observed == "failed") && !pendingPrompt(&s, id))) {
 			ids = append(ids, id)
 		}
 	}
@@ -766,7 +794,7 @@ func (e *Engine) mark(ctx context.Context, id, state string, err error) error {
 		}
 		s.Attempts[id] = a
 		t := s.Tasks[a.TaskID]
-		if (state == "unknown" || state == "disconnected" || errors.Is(err, ErrUncertain)) && t.State != "completed" {
+		if (state == "unknown" || state == "disconnected" || errors.Is(err, ErrUncertain)) && t.State != "completed" && !cleanupBarrier(a) {
 			if t.State != "recovering" || t.Error != a.Error {
 				t.UpdatedAt = now()
 			}
@@ -791,6 +819,9 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 	t := s.Tasks[a.TaskID]
 	p := s.Projects[t.ProjectID]
 	if a.Phase == "cleanup_pending" {
+		if !cleanupEligible(&s, a) {
+			return Invalid("cleanup requires a terminal task without unsettled dispatch")
+		}
 		observation, x := e.runtime.Inspect(ctx, spec(s, a))
 		if x == nil && (!observation.Exists || !observation.Owned || (observation.State != "idle" && observation.State != "failed")) {
 			x = Invalid("cleanup waits for confirmed runtime ownership and quiescence")
@@ -1042,6 +1073,9 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			return nil
 		}
 		if d.AttemptID == id && d.Status == "reply_pending" {
+			if a.FailureCount >= 8 || ((o.State == "idle" || o.State == "failed") && !e.capacityAvailable(&s, a)) {
+				return nil
+			}
 			if err = e.store.Update(ctx, func(s *State) error {
 				v := s.Decisions[d.ID]
 				v.Status = "uncertain"
@@ -1051,6 +1085,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				return err
 			}
 			if err = e.runtime.Reply(ctx, sp, d, d.Reply); err != nil {
+				var undelivered *NotDelivered
 				var rejected *Error
 				if errors.As(err, &rejected) && rejected.Code == "invalid_request" {
 					return e.store.Update(ctx, func(s *State) error {
@@ -1066,9 +1101,31 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 						return nil
 					})
 				}
+				if errors.As(err, &undelivered) {
+					if x := e.store.Update(ctx, func(s *State) error {
+						v := s.Decisions[d.ID]
+						v.Status = "reply_pending"
+						s.Decisions[d.ID] = v
+						return nil
+					}); x != nil {
+						return x
+					}
+				}
 				return e.mark(ctx, id, "unknown", err)
 			}
-			if err = e.store.Update(ctx, func(s *State) error { v := s.Decisions[d.ID]; v.Status = "answered"; s.Decisions[d.ID] = v; return nil }); err != nil {
+			if err = e.store.Update(ctx, func(s *State) error {
+				v := s.Decisions[d.ID]
+				v.Status = "answered"
+				s.Decisions[d.ID] = v
+				a := s.Attempts[id]
+				a.Phase = "executing"
+				a.Observed = "running"
+				a.FailureCount = 0
+				a.Error = ""
+				s.Attempts[id] = a
+				refreshTaskState(s, a.TaskID, "running")
+				return nil
+			}); err != nil {
 				return err
 			}
 		}
@@ -1085,9 +1142,6 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 		}
 		return commands[i].Sequence < commands[j].Sequence
 	})
-	if len(commands) > 0 && o.State == "idle" && !e.capacityAvailable(&s, a) {
-		return nil
-	}
 	for _, c := range commands {
 		if c.Kind != "prompt" {
 			continue
@@ -1100,6 +1154,9 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				err = reconciler.ReconcilePrompt(ctx, sp, c.ID, c.Text)
 			}
 		} else {
+			if (o.State == "idle" || o.State == "failed") && !e.capacityAvailable(&s, a) {
+				return nil
+			}
 			if s.Attempts[id].FailureCount >= 8 {
 				return nil
 			}
@@ -1109,6 +1166,12 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			err = e.runtime.Prompt(ctx, sp, c.ID, c.Text)
 		}
 		if err != nil {
+			var undelivered *NotDelivered
+			if errors.As(err, &undelivered) {
+				if x := e.store.Update(ctx, func(s *State) error { v := s.Commands[c.ID]; v.Status = "pending"; s.Commands[c.ID] = v; return nil }); x != nil {
+					return x
+				}
+			}
 			observed := "unknown"
 			if c.Status == "sending" && errors.Is(err, ErrUncertain) {
 				observed = o.State

@@ -38,19 +38,15 @@ type Model struct {
 type Options struct {
 	URL string
 	// Password defaults to the explicitly supplied OPENCODE_PASSWORD environment variable.
-	Password        string
-	ExpectedVersion string
-	Model           *Model
-	Agent           string
+	Password string
+	Model    *Model
 }
 
 type Runtime struct {
 	base     string
 	password string
-	expected string
 	id       string
 	model    *Model
-	agent    string
 	client   *http.Client
 }
 
@@ -64,9 +60,6 @@ func New(options Options) (*Runtime, error) {
 	u.Host = strings.ToLower(u.Host)
 	u.Path = strings.TrimRight(u.Path, "/")
 	base := u.String()
-	if options.ExpectedVersion == "" {
-		options.ExpectedVersion = Version
-	}
 	if options.Password == "" {
 		options.Password = os.Getenv("OPENCODE_PASSWORD")
 	}
@@ -81,10 +74,8 @@ func New(options Options) (*Runtime, error) {
 	return &Runtime{
 		base:     base,
 		password: options.Password,
-		expected: options.ExpectedVersion,
 		id:       "opencode_" + digest(base),
 		model:    model,
-		agent:    options.Agent,
 		client:   &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
 	}, nil
 }
@@ -103,12 +94,12 @@ func (r *Runtime) Info(ctx context.Context) (core.RuntimeInfo, error) {
 		Version string `json:"version"`
 	}
 	err := r.request(ctx, http.MethodGet, "/api/info", nil, &response)
-	info := core.RuntimeInfo{ID: r.id, Version: response.Version, Compatible: err == nil && response.Version == r.expected && response.Version == Version}
+	info := core.RuntimeInfo{ID: r.id, Version: response.Version, Compatible: err == nil && response.Version == Version}
 	if err != nil {
 		return info, err
 	}
 	if !info.Compatible {
-		info.Detail = "requires OpenCode " + Version + " and the configured exact expected version"
+		info.Detail = "requires OpenCode " + Version
 	}
 	return info, nil
 }

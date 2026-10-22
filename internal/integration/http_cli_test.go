@@ -27,24 +27,29 @@ import (
 )
 
 type fixture struct {
-	ctx       context.Context
-	dir       string
-	repo      string
-	store     *store.SQLite
-	engine    *core.Engine
-	runtime   *testruntime.Fake
-	workspace workspace.Git
-	server    *httptest.Server
-	clients   [2]*client.Client
-	runners   [2]cli.Runner
-	project   core.Project
+	ctx         context.Context
+	dir         string
+	repo        string
+	store       *store.SQLite
+	engine      *core.Engine
+	runtime     *testruntime.Fake
+	workspace   workspace.Git
+	server      *httptest.Server
+	clients     [2]*client.Client
+	runners     [2]cli.Runner
+	project     core.Project
+	concurrency int
 }
 
-func setup(t *testing.T) *fixture {
+func setup(t *testing.T, concurrency ...int) *fixture {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
 	f := &fixture{ctx: ctx, dir: t.TempDir(), runtime: testruntime.New()}
+	f.concurrency = 2
+	if len(concurrency) > 0 {
+		f.concurrency = concurrency[0]
+	}
 	f.repo = filepath.Join(f.dir, "repository")
 	if err := os.Mkdir(f.repo, 0700); err != nil {
 		t.Fatal(err)
@@ -81,7 +86,7 @@ func (f *fixture) open(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.store = s
-	f.engine = core.New(s, f.runtime, f.workspace, core.Options{RuntimeID: "fake", RegisterProject: workspace.Register, Concurrency: 2})
+	f.engine = core.New(s, f.runtime, f.workspace, core.Options{RuntimeID: "fake", RegisterProject: workspace.Register, Concurrency: f.concurrency})
 	f.server = httptest.NewServer(api.New(f.engine, api.Options{Token: "integration-test-token"}))
 	for i := range f.clients {
 		transport := http.DefaultTransport.(*http.Transport).Clone()

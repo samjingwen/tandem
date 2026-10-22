@@ -109,13 +109,6 @@ type Operation struct {
 	CreatedAt   time.Time       `json:"createdAt"`
 }
 
-type Event struct {
-	ID     int64     `json:"id"`
-	Type   string    `json:"type"`
-	TaskID string    `json:"taskId,omitempty"`
-	At     time.Time `json:"at"`
-}
-
 type State struct {
 	InstanceID string               `json:"instanceId"`
 	Revision   int64                `json:"revision"`
@@ -256,5 +249,10 @@ func Invalid(message string) error  { return &Error{Code: "invalid_request", Mes
 func NotFound(message string) error { return &Error{Code: "not_found", Message: message} }
 
 var ErrUncertain = &Error{Code: "uncertain", Message: "external outcome cannot be established; reconciliation required"}
+
+type NotDelivered struct{ Err error }
+
+func (e *NotDelivered) Error() string { return e.Err.Error() }
+func (e *NotDelivered) Unwrap() error { return e.Err }
 
 var ErrWorkspaceMissing = &Error{Code: "workspace_missing", Message: "owned workspace directory is absent"}

@@ -23,7 +23,36 @@ func consumesSlot(s *State, a Attempt) bool {
 	if uncertainDispatch(s, a.ID) {
 		return true
 	}
-	return a.Phase != "failed" && a.Observed != "idle"
+	return a.Observed != "failed" && a.Observed != "idle"
+}
+
+func pendingPrompt(s *State, attemptID string) bool {
+	for _, c := range s.Commands {
+		if c.AttemptID == attemptID && c.Kind == "prompt" && (c.Status == "pending" || c.Status == "sending" || c.Status == "parked") {
+			return true
+		}
+	}
+	return false
+}
+
+func cleanupBarrier(a Attempt) bool {
+	return a.Phase == "cleanup_pending" || a.Phase == "cleaned"
+}
+
+func cleanupEligible(s *State, a Attempt) bool {
+	t := s.Tasks[a.TaskID]
+	if t.State != "completed" && t.State != "cancelled" && t.State != "failed" {
+		return false
+	}
+	if pendingPrompt(s, a.ID) || uncertainDispatch(s, a.ID) {
+		return false
+	}
+	for _, d := range s.Decisions {
+		if d.AttemptID == a.ID && d.Status == "reply_pending" {
+			return false
+		}
+	}
+	return true
 }
 
 func (e *Engine) capacityAvailable(s *State, a Attempt) bool {
@@ -61,7 +90,7 @@ func refreshTaskState(s *State, taskID, observed string) {
 	case uncertainDispatch(s, a.ID):
 		state = "recovering"
 		message = a.Error
-	case observed == "failed":
+	case observed == "failed" && !pendingPrompt(s, a.ID):
 		if pendingDecision {
 			state = "waiting_for_input"
 			break
