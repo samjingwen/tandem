@@ -1,0 +1,59 @@
+COMMAND: ['go', 'test', '-race', './internal/integration', '-run', '^Test(CancellationPreservesUnreconciledInbox|FailedNativeControlSettlement|PausedAdmissionRetainsStartedChild|ControlRequiresOwnedQuiescentReadback|ReadCursorBindingAndRecovery|ManagedReceiptProtocol)$', '-count=1', '-v', '-timeout', '6m']
+=== RUN   TestManagedReceiptProtocol
+--- PASS: TestManagedReceiptProtocol (231.56s)
+=== RUN   TestCancellationPreservesUnreconciledInbox
+=== RUN   TestCancellationPreservesUnreconciledInbox/idle/initial=false
+=== RUN   TestCancellationPreservesUnreconciledInbox/idle/initial=true
+=== RUN   TestCancellationPreservesUnreconciledInbox/failed/initial=false
+=== RUN   TestCancellationPreservesUnreconciledInbox/failed/initial=true
+--- PASS: TestCancellationPreservesUnreconciledInbox (2.80s)
+    --- PASS: TestCancellationPreservesUnreconciledInbox/idle/initial=false (0.75s)
+    --- PASS: TestCancellationPreservesUnreconciledInbox/idle/initial=true (0.64s)
+    --- PASS: TestCancellationPreservesUnreconciledInbox/failed/initial=false (0.72s)
+    --- PASS: TestCancellationPreservesUnreconciledInbox/failed/initial=true (0.70s)
+=== RUN   TestFailedNativeControlSettlement
+=== RUN   TestFailedNativeControlSettlement/pause/cascade=false/during=false
+=== RUN   TestFailedNativeControlSettlement/pause/cascade=false/during=true
+=== RUN   TestFailedNativeControlSettlement/pause/cascade=true/during=false
+=== RUN   TestFailedNativeControlSettlement/pause/cascade=true/during=true
+=== RUN   TestFailedNativeControlSettlement/cancel/cascade=false/during=false
+=== RUN   TestFailedNativeControlSettlement/cancel/cascade=false/during=true
+=== RUN   TestFailedNativeControlSettlement/cancel/cascade=true/during=false
+=== RUN   TestFailedNativeControlSettlement/cancel/cascade=true/during=true
+--- PASS: TestFailedNativeControlSettlement (6.03s)
+    --- PASS: TestFailedNativeControlSettlement/pause/cascade=false/during=false (0.57s)
+    --- PASS: TestFailedNativeControlSettlement/pause/cascade=false/during=true (0.56s)
+    --- PASS: TestFailedNativeControlSettlement/pause/cascade=true/during=false (0.94s)
+    --- PASS: TestFailedNativeControlSettlement/pause/cascade=true/during=true (0.91s)
+    --- PASS: TestFailedNativeControlSettlement/cancel/cascade=false/during=false (0.52s)
+    --- PASS: TestFailedNativeControlSettlement/cancel/cascade=false/during=true (0.55s)
+    --- PASS: TestFailedNativeControlSettlement/cancel/cascade=true/during=false (1.02s)
+    --- PASS: TestFailedNativeControlSettlement/cancel/cascade=true/during=true (0.96s)
+=== RUN   TestPausedAdmissionRetainsStartedChild
+=== RUN   TestPausedAdmissionRetainsStartedChild/pause/1
+=== RUN   TestPausedAdmissionRetainsStartedChild/pause/2
+=== RUN   TestPausedAdmissionRetainsStartedChild/cancel/1
+=== RUN   TestPausedAdmissionRetainsStartedChild/cancel/2
+--- PASS: TestPausedAdmissionRetainsStartedChild (5.63s)
+    --- PASS: TestPausedAdmissionRetainsStartedChild/pause/1 (1.14s)
+    --- PASS: TestPausedAdmissionRetainsStartedChild/pause/2 (1.55s)
+    --- PASS: TestPausedAdmissionRetainsStartedChild/cancel/1 (1.24s)
+    --- PASS: TestPausedAdmissionRetainsStartedChild/cancel/2 (1.70s)
+=== RUN   TestControlRequiresOwnedQuiescentReadback
+=== RUN   TestControlRequiresOwnedQuiescentReadback/pause/missing
+=== RUN   TestControlRequiresOwnedQuiescentReadback/pause/foreign
+=== RUN   TestControlRequiresOwnedQuiescentReadback/pause/running
+=== RUN   TestControlRequiresOwnedQuiescentReadback/cancel/missing
+=== RUN   TestControlRequiresOwnedQuiescentReadback/cancel/foreign
+=== RUN   TestControlRequiresOwnedQuiescentReadback/cancel/running
+--- PASS: TestControlRequiresOwnedQuiescentReadback (2.89s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/pause/missing (0.51s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/pause/foreign (0.44s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/pause/running (0.51s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/cancel/missing (0.45s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/cancel/foreign (0.49s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/cancel/running (0.49s)
+=== RUN   TestReadCursorBindingAndRecovery
+--- PASS: TestReadCursorBindingAndRecovery (0.41s)
+PASS
+ok  	github.com/samjingwen/tandem/internal/integration	251.085s
