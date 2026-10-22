@@ -8,6 +8,9 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    # Cleanup must inspect every same-user cwd and fail closed on unreadable
+    # processes. Keep unrelated hosted-runner processes outside its /proc view.
+    container: buildpack-deps:bookworm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
