@@ -1021,6 +1021,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 					v.Status = "admitted"
 					s.Commands[key] = v
 					a := s.Attempts[id]
+					a.Phase = "executing"
 					a.FailureCount = 0
 					s.Attempts[id] = a
 					return nil
@@ -1031,11 +1032,11 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			}
 		}
 		cancelPending, canCancel := e.runtime.(PendingCanceller)
-		if o.State != "idle" && o.State != "failed" || (t.Desired == "cancelled" && canCancel && t.State != t.Desired) {
+		if !controlQuiescent(o) || (t.Desired == "cancelled" && canCancel && t.State != t.Desired) {
 			if a.FailureCount >= 8 {
 				return nil
 			}
-			if t.Desired == "cancelled" && canCancel {
+			if t.Desired == "cancelled" && canCancel && !uncertainAdmission {
 				err = cancelPending.CancelPending(ctx, sp)
 			} else {
 				err = e.runtime.Interrupt(ctx, sp)
@@ -1047,7 +1048,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			if err != nil {
 				return e.mark(ctx, id, "disconnected", err)
 			}
-			if o.State != "idle" {
+			if !controlQuiescent(o) {
 				return e.mark(ctx, id, "unknown", ErrUncertain)
 			}
 		}
@@ -1062,7 +1063,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			}
 			s.Tasks[v.ID] = v
 			a := s.Attempts[id]
-			a.Observed = "idle"
+			a.Observed = o.State
 			s.Attempts[id] = a
 			for key, c := range s.Commands {
 				if c.AttemptID == id && (c.Status == "pending" || c.Status == "parked") {

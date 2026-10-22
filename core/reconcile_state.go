@@ -2,6 +2,10 @@ package core
 
 import "fmt"
 
+func controlQuiescent(o Observation) bool {
+	return o.Exists && o.Owned && (o.State == "idle" || o.State == "failed")
+}
+
 func dispatchBudgetError(s *State, a Attempt) string {
 	if a.FailureCount < 8 || s.Tasks[a.TaskID].Desired == "cancelled" {
 		return ""

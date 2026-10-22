@@ -129,7 +129,9 @@ func (f *Fake) Interrupt(_ context.Context, s core.SessionSpec) error {
 	if v == nil {
 		return core.ErrUncertain
 	}
-	v.State = "idle"
+	if v.State != "failed" {
+		v.State = "idle"
+	}
 	f.Interrupts++
 	return nil
 }
