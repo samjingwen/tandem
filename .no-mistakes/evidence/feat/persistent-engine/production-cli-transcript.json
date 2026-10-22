@@ -1,0 +1,152 @@
+{
+  "runtime": "controlled HTTP fixture, not native OpenCode or model execution",
+  "checks": [
+    {
+      "name": "Concurrent CLI processes return one task and execution",
+      "taskId": "tsk_2d2cc0e97904093658edaf41a9b1aaff",
+      "attemptId": "run_229c4cf75fe211d300aa9f54272c4842",
+      "sessionRef": "ses_8cfdd45fc1c216254f56976403ed651b",
+      "runtimeCounts": {
+        "create": 1,
+        "prompt": 1,
+        "interrupt": 0
+      },
+      "cli": "ID  PROJECTID  STATE  DESIRED  TITLE\ntsk_2d2cc0e97904093658edaf41a9b1aaff  prj_7991171b099dbdc381f1b227e53d3971  running  active  Same task across clients\n"
+    },
+    {
+      "name": "Restart and second client continue the retained worker",
+      "instanceId": "2f3fcd60bd4a3899cbc0661143ff3f2a",
+      "taskId": "tsk_2d2cc0e97904093658edaf41a9b1aaff",
+      "attemptId": "run_229c4cf75fe211d300aa9f54272c4842",
+      "sessionRef": "ses_8cfdd45fc1c216254f56976403ed651b",
+      "runtimeCounts": {
+        "create": 1,
+        "prompt": 2,
+        "interrupt": 0
+      },
+      "retainedFile": "Client exits and daemon restart must retain this file."
+    },
+    {
+      "name": "Second production daemon is refused",
+      "exitCode": 1,
+      "stderr": "tandem: state store already has an active scheduler owner; connect as a client instead\n"
+    },
+    {
+      "name": "Two modifying workers receive distinct owned checkouts",
+      "owners": [
+        "run_229c4cf75fe211d300aa9f54272c4842",
+        "run_f746347617e7c2b8a8f0a6974674557d"
+      ],
+      "branches": [
+        "tandem/run_229c4cf75fe211d300aa9f54272c4842",
+        "tandem/run_f746347617e7c2b8a8f0a6974674557d"
+      ],
+      "runtimeCounts": {
+        "create": 2,
+        "prompt": 3,
+        "interrupt": 0
+      }
+    },
+    {
+      "name": "Dropped native event stream reconnects and converges without duplicate execution",
+      "eventConnectionsBefore": 2,
+      "eventConnectionsAfter": 3,
+      "observedTask": {
+        "id": "tsk_1df0d62544aabaa28ef6ea2ed27e01c8",
+        "projectId": "prj_7991171b099dbdc381f1b227e53d3971",
+        "dependencies": [],
+        "title": "Independent modifying worker",
+        "instructions": "Use isolated checkout.",
+        "role": "worker",
+        "desired": "active",
+        "state": "failed",
+        "generation": 1,
+        "attemptId": "run_f746347617e7c2b8a8f0a6974674557d",
+        "error": "runtime execution failed",
+        "createdAt": "2026-10-22T09:09:02.347065Z",
+        "updatedAt": "2026-10-22T09:09:03.850246Z"
+      },
+      "runtimeCounts": {
+        "create": 2,
+        "prompt": 3,
+        "interrupt": 0
+      }
+    },
+    {
+      "name": "CLI completely traverses 65 valid Unicode 128-KiB tasks",
+      "returnedRecords": 65,
+      "originalBytesPerTask": 131072,
+      "sha256PerTask": "0e71ee0325d003fecd76aff863f7529c4a3d10601a46f5813d886098ace48c71",
+      "manifest": {
+        "instanceId": "2f3fcd60bd4a3899cbc0661143ff3f2a",
+        "revision": 87,
+        "collections": {
+          "attempts": 2,
+          "commands": 4,
+          "decisions": 0,
+          "projects": 1,
+          "results": 0,
+          "tasks": 67
+        },
+        "maxPageBytes": 262144,
+        "contentBytes": 32768,
+        "maxRecords": 64
+      }
+    },
+    {
+      "name": "Native idleness is not task completion",
+      "task": {
+        "id": "tsk_2d2cc0e97904093658edaf41a9b1aaff",
+        "projectId": "prj_7991171b099dbdc381f1b227e53d3971",
+        "dependencies": [],
+        "title": "Same task across clients",
+        "instructions": "Retain worker identity.\n\nFollow-up:\nContinue in the existing session.",
+        "role": "worker",
+        "desired": "active",
+        "state": "running",
+        "generation": 2,
+        "attemptId": "run_229c4cf75fe211d300aa9f54272c4842",
+        "createdAt": "2026-10-22T09:08:59.794622Z",
+        "updatedAt": "2026-10-22T09:09:01.384938Z"
+      }
+    },
+    {
+      "name": "Explicit evidence and review acceptance complete the same task",
+      "result": {
+        "taskId": "tsk_2d2cc0e97904093658edaf41a9b1aaff",
+        "attemptId": "run_229c4cf75fe211d300aa9f54272c4842",
+        "generation": 2,
+        "summary": "Verified fixture artifact",
+        "evidence": [
+          {
+            "name": "independent fixture assertion",
+            "reference": "fixture://retained-file",
+            "passed": true
+          }
+        ],
+        "accepted": false,
+        "late": false,
+        "createdAt": "2026-10-22T09:09:24.395275Z"
+      },
+      "acceptedTask": {
+        "id": "tsk_2d2cc0e97904093658edaf41a9b1aaff",
+        "projectId": "prj_7991171b099dbdc381f1b227e53d3971",
+        "dependencies": [],
+        "title": "Same task across clients",
+        "instructions": "Retain worker identity.\n\nFollow-up:\nContinue in the existing session.",
+        "role": "worker",
+        "desired": "active",
+        "state": "completed",
+        "generation": 2,
+        "attemptId": "run_229c4cf75fe211d300aa9f54272c4842",
+        "createdAt": "2026-10-22T09:08:59.794622Z",
+        "updatedAt": "2026-10-22T09:09:27.463168Z"
+      }
+    },
+    {
+      "name": "Final readable CLI inventory",
+      "output": "ID  PROJECTID  STATE  DESIRED  TITLE\ntsk_01bcef5e2db1d23009bff0e626be56d3  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 40\ntsk_0724075a7be50b84d349eabf819a8f8d  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 39\ntsk_0cef6132975bbdad0f486580ab17b529  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 57\ntsk_11324456fec9dfce89ac6250c2a2a60a  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 54\ntsk_1324f24d9b4d8f07787b7fc5a0cc463b  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 33\ntsk_1c5ce43a32a83b7ca3795fcb86d2f38d  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 8\ntsk_1df0d62544aabaa28ef6ea2ed27e01c8  prj_7991171b099dbdc381f1b227e53d3971  running  active  Independent modifying worker\ntsk_1e9b16dcd3a9f6769f77413ef1234e88  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 7\ntsk_243e12a86924470186fbe0724a1147ac  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 35\ntsk_2d2cc0e97904093658edaf41a9b1aaff  prj_7991171b099dbdc381f1b227e53d3971  completed  active  Same task across clients\ntsk_38cff0b6906d39e829822cac4c9fc413  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 6\ntsk_3c868f09f5650cd79e632f36fb020931  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 41\ntsk_3d930bc24f873d75af0db3eb1a3be77e  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 29\ntsk_428396a0d681e617393c1e837132f876  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 46\ntsk_44dc71021574789d23cfb3e06041a2bf  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 2\ntsk_472f4349221cb7dabb2058e8ce5ace49  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 62\ntsk_49eb792903cdd0edf469e8e723f08eed  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 37\ntsk_4e37695a1a9a7b12f750d8b912ecfc5f  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 20\ntsk_510516ba980ec602496c5081c61229a6  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 42\ntsk_53aa16f34c2ab168c373928f42fca5e5  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 25\ntsk_54f6678b0a947f72d3a228700f1723ca  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 9\ntsk_58c675181cfb56063cb5aca838d61ab3  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 13\ntsk_59f9fd298f0a31db526cffc2bdb76a2e  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 58\ntsk_5b2abb053b65334f594441cd41873688  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 26\ntsk_5e62932d5e98bc747be2a297032fe530  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 43\ntsk_5fc70898ba7e68af7769fe5fc82c23c6  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 19\ntsk_60ce9fc83085cdc3f2b826396d9f074e  prj_7991171b099dbdc381f1b227e53d3971  running  active  Large task 0\ntsk_691ba6f5b6af5283630c3e60202847da  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 51\ntsk_6d61feeccfaaf37d3a1a1fd0ad603db6  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 16\ntsk_77e2ac87cc2e833157fb278a239d303a  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 48\ntsk_799730aa6aad7c1ad469ced15e393cac  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 49\ntsk_808cbbf9de32e4aecba8ad0cb19a9243  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 18\ntsk_8adfecf39533a7da721cc88d70452be8  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 10\ntsk_8c35004fb68c4bc616d5126a690bf370  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 47\ntsk_8fa2f64dedbd2efb17e7880cc8d3aeb6  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 3\ntsk_94bd6304414b9f61f3cdd6b4916841e0  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 12\ntsk_98bd1be28110c3ebc2c266f389868b64  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 23\ntsk_a7199853610c35eb2c5cb5f64aa14b90  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 11\ntsk_aedcc1add6ebf62513ff06c569d8295e  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 14\ntsk_af780108f78140d66d56f5dee85fdf8c  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 24\ntsk_b3ddcffa44cc773b4cb4e412fa4ca28b  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 21\ntsk_b414fd23a69259ee5f9e0f60c791880f  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 61\ntsk_b5fa9be21b69558e6937adc28dec4c22  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 63\ntsk_b5fd72df34901d2753ccfe8eedc1c214  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 28\ntsk_b63c87b2e86b5f1e9cc82cdfbd4b35c7  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 59\ntsk_b98dece9ec85ca451345e398ce1f4dce  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 50\ntsk_bf783a58cd3ad3a733b85fd2caa4245f  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 36\ntsk_c221c4991386fab09cd813eff752df35  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 15\ntsk_c5d5bc78a15a096ef789113b76957299  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 44\ntsk_c8065956b6fe9ebe19fe4ef0b27b6c48  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 1\ntsk_c9c58c7efdfca85774769ff738518c05  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 5\ntsk_cb3493fc0b2d79ed4ee6a6b008064f32  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 52\ntsk_cb6d5ca51b76b9257630a3ba3ad1a544  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 45\ntsk_d31a9935103f4f631b9efe3f02737c76  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 53\ntsk_d3636b20bb73b112f9781d6f087108ec  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 4\ntsk_d41abc5e088e125155df7204e75120b6  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 55\ntsk_d552de37a99825ebb6b914986583943f  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 34\ntsk_d8bd6383a049d113f899d2b4445697b5  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 32\ntsk_d9fefbe232e3609039e4bcd7234c370e  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 27\ntsk_e1b69697b4495e883e09a956e55bf909  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 30\ntsk_f30a87cd5d2b6e9f2bc90c4680f1891f  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 22\ntsk_f4b4472fe9a5b6d840259bc314f2b5f1  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 56\ntsk_f52c8d56e44dd6b56135133c53a219d7  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 17\ntsk_f62b833e747e585640642f16a513f4c7  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 64\ntsk_f8a25ddf8a02defc52ff3e4c366299b2  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 31\ntsk_fc8c1cb2060d017fee24c8b1cabf5ad1  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 60\ntsk_fe7b8979a05177eb030ca1ef873314ba  prj_7991171b099dbdc381f1b227e53d3971  queued  active  Large task 38\n"
+    }
+  ],
+  "result": "pass"
+}

@@ -1,0 +1,33 @@
+COMMAND: ['go', 'test', './internal/integration', '-run', '^TestArithmetic(WorkloadCoverage|BehavioralOracles)$', '-count=1', '-v']
+=== RUN   TestArithmeticWorkloadCoverage
+=== RUN   TestArithmeticWorkloadCoverage/sum-product
+=== RUN   TestArithmeticWorkloadCoverage/product-sum
+=== RUN   TestArithmeticWorkloadCoverage/duplicate-sum
+=== RUN   TestArithmeticWorkloadCoverage/duplicate-product
+=== RUN   TestArithmeticWorkloadCoverage/missing-worker
+=== RUN   TestArithmeticWorkloadCoverage/missing-artifact
+=== RUN   TestArithmeticWorkloadCoverage/ambiguous-worker
+=== RUN   TestArithmeticWorkloadCoverage/extra-worker
+=== RUN   TestArithmeticWorkloadCoverage/missing-requested-test
+--- PASS: TestArithmeticWorkloadCoverage (0.01s)
+    --- PASS: TestArithmeticWorkloadCoverage/sum-product (0.00s)
+    --- PASS: TestArithmeticWorkloadCoverage/product-sum (0.00s)
+    --- PASS: TestArithmeticWorkloadCoverage/duplicate-sum (0.00s)
+    --- PASS: TestArithmeticWorkloadCoverage/duplicate-product (0.00s)
+    --- PASS: TestArithmeticWorkloadCoverage/missing-worker (0.00s)
+    --- PASS: TestArithmeticWorkloadCoverage/missing-artifact (0.00s)
+    --- PASS: TestArithmeticWorkloadCoverage/ambiguous-worker (0.00s)
+    --- PASS: TestArithmeticWorkloadCoverage/extra-worker (0.00s)
+    --- PASS: TestArithmeticWorkloadCoverage/missing-requested-test (0.00s)
+=== RUN   TestArithmeticBehavioralOracles
+=== RUN   TestArithmeticBehavioralOracles/sum/false
+=== RUN   TestArithmeticBehavioralOracles/sum/true
+=== RUN   TestArithmeticBehavioralOracles/product/false
+=== RUN   TestArithmeticBehavioralOracles/product/true
+--- PASS: TestArithmeticBehavioralOracles (2.42s)
+    --- PASS: TestArithmeticBehavioralOracles/sum/false (0.60s)
+    --- PASS: TestArithmeticBehavioralOracles/sum/true (0.56s)
+    --- PASS: TestArithmeticBehavioralOracles/product/false (0.70s)
+    --- PASS: TestArithmeticBehavioralOracles/product/true (0.56s)
+PASS
+ok  	github.com/samjingwen/tandem/internal/integration	2.825s

@@ -1,0 +1,9 @@
+COMMAND: ['go', 'test', './internal/api', '-run', '^Test(RecordPageByteBudgetIncludesEscapingAndCursor|ContentCachePreservesRevisionAndEvictionSemantics|ReceiptProjectBindings)$', '-count=1', '-v']
+=== RUN   TestRecordPageByteBudgetIncludesEscapingAndCursor
+--- PASS: TestRecordPageByteBudgetIncludesEscapingAndCursor (0.03s)
+=== RUN   TestContentCachePreservesRevisionAndEvictionSemantics
+--- PASS: TestContentCachePreservesRevisionAndEvictionSemantics (0.01s)
+=== RUN   TestReceiptProjectBindings
+--- PASS: TestReceiptProjectBindings (0.01s)
+PASS
+ok  	github.com/samjingwen/tandem/internal/api	0.422s

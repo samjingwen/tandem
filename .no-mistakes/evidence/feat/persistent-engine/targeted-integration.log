@@ -1,0 +1,326 @@
+COMMAND: ['go', 'test', './internal/integration', '-run', '^Test(IndependentClientsDuplicateCreateDisconnectAndRestart|AnotherClientAnswersDecisionAndAcceptsCurrentGeneration|TaskCleanupResolvesOwnedAttempt|LargeInventoryCLIReads|AccumulatedContentAndExactMutationReceipts|ReadCursorBindingAndRecovery|ManagedReceiptProtocol|DecisionListPromptProjection|CancellationPreservesUnreconciledInbox|FailedNativeControlSettlement|PausedAdmissionRetainsStartedChild|ControlRequiresOwnedQuiescentReadback|FirstExecutionAncestorBarrier|DaemonFixtureLeavesPopulatedSourceUntouched|CanceledTaskRetainsLateResultsWithoutCompletion|RetryCannotForkAnAlreadyResumedFailedAttempt|ExpiredDispatchContextPreservesOutcome|FollowupBeforeInitialCommandCoalescesAfterCreateCrash|UndeliveredPromptRetriesWithoutReplacingAttempt|UndeliveredDecisionReplyRetriesOrAllowsCorrection|FailedContinuationsRespectCapacityAndRemainEligible|CleanupBarsContinuationAndRetainsLateEvidence|CleanupRevalidatesPersistedTaskEligibility|CreationRejectsTransitiveAndImplicitCompletionCycles|FutureResultCannotReserveAnUnissuedGeneration|OldAttemptCannotClaimReplacementGeneration|CascadeResumeCannotCrossChildCleanupBarrier|EffectsBookkeepingAfterExpiry|AdmissionRecoveryAfterExpiry|ExpiredExternalFailuresBoundMutations|DispatchBudgetSurvivesIdleAndResume|SuccessfulDispatchAfterExpiry|PauseSettlesAfterInterruptBudget|UnboundControlsSettleAfterDisconnectBudget|CancellationBudgetPreservesActionableFailure|OpenAPIConsumerValidatesEngineWire|NegotiatedReceiptMatchesSchemaAndLegacyReplay)$', '-count=1', '-v', '-timeout', '12m']
+=== RUN   TestDaemonFixtureLeavesPopulatedSourceUntouched
+    acceptance_regression_test.go:94: actual daemon instance 99a223ca51d1df2e6e321060d9cbd3dc remained ready across independent clients and refused a second scheduler
+--- PASS: TestDaemonFixtureLeavesPopulatedSourceUntouched (1.37s)
+=== RUN   TestFirstExecutionAncestorBarrier
+=== RUN   TestFirstExecutionAncestorBarrier/pause/1/undelivered
+=== RUN   TestFirstExecutionAncestorBarrier/pause/1/uncertain
+=== RUN   TestFirstExecutionAncestorBarrier/pause/1/admitted-uncertain
+=== RUN   TestFirstExecutionAncestorBarrier/pause/1/started
+=== RUN   TestFirstExecutionAncestorBarrier/pause/2/undelivered
+=== RUN   TestFirstExecutionAncestorBarrier/pause/2/uncertain
+=== RUN   TestFirstExecutionAncestorBarrier/pause/2/admitted-uncertain
+=== RUN   TestFirstExecutionAncestorBarrier/pause/2/started
+=== RUN   TestFirstExecutionAncestorBarrier/cancel/1/undelivered
+=== RUN   TestFirstExecutionAncestorBarrier/cancel/1/uncertain
+=== RUN   TestFirstExecutionAncestorBarrier/cancel/1/admitted-uncertain
+=== RUN   TestFirstExecutionAncestorBarrier/cancel/1/started
+=== RUN   TestFirstExecutionAncestorBarrier/cancel/2/undelivered
+=== RUN   TestFirstExecutionAncestorBarrier/cancel/2/uncertain
+=== RUN   TestFirstExecutionAncestorBarrier/cancel/2/admitted-uncertain
+=== RUN   TestFirstExecutionAncestorBarrier/cancel/2/started
+--- PASS: TestFirstExecutionAncestorBarrier (10.55s)
+    --- PASS: TestFirstExecutionAncestorBarrier/pause/1/undelivered (0.62s)
+    --- PASS: TestFirstExecutionAncestorBarrier/pause/1/uncertain (0.46s)
+    --- PASS: TestFirstExecutionAncestorBarrier/pause/1/admitted-uncertain (0.46s)
+    --- PASS: TestFirstExecutionAncestorBarrier/pause/1/started (0.47s)
+    --- PASS: TestFirstExecutionAncestorBarrier/pause/2/undelivered (0.84s)
+    --- PASS: TestFirstExecutionAncestorBarrier/pause/2/uncertain (0.65s)
+    --- PASS: TestFirstExecutionAncestorBarrier/pause/2/admitted-uncertain (0.79s)
+    --- PASS: TestFirstExecutionAncestorBarrier/pause/2/started (0.70s)
+    --- PASS: TestFirstExecutionAncestorBarrier/cancel/1/undelivered (0.74s)
+    --- PASS: TestFirstExecutionAncestorBarrier/cancel/1/uncertain (0.54s)
+    --- PASS: TestFirstExecutionAncestorBarrier/cancel/1/admitted-uncertain (0.56s)
+    --- PASS: TestFirstExecutionAncestorBarrier/cancel/1/started (0.52s)
+    --- PASS: TestFirstExecutionAncestorBarrier/cancel/2/undelivered (0.87s)
+    --- PASS: TestFirstExecutionAncestorBarrier/cancel/2/uncertain (0.78s)
+    --- PASS: TestFirstExecutionAncestorBarrier/cancel/2/admitted-uncertain (0.75s)
+    --- PASS: TestFirstExecutionAncestorBarrier/cancel/2/started (0.79s)
+=== RUN   TestManagedReceiptProtocol
+--- PASS: TestManagedReceiptProtocol (14.67s)
+=== RUN   TestDecisionListPromptProjection
+=== RUN   TestDecisionListPromptProjection/form/9
+=== RUN   TestDecisionListPromptProjection/permission/9
+=== RUN   TestDecisionListPromptProjection/form/14
+=== RUN   TestDecisionListPromptProjection/permission/14
+=== RUN   TestDecisionListPromptProjection/form/20
+=== RUN   TestDecisionListPromptProjection/permission/20
+=== RUN   TestDecisionListPromptProjection/form/3005
+=== RUN   TestDecisionListPromptProjection/permission/3005
+--- PASS: TestDecisionListPromptProjection (2.43s)
+    --- PASS: TestDecisionListPromptProjection/form/9 (0.30s)
+    --- PASS: TestDecisionListPromptProjection/permission/9 (0.31s)
+    --- PASS: TestDecisionListPromptProjection/form/14 (0.29s)
+    --- PASS: TestDecisionListPromptProjection/permission/14 (0.33s)
+    --- PASS: TestDecisionListPromptProjection/form/20 (0.31s)
+    --- PASS: TestDecisionListPromptProjection/permission/20 (0.28s)
+    --- PASS: TestDecisionListPromptProjection/form/3005 (0.29s)
+    --- PASS: TestDecisionListPromptProjection/permission/3005 (0.31s)
+=== RUN   TestCancellationPreservesUnreconciledInbox
+=== RUN   TestCancellationPreservesUnreconciledInbox/idle/initial=false
+=== RUN   TestCancellationPreservesUnreconciledInbox/idle/initial=true
+=== RUN   TestCancellationPreservesUnreconciledInbox/failed/initial=false
+=== RUN   TestCancellationPreservesUnreconciledInbox/failed/initial=true
+--- PASS: TestCancellationPreservesUnreconciledInbox (1.45s)
+    --- PASS: TestCancellationPreservesUnreconciledInbox/idle/initial=false (0.39s)
+    --- PASS: TestCancellationPreservesUnreconciledInbox/idle/initial=true (0.34s)
+    --- PASS: TestCancellationPreservesUnreconciledInbox/failed/initial=false (0.39s)
+    --- PASS: TestCancellationPreservesUnreconciledInbox/failed/initial=true (0.33s)
+=== RUN   TestFailedNativeControlSettlement
+=== RUN   TestFailedNativeControlSettlement/pause/cascade=false/during=false
+=== RUN   TestFailedNativeControlSettlement/pause/cascade=false/during=true
+=== RUN   TestFailedNativeControlSettlement/pause/cascade=true/during=false
+=== RUN   TestFailedNativeControlSettlement/pause/cascade=true/during=true
+=== RUN   TestFailedNativeControlSettlement/cancel/cascade=false/during=false
+=== RUN   TestFailedNativeControlSettlement/cancel/cascade=false/during=true
+=== RUN   TestFailedNativeControlSettlement/cancel/cascade=true/during=false
+=== RUN   TestFailedNativeControlSettlement/cancel/cascade=true/during=true
+--- PASS: TestFailedNativeControlSettlement (3.63s)
+    --- PASS: TestFailedNativeControlSettlement/pause/cascade=false/during=false (0.32s)
+    --- PASS: TestFailedNativeControlSettlement/pause/cascade=false/during=true (0.33s)
+    --- PASS: TestFailedNativeControlSettlement/pause/cascade=true/during=false (0.60s)
+    --- PASS: TestFailedNativeControlSettlement/pause/cascade=true/during=true (0.59s)
+    --- PASS: TestFailedNativeControlSettlement/cancel/cascade=false/during=false (0.33s)
+    --- PASS: TestFailedNativeControlSettlement/cancel/cascade=false/during=true (0.32s)
+    --- PASS: TestFailedNativeControlSettlement/cancel/cascade=true/during=false (0.58s)
+    --- PASS: TestFailedNativeControlSettlement/cancel/cascade=true/during=true (0.55s)
+=== RUN   TestPausedAdmissionRetainsStartedChild
+=== RUN   TestPausedAdmissionRetainsStartedChild/pause/1
+=== RUN   TestPausedAdmissionRetainsStartedChild/pause/2
+=== RUN   TestPausedAdmissionRetainsStartedChild/cancel/1
+=== RUN   TestPausedAdmissionRetainsStartedChild/cancel/2
+--- PASS: TestPausedAdmissionRetainsStartedChild (3.18s)
+    --- PASS: TestPausedAdmissionRetainsStartedChild/pause/1 (0.62s)
+    --- PASS: TestPausedAdmissionRetainsStartedChild/pause/2 (0.93s)
+    --- PASS: TestPausedAdmissionRetainsStartedChild/cancel/1 (0.64s)
+    --- PASS: TestPausedAdmissionRetainsStartedChild/cancel/2 (1.00s)
+=== RUN   TestControlRequiresOwnedQuiescentReadback
+=== RUN   TestControlRequiresOwnedQuiescentReadback/pause/missing
+=== RUN   TestControlRequiresOwnedQuiescentReadback/pause/foreign
+=== RUN   TestControlRequiresOwnedQuiescentReadback/pause/running
+=== RUN   TestControlRequiresOwnedQuiescentReadback/cancel/missing
+=== RUN   TestControlRequiresOwnedQuiescentReadback/cancel/foreign
+=== RUN   TestControlRequiresOwnedQuiescentReadback/cancel/running
+--- PASS: TestControlRequiresOwnedQuiescentReadback (1.84s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/pause/missing (0.30s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/pause/foreign (0.30s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/pause/running (0.30s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/cancel/missing (0.32s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/cancel/foreign (0.31s)
+    --- PASS: TestControlRequiresOwnedQuiescentReadback/cancel/running (0.31s)
+=== RUN   TestEffectsBookkeepingAfterExpiry
+=== RUN   TestEffectsBookkeepingAfterExpiry/workspace-ensure/cancel/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/workspace-ensure/cancel/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/workspace-ensure/deadline/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/workspace-ensure/deadline/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/workspace-inspect/cancel/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/workspace-inspect/cancel/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/workspace-inspect/deadline/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/workspace-inspect/deadline/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/session-ensure/cancel/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/session-ensure/cancel/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/session-ensure/deadline/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/session-ensure/deadline/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/session-inspect/cancel/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/session-inspect/cancel/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/session-inspect/deadline/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/session-inspect/deadline/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/interrupt/cancel/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/interrupt/cancel/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/interrupt/deadline/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/interrupt/deadline/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/control-settle/cancel/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/control-settle/cancel/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/control-settle/deadline/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/control-settle/deadline/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/cleanup/cancel/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/cleanup/cancel/true
+=== RUN   TestEffectsBookkeepingAfterExpiry/cleanup/deadline/false
+=== RUN   TestEffectsBookkeepingAfterExpiry/cleanup/deadline/true
+--- PASS: TestEffectsBookkeepingAfterExpiry (21.63s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/workspace-ensure/cancel/false (0.20s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/workspace-ensure/cancel/true (0.21s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/workspace-ensure/deadline/false (1.11s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/workspace-ensure/deadline/true (1.13s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/workspace-inspect/cancel/false (0.26s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/workspace-inspect/cancel/true (0.21s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/workspace-inspect/deadline/false (1.13s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/workspace-inspect/deadline/true (1.16s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/session-ensure/cancel/false (0.25s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/session-ensure/cancel/true (0.21s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/session-ensure/deadline/false (1.09s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/session-ensure/deadline/true (1.12s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/session-inspect/cancel/false (0.26s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/session-inspect/cancel/true (0.29s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/session-inspect/deadline/false (1.35s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/session-inspect/deadline/true (1.28s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/interrupt/cancel/false (0.29s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/interrupt/cancel/true (0.26s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/interrupt/deadline/false (1.29s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/interrupt/deadline/true (1.30s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/control-settle/cancel/false (0.27s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/control-settle/cancel/true (0.26s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/control-settle/deadline/false (1.24s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/control-settle/deadline/true (1.26s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/cleanup/cancel/false (0.88s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/cleanup/cancel/true (0.66s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/cleanup/deadline/false (1.34s)
+    --- PASS: TestEffectsBookkeepingAfterExpiry/cleanup/deadline/true (1.32s)
+=== RUN   TestAdmissionRecoveryAfterExpiry
+=== RUN   TestAdmissionRecoveryAfterExpiry/active/cancel
+=== RUN   TestAdmissionRecoveryAfterExpiry/active/deadline
+=== RUN   TestAdmissionRecoveryAfterExpiry/paused/cancel
+=== RUN   TestAdmissionRecoveryAfterExpiry/paused/deadline
+--- PASS: TestAdmissionRecoveryAfterExpiry (3.25s)
+    --- PASS: TestAdmissionRecoveryAfterExpiry/active/cancel (0.32s)
+    --- PASS: TestAdmissionRecoveryAfterExpiry/active/deadline (1.29s)
+    --- PASS: TestAdmissionRecoveryAfterExpiry/paused/cancel (0.35s)
+    --- PASS: TestAdmissionRecoveryAfterExpiry/paused/deadline (1.28s)
+=== RUN   TestExpiredExternalFailuresBoundMutations
+=== RUN   TestExpiredExternalFailuresBoundMutations/workspace-ensure
+=== RUN   TestExpiredExternalFailuresBoundMutations/session-ensure
+=== RUN   TestExpiredExternalFailuresBoundMutations/interrupt
+--- PASS: TestExpiredExternalFailuresBoundMutations (1.79s)
+    --- PASS: TestExpiredExternalFailuresBoundMutations/workspace-ensure (0.58s)
+    --- PASS: TestExpiredExternalFailuresBoundMutations/session-ensure (0.56s)
+    --- PASS: TestExpiredExternalFailuresBoundMutations/interrupt (0.65s)
+=== RUN   TestDispatchBudgetSurvivesIdleAndResume
+=== RUN   TestDispatchBudgetSurvivesIdleAndResume/prompt
+=== RUN   TestDispatchBudgetSurvivesIdleAndResume/reply
+--- PASS: TestDispatchBudgetSurvivesIdleAndResume (1.59s)
+    --- PASS: TestDispatchBudgetSurvivesIdleAndResume/prompt (0.77s)
+    --- PASS: TestDispatchBudgetSurvivesIdleAndResume/reply (0.82s)
+=== RUN   TestSuccessfulDispatchAfterExpiry
+=== RUN   TestSuccessfulDispatchAfterExpiry/prompt/cancel
+=== RUN   TestSuccessfulDispatchAfterExpiry/prompt/deadline
+=== RUN   TestSuccessfulDispatchAfterExpiry/reply/cancel
+=== RUN   TestSuccessfulDispatchAfterExpiry/reply/deadline
+--- PASS: TestSuccessfulDispatchAfterExpiry (3.41s)
+    --- PASS: TestSuccessfulDispatchAfterExpiry/prompt/cancel (0.34s)
+    --- PASS: TestSuccessfulDispatchAfterExpiry/prompt/deadline (1.31s)
+    --- PASS: TestSuccessfulDispatchAfterExpiry/reply/cancel (0.38s)
+    --- PASS: TestSuccessfulDispatchAfterExpiry/reply/deadline (1.37s)
+=== RUN   TestPauseSettlesAfterInterruptBudget
+=== RUN   TestPauseSettlesAfterInterruptBudget/false
+=== RUN   TestPauseSettlesAfterInterruptBudget/true
+--- PASS: TestPauseSettlesAfterInterruptBudget (2.32s)
+    --- PASS: TestPauseSettlesAfterInterruptBudget/false (0.77s)
+    --- PASS: TestPauseSettlesAfterInterruptBudget/true (1.56s)
+=== RUN   TestUnboundControlsSettleAfterDisconnectBudget
+=== RUN   TestUnboundControlsSettleAfterDisconnectBudget/workspace_pending/false/pause
+=== RUN   TestUnboundControlsSettleAfterDisconnectBudget/workspace_pending/false/cancel
+=== RUN   TestUnboundControlsSettleAfterDisconnectBudget/workspace_pending/true/pause
+=== RUN   TestUnboundControlsSettleAfterDisconnectBudget/workspace_pending/true/cancel
+=== RUN   TestUnboundControlsSettleAfterDisconnectBudget/session_pending/false/pause
+=== RUN   TestUnboundControlsSettleAfterDisconnectBudget/session_pending/false/cancel
+=== RUN   TestUnboundControlsSettleAfterDisconnectBudget/session_pending/true/pause
+=== RUN   TestUnboundControlsSettleAfterDisconnectBudget/session_pending/true/cancel
+--- PASS: TestUnboundControlsSettleAfterDisconnectBudget (2.50s)
+    --- PASS: TestUnboundControlsSettleAfterDisconnectBudget/workspace_pending/false/pause (0.27s)
+    --- PASS: TestUnboundControlsSettleAfterDisconnectBudget/workspace_pending/false/cancel (0.21s)
+    --- PASS: TestUnboundControlsSettleAfterDisconnectBudget/workspace_pending/true/pause (0.31s)
+    --- PASS: TestUnboundControlsSettleAfterDisconnectBudget/workspace_pending/true/cancel (0.34s)
+    --- PASS: TestUnboundControlsSettleAfterDisconnectBudget/session_pending/false/pause (0.29s)
+    --- PASS: TestUnboundControlsSettleAfterDisconnectBudget/session_pending/false/cancel (0.27s)
+    --- PASS: TestUnboundControlsSettleAfterDisconnectBudget/session_pending/true/pause (0.41s)
+    --- PASS: TestUnboundControlsSettleAfterDisconnectBudget/session_pending/true/cancel (0.40s)
+=== RUN   TestCancellationBudgetPreservesActionableFailure
+=== RUN   TestCancellationBudgetPreservesActionableFailure/pending
+=== RUN   TestCancellationBudgetPreservesActionableFailure/parked
+=== RUN   TestCancellationBudgetPreservesActionableFailure/reply_pending
+--- PASS: TestCancellationBudgetPreservesActionableFailure (2.49s)
+    --- PASS: TestCancellationBudgetPreservesActionableFailure/pending (0.92s)
+    --- PASS: TestCancellationBudgetPreservesActionableFailure/parked (0.79s)
+    --- PASS: TestCancellationBudgetPreservesActionableFailure/reply_pending (0.79s)
+=== RUN   TestTaskCleanupResolvesOwnedAttempt
+--- PASS: TestTaskCleanupResolvesOwnedAttempt (0.84s)
+=== RUN   TestRetryCannotForkAnAlreadyResumedFailedAttempt
+--- PASS: TestRetryCannotForkAnAlreadyResumedFailedAttempt (0.34s)
+=== RUN   TestIndependentClientsDuplicateCreateDisconnectAndRestart
+--- PASS: TestIndependentClientsDuplicateCreateDisconnectAndRestart (0.33s)
+=== RUN   TestAnotherClientAnswersDecisionAndAcceptsCurrentGeneration
+--- PASS: TestAnotherClientAnswersDecisionAndAcceptsCurrentGeneration (0.48s)
+=== RUN   TestCanceledTaskRetainsLateResultsWithoutCompletion
+--- PASS: TestCanceledTaskRetainsLateResultsWithoutCompletion (0.34s)
+=== RUN   TestOpenAPIConsumerValidatesEngineWire
+--- PASS: TestOpenAPIConsumerValidatesEngineWire (0.27s)
+=== RUN   TestNegotiatedReceiptMatchesSchemaAndLegacyReplay
+--- PASS: TestNegotiatedReceiptMatchesSchemaAndLegacyReplay (0.12s)
+=== RUN   TestLargeInventoryCLIReads
+--- PASS: TestLargeInventoryCLIReads (6.62s)
+=== RUN   TestAccumulatedContentAndExactMutationReceipts
+--- PASS: TestAccumulatedContentAndExactMutationReceipts (8.82s)
+=== RUN   TestReadCursorBindingAndRecovery
+--- PASS: TestReadCursorBindingAndRecovery (0.24s)
+=== RUN   TestExpiredDispatchContextPreservesOutcome
+=== RUN   TestExpiredDispatchContextPreservesOutcome/cancel/prompt/undelivered
+=== RUN   TestExpiredDispatchContextPreservesOutcome/cancel/prompt/rejected
+=== RUN   TestExpiredDispatchContextPreservesOutcome/cancel/prompt/ambiguous
+=== RUN   TestExpiredDispatchContextPreservesOutcome/cancel/reply/undelivered
+=== RUN   TestExpiredDispatchContextPreservesOutcome/cancel/reply/rejected
+=== RUN   TestExpiredDispatchContextPreservesOutcome/cancel/reply/ambiguous
+=== RUN   TestExpiredDispatchContextPreservesOutcome/deadline/prompt/undelivered
+=== RUN   TestExpiredDispatchContextPreservesOutcome/deadline/prompt/rejected
+=== RUN   TestExpiredDispatchContextPreservesOutcome/deadline/prompt/ambiguous
+=== RUN   TestExpiredDispatchContextPreservesOutcome/deadline/reply/undelivered
+=== RUN   TestExpiredDispatchContextPreservesOutcome/deadline/reply/rejected
+=== RUN   TestExpiredDispatchContextPreservesOutcome/deadline/reply/ambiguous
+--- PASS: TestExpiredDispatchContextPreservesOutcome (10.97s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/cancel/prompt/undelivered (0.42s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/cancel/prompt/rejected (0.40s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/cancel/prompt/ambiguous (0.40s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/cancel/reply/undelivered (0.44s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/cancel/reply/rejected (0.44s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/cancel/reply/ambiguous (0.45s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/deadline/prompt/undelivered (1.40s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/deadline/prompt/rejected (1.39s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/deadline/prompt/ambiguous (1.33s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/deadline/reply/undelivered (1.44s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/deadline/reply/rejected (1.43s)
+    --- PASS: TestExpiredDispatchContextPreservesOutcome/deadline/reply/ambiguous (1.42s)
+=== RUN   TestFollowupBeforeInitialCommandCoalescesAfterCreateCrash
+=== RUN   TestFollowupBeforeInitialCommandCoalescesAfterCreateCrash/false
+=== RUN   TestFollowupBeforeInitialCommandCoalescesAfterCreateCrash/true
+--- PASS: TestFollowupBeforeInitialCommandCoalescesAfterCreateCrash (0.71s)
+    --- PASS: TestFollowupBeforeInitialCommandCoalescesAfterCreateCrash/false (0.35s)
+    --- PASS: TestFollowupBeforeInitialCommandCoalescesAfterCreateCrash/true (0.36s)
+=== RUN   TestUndeliveredPromptRetriesWithoutReplacingAttempt
+=== RUN   TestUndeliveredPromptRetriesWithoutReplacingAttempt/preflight_read_disconnected
+=== RUN   TestUndeliveredPromptRetriesWithoutReplacingAttempt/request_rejected
+--- PASS: TestUndeliveredPromptRetriesWithoutReplacingAttempt (0.54s)
+    --- PASS: TestUndeliveredPromptRetriesWithoutReplacingAttempt/preflight_read_disconnected (0.27s)
+    --- PASS: TestUndeliveredPromptRetriesWithoutReplacingAttempt/request_rejected (0.27s)
+=== RUN   TestUndeliveredDecisionReplyRetriesOrAllowsCorrection
+=== RUN   TestUndeliveredDecisionReplyRetriesOrAllowsCorrection/false
+=== RUN   TestUndeliveredDecisionReplyRetriesOrAllowsCorrection/true
+--- PASS: TestUndeliveredDecisionReplyRetriesOrAllowsCorrection (0.69s)
+    --- PASS: TestUndeliveredDecisionReplyRetriesOrAllowsCorrection/false (0.36s)
+    --- PASS: TestUndeliveredDecisionReplyRetriesOrAllowsCorrection/true (0.33s)
+=== RUN   TestFailedContinuationsRespectCapacityAndRemainEligible
+=== RUN   TestFailedContinuationsRespectCapacityAndRemainEligible/worker/followup
+=== RUN   TestFailedContinuationsRespectCapacityAndRemainEligible/worker/resume
+=== RUN   TestFailedContinuationsRespectCapacityAndRemainEligible/worker/reply
+=== RUN   TestFailedContinuationsRespectCapacityAndRemainEligible/coordinator/followup
+=== RUN   TestFailedContinuationsRespectCapacityAndRemainEligible/coordinator/resume
+=== RUN   TestFailedContinuationsRespectCapacityAndRemainEligible/coordinator/reply
+--- PASS: TestFailedContinuationsRespectCapacityAndRemainEligible (5.25s)
+    --- PASS: TestFailedContinuationsRespectCapacityAndRemainEligible/worker/followup (0.85s)
+    --- PASS: TestFailedContinuationsRespectCapacityAndRemainEligible/worker/resume (0.89s)
+    --- PASS: TestFailedContinuationsRespectCapacityAndRemainEligible/worker/reply (0.86s)
+    --- PASS: TestFailedContinuationsRespectCapacityAndRemainEligible/coordinator/followup (0.94s)
+    --- PASS: TestFailedContinuationsRespectCapacityAndRemainEligible/coordinator/resume (0.87s)
+    --- PASS: TestFailedContinuationsRespectCapacityAndRemainEligible/coordinator/reply (0.85s)
+=== RUN   TestCleanupBarsContinuationAndRetainsLateEvidence
+--- PASS: TestCleanupBarsContinuationAndRetainsLateEvidence (0.71s)
+=== RUN   TestCleanupRevalidatesPersistedTaskEligibility
+--- PASS: TestCleanupRevalidatesPersistedTaskEligibility (0.30s)
+=== RUN   TestCreationRejectsTransitiveAndImplicitCompletionCycles
+--- PASS: TestCreationRejectsTransitiveAndImplicitCompletionCycles (0.09s)
+=== RUN   TestFutureResultCannotReserveAnUnissuedGeneration
+--- PASS: TestFutureResultCannotReserveAnUnissuedGeneration (0.27s)
+=== RUN   TestOldAttemptCannotClaimReplacementGeneration
+--- PASS: TestOldAttemptCannotClaimReplacementGeneration (0.37s)
+=== RUN   TestCascadeResumeCannotCrossChildCleanupBarrier
+--- PASS: TestCascadeResumeCannotCrossChildCleanupBarrier (0.93s)
+PASS
+ok  	github.com/samjingwen/tandem/internal/integration	117.991s

@@ -1,0 +1,22 @@
+COMMAND (cwd=plugin): ['node', '--experimental-strip-types', '--test', 'test/reads.test.ts', 'test/binding.test.ts', 'test/guards.test.ts']
+✔ managed-only defaults and exact hub opt-in deny descendant tools before a snapshot fetch (10.694666ms)
+✔ API bindings reject moved locations and persisted workspace/role collisions; local work survives service downtime (3.766917ms)
+✔ controls preserve wire format and scope for coordinators/hub, never ordinary workers (4.739708ms)
+✔ workers cannot self-answer forms; coordinators answer only child forms; opted-in hub confirms permissions (5.917333ms)
+✔ managed paths are canonicalized, including new files and search roots, without executing native tools (6.816ms)
+✔ native delegation/admin/MCP tool names and outside mutation targets fail before execution (4.229792ms)
+✔ moving a managed native session cannot redefine its assigned workspace (1.901625ms)
+✔ fresh approval requirements never relax an existing runtime deny (1.908084ms)
+✔ unbound inherited hook calls are denied outside the explicit hub (1.72825ms)
+✔ native guards reject malformed bindings and moved permission roots without a Tandem lookup (2.41975ms)
+✔ bounded client traverses projected inventory and exact Unicode content without a global snapshot (38.140167ms)
+✔ bounded client rejects mixed revisions and content damage instead of reconstructing silently (1.807958ms)
+✔ bounded response reader cancels oversized streams before decoding them (0.502541ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 339.739291
