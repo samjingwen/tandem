@@ -2,6 +2,23 @@ package core
 
 import "fmt"
 
+func dispatchBudgetError(s *State, a Attempt) string {
+	if a.FailureCount < 8 {
+		return ""
+	}
+	for _, c := range s.Commands {
+		if c.AttemptID == a.ID && c.Kind == "prompt" && (c.Status == "pending" || c.Status == "parked") {
+			return "dispatch retry budget exhausted; resume the task to retry pending delivery"
+		}
+	}
+	for _, d := range s.Decisions {
+		if d.AttemptID == a.ID && d.Status == "reply_pending" {
+			return "dispatch retry budget exhausted; resume the task to retry pending delivery"
+		}
+	}
+	return ""
+}
+
 func uncertainDispatch(s *State, attemptID string) bool {
 	for _, c := range s.Commands {
 		if c.AttemptID == attemptID && c.Kind == "prompt" && c.Status == "sending" {
@@ -90,6 +107,11 @@ func refreshTaskState(s *State, taskID, observed string) {
 	case uncertainDispatch(s, a.ID):
 		state = "recovering"
 		message = a.Error
+	case dispatchBudgetError(s, a) != "":
+		state = "recovering"
+		message = dispatchBudgetError(s, a)
+		a.Error = message
+		s.Attempts[a.ID] = a
 	case observed == "failed" && !pendingPrompt(s, a.ID):
 		if pendingDecision {
 			state = "waiting_for_input"

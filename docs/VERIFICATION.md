@@ -4,6 +4,7 @@ Deterministic integration tests use the real engine, SQLite, HTTP API, CLI parsi
 Only execution is simulated where a controlled fake runtime is named.
 Fake-runtime success is not evidence of model/provider availability.
 Previously recorded native/model evaluations predate the dispatch, capacity, cleanup, graph, and generation corrections and do not verify those revised paths.
+They also predate the isolated daemon-store and exact Sum/Product aggregate-oracle corrections; neither changed live evaluation has been rerun as part of review.
 Native/model revalidation remains opt-in using the commands below; review-phase regression checks use disposable fake-runtime and HTTP fixtures only.
 
 ## Required acceptance cases
@@ -26,6 +27,11 @@ Native/model revalidation remains opt-in using the commands below; review-phase 
 | CLI/API and external clients share contract | `internal/integration` HTTP/CLI tests; OpenAPI consumer validation; external consumer acceptance |
 
 Additional tests cover instruction-generation staleness, ancestor dependency cycles, finite write/model-notification budgets, read-only uncertain-prompt recovery, preserved native permission choices, explicit shared-policy delivery, and quiet persistence when observations do not change.
+`TestEffectsBookkeepingAfterExpiry`, `TestExpiredExternalFailuresBoundMutations`, and `TestSuccessfulDispatchAfterExpiry` inject cancelled/deadline-expired external calls against disposable SQLite/Git fixtures and check durable outcomes and bounded writes.
+`TestDispatchBudgetSurvivesIdleAndResume` exercises API/CLI prompt/reply exhaustion, stable idle diagnostics, and same-attempt recovery through explicit resume.
+`TestPauseSettlesAfterInterruptBudget` covers individual and cascade read-only pause settlement after eight failed interrupts, including parked continuations.
+`TestDaemonFixtureLeavesPopulatedSourceUntouched` runs production daemon processes against a fresh store with a fake HTTP runtime, checking that supplied populated state remains byte-for-byte unchanged and no task/session operation occurs.
+`TestArithmeticWorkloadCoverage` rejects missing, duplicate, and ambiguous Sum/Product coverage, while `TestArithmeticBehavioralOracles` executes independent Go checks against correct and deliberately incorrect arithmetic fixtures without models.
 Formatter, analyzer, and compiler enforcement probes execute their real consumers against conforming and violating disposable fixtures.
 They are Lint-phase proof rather than string searches over configuration files.
 
@@ -62,6 +68,7 @@ go test -v ./internal/opencode -run '^TestLiveIsolated210$' -count=1
 First provision a Tandem-owned runtime connection using the documented setup operation.
 Do not copy or inspect provider authentication caches.
 The daemon-process test starts no tasks/models, verifies readiness through independent clients, and refuses a second actual service process against the same store.
+Both processes use one fresh owner-only disposable state directory containing only the supplied explicit connection configuration, never the supplied store or its worktrees.
 
 ```sh
 TANDEM_LIVE_CONNECTION_DIR=/absolute/path/to/connection \
@@ -74,6 +81,7 @@ Set optional `TANDEM_LIVE_MODEL=provider/model#variant` to select an already-con
 It submits conversational intake through the actual standalone CLI process, lets that process exit, and uses another client to inspect and continue the same task/coordinator session.
 A real coordinator dispatches two bounded modifying workers through Tandem tools into different owned worktrees.
 The harness performs a narrow safety preflight on generated arithmetic-only demo artifacts and runs independent Go test oracles without injected control/provider environment variables or module-network access.
+It requires exactly one Sum worker and one Product worker, each with its requested implementation/test artifacts, before running the matching arithmetic oracle and rechecking the same worker coverage after continuation.
 This preflight is not an OS sandbox or a general hostile-code validator.
 All records, code, and verification logs are retained for inspection; owned runtime sessions are interrupted during teardown, never globally stopped.
 

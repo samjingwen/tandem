@@ -780,8 +780,14 @@ func (e *Engine) Tick(ctx context.Context) error {
 	return nil
 }
 
+func (e *Engine) bookkeeping(ctx context.Context, update func(*State) error) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	return e.store.Update(ctx, update)
+}
+
 func (e *Engine) mark(ctx context.Context, id, state string, err error) error {
-	return e.store.Update(ctx, func(s *State) error {
+	return e.bookkeeping(ctx, func(s *State) error {
 		a := s.Attempts[id]
 		before := a
 		a.Observed = state
@@ -790,6 +796,9 @@ func (e *Engine) mark(ctx context.Context, id, state string, err error) error {
 			if a.FailureCount < 8 {
 				a.FailureCount++
 			}
+		}
+		if message := dispatchBudgetError(s, a); message != "" {
+			a.Error = message
 		}
 		if a.Observed != before.Observed || a.Error != before.Error || a.FailureCount != before.FailureCount {
 			a.UpdatedAt = now()
@@ -840,9 +849,9 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			x = e.workspaces.Remove(ctx, p, a.Workspace)
 		}
 		if x != nil && !errors.Is(x, ErrWorkspaceMissing) {
-			return e.store.Update(ctx, func(s *State) error { v := s.Attempts[id]; v.Error = x.Error(); s.Attempts[id] = v; return nil })
+			return e.bookkeeping(ctx, func(s *State) error { v := s.Attempts[id]; v.Error = x.Error(); s.Attempts[id] = v; return nil })
 		}
-		return e.store.Update(ctx, func(s *State) error {
+		return e.bookkeeping(ctx, func(s *State) error {
 			v := s.Attempts[id]
 			v.Workspace.Allocated = false
 			v.Phase = "cleaned"
@@ -902,7 +911,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 		}
 		a.Workspace = w
 		a.Phase = "session_pending"
-		if err = e.store.Update(ctx, func(s *State) error { s.Attempts[id] = a; return nil }); err != nil {
+		if err = e.bookkeeping(ctx, func(s *State) error { s.Attempts[id] = a; return nil }); err != nil {
 			return err
 		}
 	}
@@ -912,7 +921,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 	sp := spec(s, a)
 	if a.Phase == "session_pending" {
 		if t.Desired != "active" {
-			return e.store.Update(ctx, func(s *State) error {
+			return e.bookkeeping(ctx, func(s *State) error {
 				v := s.Tasks[t.ID]
 				v.State = v.Desired
 				s.Tasks[v.ID] = v
@@ -937,7 +946,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 		}
 		a.Phase = "session_bound"
 		a.FailureCount = 0
-		if err = e.store.Update(ctx, func(s *State) error {
+		if err = e.bookkeeping(ctx, func(s *State) error {
 			s.Attempts[id] = a
 			c := Command{ID: "initial_" + id, TaskID: t.ID, AttemptID: id, Kind: "prompt", Text: workerPrompt(s, t, a), Status: "pending", Generation: t.Generation, Sequence: s.Revision + 1}
 			s.Commands[c.ID] = c
@@ -956,13 +965,14 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 	if o.State == "unknown" || o.State == "disconnected" {
 		return e.mark(ctx, id, o.State, ErrUncertain)
 	}
-	if err = e.store.Update(ctx, func(s *State) error {
+	if err = e.bookkeeping(ctx, func(s *State) error {
 		v := s.Attempts[id]
-		if v.Observed != o.State || (v.Error != "" && !uncertainDispatch(s, id)) {
+		clearError := !uncertainDispatch(s, id) && dispatchBudgetError(s, v) == ""
+		if v.Observed != o.State || (v.Error != "" && clearError) {
 			v.UpdatedAt = now()
 		}
 		v.Observed = o.State
-		if !uncertainDispatch(s, id) {
+		if clearError {
 			v.Error = ""
 		}
 		s.Attempts[id] = v
@@ -1006,7 +1016,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 					uncertainAdmission = true
 					continue
 				}
-				if err = e.store.Update(ctx, func(s *State) error {
+				if err = e.bookkeeping(ctx, func(s *State) error {
 					v := s.Commands[key]
 					v.Status = "admitted"
 					s.Commands[key] = v
@@ -1020,11 +1030,11 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				a.FailureCount = 0
 			}
 		}
-		if a.FailureCount >= 8 {
-			return nil
-		}
 		cancelPending, canCancel := e.runtime.(PendingCanceller)
 		if o.State != "idle" && o.State != "failed" || (t.Desired == "cancelled" && canCancel && t.State != t.Desired) {
+			if a.FailureCount >= 8 {
+				return nil
+			}
 			if t.Desired == "cancelled" && canCancel {
 				err = cancelPending.CancelPending(ctx, sp)
 			} else {
@@ -1044,7 +1054,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 		if uncertainAdmission {
 			return e.mark(ctx, id, o.State, ErrUncertain)
 		}
-		return e.store.Update(ctx, func(s *State) error {
+		return e.bookkeeping(ctx, func(s *State) error {
 			v := s.Tasks[t.ID]
 			if v.State != v.Desired {
 				v.State = v.Desired
@@ -1087,12 +1097,10 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				return err
 			}
 			if err = e.runtime.Reply(ctx, sp, d, d.Reply); err != nil {
-				ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-				defer cancel()
 				var undelivered *NotDelivered
 				var rejected *Error
 				if errors.As(err, &rejected) && rejected.Code == "invalid_request" {
-					return e.store.Update(ctx, func(s *State) error {
+					return e.bookkeeping(ctx, func(s *State) error {
 						v := s.Decisions[d.ID]
 						v.Status = "pending"
 						v.Reply = nil
@@ -1106,7 +1114,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 					})
 				}
 				if errors.As(err, &undelivered) {
-					if x := e.store.Update(ctx, func(s *State) error {
+					if x := e.bookkeeping(ctx, func(s *State) error {
 						v := s.Decisions[d.ID]
 						v.Status = "reply_pending"
 						s.Decisions[d.ID] = v
@@ -1117,7 +1125,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				}
 				return e.mark(ctx, id, "unknown", err)
 			}
-			if err = e.store.Update(ctx, func(s *State) error {
+			if err = e.bookkeeping(ctx, func(s *State) error {
 				v := s.Decisions[d.ID]
 				v.Status = "answered"
 				s.Decisions[d.ID] = v
@@ -1170,11 +1178,9 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			err = e.runtime.Prompt(ctx, sp, c.ID, c.Text)
 		}
 		if err != nil {
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-			defer cancel()
 			var undelivered *NotDelivered
 			if errors.As(err, &undelivered) {
-				if x := e.store.Update(ctx, func(s *State) error { v := s.Commands[c.ID]; v.Status = "pending"; s.Commands[c.ID] = v; return nil }); x != nil {
+				if x := e.bookkeeping(ctx, func(s *State) error { v := s.Commands[c.ID]; v.Status = "pending"; s.Commands[c.ID] = v; return nil }); x != nil {
 					return x
 				}
 			}
@@ -1184,7 +1190,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			}
 			return e.mark(ctx, id, observed, err)
 		}
-		if err = e.store.Update(ctx, func(s *State) error {
+		if err = e.bookkeeping(ctx, func(s *State) error {
 			v := s.Commands[c.ID]
 			v.Status = "admitted"
 			s.Commands[c.ID] = v

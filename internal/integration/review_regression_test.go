@@ -17,10 +17,12 @@ import (
 
 type outcomeRuntime struct {
 	*testruntime.Fake
-	promptOutcome func(context.Context) error
-	replyOutcome  func(context.Context) error
-	prompts       []string
-	replies       int
+	promptOutcome  func(context.Context) error
+	replyOutcome   func(context.Context) error
+	afterDelivery  func(context.Context)
+	afterReconcile func(context.Context)
+	prompts        []string
+	replies        int
 }
 
 func (r *outcomeRuntime) Prompt(ctx context.Context, spec core.SessionSpec, id, text string) error {
@@ -28,7 +30,11 @@ func (r *outcomeRuntime) Prompt(ctx context.Context, spec core.SessionSpec, id, 
 	if r.promptOutcome != nil {
 		return r.promptOutcome(ctx)
 	}
-	return r.Fake.Prompt(ctx, spec, id, text)
+	err := r.Fake.Prompt(ctx, spec, id, text)
+	if err == nil && r.afterDelivery != nil {
+		r.afterDelivery(ctx)
+	}
+	return err
 }
 
 func (r *outcomeRuntime) Reply(ctx context.Context, spec core.SessionSpec, d core.Decision, answer json.RawMessage) error {
@@ -36,7 +42,19 @@ func (r *outcomeRuntime) Reply(ctx context.Context, spec core.SessionSpec, d cor
 	if r.replyOutcome != nil {
 		return r.replyOutcome(ctx)
 	}
-	return r.Fake.Reply(ctx, spec, d, answer)
+	err := r.Fake.Reply(ctx, spec, d, answer)
+	if err == nil && r.afterDelivery != nil {
+		r.afterDelivery(ctx)
+	}
+	return err
+}
+
+func (r *outcomeRuntime) ReconcilePrompt(ctx context.Context, spec core.SessionSpec, id, text string) error {
+	err := r.Fake.ReconcilePrompt(ctx, spec, id, text)
+	if err == nil && r.afterReconcile != nil {
+		r.afterReconcile(ctx)
+	}
+	return err
 }
 
 func TestExpiredDispatchContextPreservesOutcome(t *testing.T) {

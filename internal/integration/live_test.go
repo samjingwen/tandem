@@ -205,6 +205,10 @@ func TestLiveCoordinatorDelegationAcceptance(t *testing.T) {
 		case <-time.After(500 * time.Millisecond):
 		}
 	}
+	assignments, err := arithmeticWorkers(snapshot, parent.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	seen := map[string]bool{}
 	for _, task := range snapshot.Tasks {
 		if task.ParentID != parent.ID {
@@ -219,23 +223,7 @@ func TestLiveCoordinatorDelegationAcceptance(t *testing.T) {
 			t.Fatal(err)
 		}
 		validateArithmeticFixture(t, a.Workspace.Path)
-		oracle := ""
-		if _, x := os.Stat(filepath.Join(a.Workspace.Path, "sum.go")); x == nil {
-			oracle = "if Sum(2,3)!=5 || Sum(-2,3)!=1 { t.Fatal(\"incorrect Sum\") }"
-		} else if _, x = os.Stat(filepath.Join(a.Workspace.Path, "product.go")); x == nil {
-			oracle = "if Product(4,7)!=28 || Product(-2,3)!=-6 { t.Fatal(\"incorrect Product\") }"
-		} else {
-			t.Fatal("worker did not produce its specified public Go artifact", task.ID)
-		}
-		verification := "package arithmetic\nimport \"testing\"\nfunc TestExternalTandemAcceptance(t *testing.T){" + oracle + "}\n"
-		if err = os.WriteFile(filepath.Join(a.Workspace.Path, "tandem_acceptance_test.go"), []byte(verification), 0600); err != nil {
-			t.Fatal(err)
-		}
-		command := exec.CommandContext(ctx, "go", "test", "-timeout=15s", "./...")
-		command.Dir = a.Workspace.Path
-		// No control-plane/provider environment is injected into generated code.
-		command.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME"), "GOTOOLCHAIN=local", "GOPROXY=off", "GOSUMDB=off", "CGO_ENABLED=0"}
-		output, testErr := command.CombinedOutput()
+		output, testErr := arithmeticOracle(ctx, a.Workspace.Path, assignments[task.ID])
 		if testErr != nil {
 			t.Fatalf("actual fixture tests failed for %s: %s", task.ID, output)
 		}
@@ -274,6 +262,15 @@ func TestLiveCoordinatorDelegationAcceptance(t *testing.T) {
 			if len(continued.Tasks) != 3 {
 				t.Fatal("continuation duplicated delegated work")
 			}
+			coverage, x := arithmeticWorkers(continued, parent.ID)
+			if x != nil || len(coverage) != len(assignments) {
+				t.Fatal("continuation changed workload coverage", x)
+			}
+			for id, operation := range assignments {
+				if coverage[id] != operation || continued.Tasks[id].AttemptID != snapshot.Tasks[id].AttemptID {
+					t.Fatal("continuation replaced delegated work")
+				}
+			}
 			break
 		}
 		select {
@@ -294,6 +291,70 @@ func TestLiveCoordinatorDelegationAcceptance(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(summary.String())
+}
+
+func arithmeticWorkers(s core.State, parent string) (map[string]string, error) {
+	assignments := map[string]string{}
+	seen := map[string]bool{}
+	for _, task := range s.Tasks {
+		if task.ParentID != parent {
+			continue
+		}
+		a, ok := s.Attempts[task.AttemptID]
+		if !ok || a.TaskID != task.ID || task.Role != "worker" {
+			return nil, fmt.Errorf("worker lacks an owned attempt: %s", task.ID)
+		}
+		operation := ""
+		for _, name := range []string{"sum", "product"} {
+			present := 0
+			for _, suffix := range []string{".go", "_test.go"} {
+				info, err := os.Lstat(filepath.Join(a.Workspace.Path, name+suffix))
+				if os.IsNotExist(err) {
+					continue
+				}
+				if err != nil || !info.Mode().IsRegular() {
+					return nil, fmt.Errorf("invalid arithmetic artifact: %s", task.ID)
+				}
+				present++
+			}
+			if present == 0 {
+				continue
+			}
+			if present != 2 || operation != "" || seen[name] {
+				return nil, fmt.Errorf("incomplete, ambiguous or duplicate arithmetic worker: %s", task.ID)
+			}
+			operation = name
+		}
+		if operation == "" {
+			return nil, fmt.Errorf("missing arithmetic workload: %s", task.ID)
+		}
+		seen[operation] = true
+		assignments[task.ID] = operation
+	}
+	if len(assignments) != 2 || !seen["sum"] || !seen["product"] {
+		return nil, fmt.Errorf("expected exactly one Sum and one Product worker")
+	}
+	return assignments, nil
+}
+
+func arithmeticOracle(ctx context.Context, directory, operation string) ([]byte, error) {
+	var oracle string
+	switch operation {
+	case "sum":
+		oracle = "if Sum(2,3)!=5 || Sum(-2,3)!=1 { t.Fatal(\"incorrect Sum\") }"
+	case "product":
+		oracle = "if Product(4,7)!=28 || Product(-2,3)!=-6 { t.Fatal(\"incorrect Product\") }"
+	default:
+		return nil, fmt.Errorf("unexpected arithmetic operation")
+	}
+	verification := "package arithmetic\nimport \"testing\"\nfunc TestExternalTandemAcceptance(t *testing.T){" + oracle + "}\n"
+	if err := os.WriteFile(filepath.Join(directory, "tandem_acceptance_test.go"), []byte(verification), 0600); err != nil {
+		return nil, err
+	}
+	command := exec.CommandContext(ctx, "go", "test", "-timeout=15s", "./...")
+	command.Dir = directory
+	command.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME"), "GOTOOLCHAIN=local", "GOPROXY=off", "GOSUMDB=off", "CGO_ENABLED=0"}
+	return command.CombinedOutput()
 }
 
 // This is a narrow execution-safety preflight for the generated demo artifact,

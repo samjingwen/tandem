@@ -15,8 +15,29 @@ import (
 	"time"
 
 	"github.com/samjingwen/tandem/core"
+	"github.com/samjingwen/tandem/internal/bootstrap"
 	"github.com/samjingwen/tandem/internal/client"
 )
+
+func daemonFixtureDirectory(t *testing.T, source string) string {
+	t.Helper()
+	connection, err := bootstrap.Load(source)
+	if err != nil {
+		t.Fatal("load explicit Tandem-owned connection configuration", err)
+	}
+	directory := t.TempDir()
+	if err = os.Chmod(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(directory, "opencode-connection.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	return directory
+}
 
 // TestLiveDaemonProcessOwnershipAndClientLifetime exercises the actual built
 // service binary against an explicitly supplied Tandem-owned runtime connection.
@@ -30,6 +51,12 @@ func TestLiveDaemonProcessOwnershipAndClientLifetime(t *testing.T) {
 	if !filepath.IsAbs(directory) || !filepath.IsAbs(binary) {
 		t.Fatal("live paths must be absolute")
 	}
+	directory = daemonFixtureDirectory(t, directory)
+	verifyDaemonFixture(t, binary, directory)
+}
+
+func verifyDaemonFixture(t *testing.T, binary, directory string) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	var random [32]byte
@@ -38,7 +65,7 @@ func TestLiveDaemonProcessOwnershipAndClientLifetime(t *testing.T) {
 	}
 	token := hex.EncodeToString(random[:])
 	env := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME"), "TANDEM_TOKEN=" + token}
-	command := exec.CommandContext(ctx, binary, "serve", "--state-dir", directory, "--bind", "127.0.0.1:0")
+	command := exec.CommandContext(ctx, binary, "serve", "--state-dir", directory, "--bind", "127.0.0.1:0", "--allocator", "git")
 	command.Env = env
 	stdout, err := command.StdoutPipe()
 	if err != nil {
@@ -89,6 +116,9 @@ func TestLiveDaemonProcessOwnershipAndClientLifetime(t *testing.T) {
 	if err = first.Do(ctx, http.MethodGet, "/v1/snapshot", "", nil, &snapshot); err != nil {
 		t.Fatal(err)
 	}
+	if len(snapshot.Tasks) != 0 || len(snapshot.Attempts) != 0 || len(snapshot.Projects) != 0 {
+		t.Fatal("daemon fixture inherited existing work")
+	}
 	firstTransport.CloseIdleConnections()
 	second, err := client.New(client.Options{URL: receipt.URL, Token: token})
 	if err != nil {
@@ -101,7 +131,7 @@ func TestLiveDaemonProcessOwnershipAndClientLifetime(t *testing.T) {
 	if reconnected.InstanceID != receipt.InstanceID || snapshot.InstanceID != reconnected.InstanceID {
 		t.Fatal("client replacement changed instance identity")
 	}
-	other := exec.CommandContext(ctx, binary, "serve", "--state-dir", directory, "--bind", "127.0.0.1:0")
+	other := exec.CommandContext(ctx, binary, "serve", "--state-dir", directory, "--bind", "127.0.0.1:0", "--allocator", "git")
 	other.Env = env
 	if err = other.Run(); err == nil {
 		t.Fatal("second actual service process became a scheduler")
