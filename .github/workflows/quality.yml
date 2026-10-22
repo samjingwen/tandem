@@ -1,0 +1,29 @@
+name: quality
+on:
+  pull_request:
+  push:
+    branches: [master]
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    # Cleanup must inspect every same-user cwd and fail closed on unreadable
+    # processes. Keep unrelated hosted-runner processes outside its /proc view.
+    container: buildpack-deps:bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: plugin/package-lock.json
+      - run: make prepare
+      - run: make check
+      - run: make test-race
+      - run: make security
+      - run: make prove-quality
+      - run: make build

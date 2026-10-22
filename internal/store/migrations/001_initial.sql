@@ -1,0 +1,12 @@
+CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE projects (id TEXT PRIMARY KEY, body TEXT NOT NULL CHECK(json_valid(body)));
+CREATE TABLE tasks (id TEXT PRIMARY KEY, body TEXT NOT NULL CHECK(json_valid(body)));
+CREATE TABLE attempts (id TEXT PRIMARY KEY, body TEXT NOT NULL CHECK(json_valid(body)));
+CREATE TABLE commands (id TEXT PRIMARY KEY, body TEXT NOT NULL CHECK(json_valid(body)));
+CREATE TABLE decisions (id TEXT PRIMARY KEY, body TEXT NOT NULL CHECK(json_valid(body)));
+CREATE TABLE results (id TEXT PRIMARY KEY, body TEXT NOT NULL CHECK(json_valid(body)));
+CREATE TABLE operations (id TEXT PRIMARY KEY, body TEXT NOT NULL CHECK(json_valid(body)));
+CREATE UNIQUE INDEX project_path ON projects(json_extract(body, '$.path'));
+CREATE UNIQUE INDEX attempt_session ON attempts(json_extract(body, '$.runtimeId'),json_extract(body, '$.sessionRef'));
+CREATE TABLE history (revision INTEGER NOT NULL, entity TEXT NOT NULL, id TEXT NOT NULL, at TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(revision,entity,id));
+INSERT INTO metadata(key,value) VALUES('revision','0');

@@ -1,0 +1,18 @@
+commands:
+  prepare: make prepare
+  lint: make lint plugin-check prove-quality security
+  format: make format
+  test: >-
+    go test ./internal/integration
+    -run '^Test(IndependentClientsDuplicateCreateDisconnectAndRestart|AnotherClientAnswersDecisionAndAcceptsCurrentGeneration|TaskCleanupResolvesOwnedAttempt)$'
+    -count=1
+pr:
+  publish_intent: false
+document:
+  instructions: >-
+    README.md owns installation and first use.
+    docs/API.md and internal/api/openapi.json own the client contract.
+    docs/OPENCODE.md owns pinned runtime and plugin compatibility.
+    docs/OPERATIONS.md owns operational recovery/security procedures.
+    docs/ARCHITECTURE.md owns design decisions and boundaries.
+    Keep machine-local records and private integration-repository details out of public source.
