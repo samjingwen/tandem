@@ -796,6 +796,9 @@ func (e *Engine) mark(ctx context.Context, id, state string, err error) error {
 			if a.FailureCount < 8 {
 				a.FailureCount++
 			}
+			if a.FailureCount >= 8 && s.Tasks[a.TaskID].Desired == "cancelled" {
+				a.Error += "; cancellation retry budget exhausted; repeat cancel to retry"
+			}
 		}
 		if message := dispatchBudgetError(s, a); message != "" {
 			a.Error = message
@@ -864,6 +867,17 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 		})
 	}
 	if a.Phase == "workspace_pending" || a.Phase == "session_pending" {
+		if t.Desired != "active" {
+			return e.bookkeeping(ctx, func(s *State) error {
+				v := s.Tasks[t.ID]
+				v.State = v.Desired
+				s.Tasks[v.ID] = v
+				a := s.Attempts[id]
+				a.Observed = "idle"
+				s.Attempts[id] = a
+				return nil
+			})
+		}
 		for parent := t.ParentID; parent != ""; parent = s.Tasks[parent].ParentID {
 			if s.Tasks[parent].Desired != "active" {
 				return e.store.Update(ctx, func(s *State) error {
@@ -894,17 +908,6 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 		if a.FailureCount >= 8 {
 			return nil
 		}
-		if t.Desired != "active" {
-			return e.store.Update(ctx, func(s *State) error {
-				v := s.Tasks[t.ID]
-				v.State = v.Desired
-				s.Tasks[v.ID] = v
-				a := s.Attempts[id]
-				a.Observed = "idle"
-				s.Attempts[id] = a
-				return nil
-			})
-		}
 		w, x := e.workspaces.Ensure(ctx, p, a.Workspace)
 		if x != nil {
 			return e.mark(ctx, id, "unknown", x)
@@ -920,17 +923,6 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 	}
 	sp := spec(s, a)
 	if a.Phase == "session_pending" {
-		if t.Desired != "active" {
-			return e.bookkeeping(ctx, func(s *State) error {
-				v := s.Tasks[t.ID]
-				v.State = v.Desired
-				s.Tasks[v.ID] = v
-				a := s.Attempts[id]
-				a.Observed = "idle"
-				s.Attempts[id] = a
-				return nil
-			})
-		}
 		if a.FailureCount >= 8 {
 			observed, x := e.runtime.Inspect(ctx, sp)
 			if x != nil || !observed.Exists || !observed.Owned {
@@ -967,7 +959,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 	}
 	if err = e.bookkeeping(ctx, func(s *State) error {
 		v := s.Attempts[id]
-		clearError := !uncertainDispatch(s, id) && dispatchBudgetError(s, v) == ""
+		clearError := !uncertainDispatch(s, id) && dispatchBudgetError(s, v) == "" && !(s.Tasks[v.TaskID].Desired == "cancelled" && v.FailureCount >= 8)
 		if v.Observed != o.State || (v.Error != "" && clearError) {
 			v.UpdatedAt = now()
 		}

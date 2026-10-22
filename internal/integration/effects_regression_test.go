@@ -426,3 +426,162 @@ func TestPauseSettlesAfterInterruptBudget(t *testing.T) {
 		})
 	}
 }
+
+func TestUnboundControlsSettleAfterDisconnectBudget(t *testing.T) {
+	for _, phase := range []string{"workspace_pending", "session_pending"} {
+		for _, cascade := range []bool{false, true} {
+			for _, action := range []string{"pause", "cancel"} {
+				t.Run(fmt.Sprintf("%s/%t/%s", phase, cascade, action), func(t *testing.T) {
+					f := setup(t)
+					calls := 0
+					fail := func() error { calls++; return errors.New("allocation unavailable") }
+					r := &effectsRuntime{Fake: f.runtime, stage: "session-ensure", call: fail}
+					w := effectsWorkspaces{Workspaces: f.workspace}
+					if phase == "workspace_pending" {
+						w.stage, w.call = "workspace-ensure", fail
+					}
+					e := core.New(f.store, r, w, core.Options{RuntimeID: "fake", Concurrency: 2})
+					var parent core.Task
+					f.do(t, 0, http.MethodPost, "/v1/tasks", "parent", core.CreateTask{ProjectID: f.project.ID, Title: "Parent", Instructions: "Unbound control fixture"}, &parent)
+					if cascade {
+						f.do(t, 0, http.MethodPost, "/v1/tasks", "child", core.CreateTask{ProjectID: f.project.ID, ParentID: parent.ID, Title: "Child", Instructions: "Unbound descendant"}, nil)
+					}
+					if err := e.Tick(f.ctx); err != nil {
+						t.Fatal(err)
+					}
+					s := f.snapshot(t, 0)
+					wantAttempts := 1
+					if cascade {
+						wantAttempts = 2
+					}
+					if len(s.Attempts) != wantAttempts {
+						t.Fatal("fixture did not allocate all attempts", s.Attempts)
+					}
+					for _, a := range s.Attempts {
+						if a.Phase != phase {
+							t.Fatal("fixture did not reach requested phase", a)
+						}
+					}
+					f.do(t, 0, http.MethodPost, "/v1/tasks/"+parent.ID+"/control", "control", core.Control{Action: action, Cascade: cascade}, nil)
+					f.runtime.Disconnected = true
+					for range 8 {
+						if err := e.Tick(f.ctx); err == nil {
+							t.Fatal("runtime disconnect was not observed")
+						}
+					}
+					for _, a := range f.snapshot(t, 0).Attempts {
+						if a.FailureCount != 8 {
+							t.Fatal("disconnect budget was not exhausted", a)
+						}
+					}
+					beforeCalls := calls
+					f.runtime.Disconnected = false
+					for range 2 {
+						if err := e.Tick(f.ctx); err != nil {
+							t.Fatal(err)
+						}
+					}
+					s = f.snapshot(t, 1)
+					want := "paused"
+					if action == "cancel" {
+						want = "cancelled"
+					}
+					for _, a := range s.Attempts {
+						if s.Tasks[a.TaskID].State != want || a.Observed != "idle" || a.Phase != phase {
+							t.Fatal("unbound control failed to settle locally", s.Tasks[a.TaskID], a)
+						}
+					}
+					if calls != beforeCalls || f.runtime.EnsureRequests != 0 || f.runtime.PromptRequests != 0 || f.runtime.Interrupts != 0 {
+						t.Fatal("unbound settlement attempted an external mutation")
+					}
+				})
+			}
+		}
+	}
+}
+
+type cancellationBudgetRuntime struct {
+	*outcomeRuntime
+	calls int
+	fail  bool
+}
+
+func (r *cancellationBudgetRuntime) CancelPending(ctx context.Context, sp core.SessionSpec) error {
+	r.calls++
+	if r.fail {
+		return errors.New("native cancellation rejected")
+	}
+	return r.Fake.CancelPending(ctx, sp)
+}
+
+func TestCancellationBudgetPreservesActionableFailure(t *testing.T) {
+	for _, pending := range []string{"pending", "parked", "reply_pending"} {
+		t.Run(pending, func(t *testing.T) {
+			f := setup(t)
+			task, attempt := f.task(t)
+			if pending == "reply_pending" {
+				f.runtime.SetDecisions(attempt.SessionRef, core.Decision{Kind: "form", RuntimeRef: "cancel-form"})
+				f.tick(t)
+				for _, d := range f.snapshot(t, 0).Decisions {
+					f.do(t, 0, http.MethodPost, "/v1/decisions/"+d.ID+"/reply", "answer", core.ReplyDecision{Answer: json.RawMessage(`{"answer":{"value":"yes"}}`)}, nil)
+				}
+			} else {
+				f.do(t, 0, http.MethodPost, "/v1/tasks/"+task.ID+"/followup", "follow", core.Followup{Text: "Never deliver cancelled work"}, nil)
+				if pending == "parked" {
+					f.do(t, 0, http.MethodPost, "/v1/tasks/"+task.ID+"/control", "pause", core.Control{Action: "pause"}, nil)
+					f.tick(t)
+				}
+			}
+			found := false
+			for _, c := range f.snapshot(t, 0).Commands {
+				found = found || c.Status == pending
+			}
+			for _, d := range f.snapshot(t, 0).Decisions {
+				found = found || d.Status == pending
+			}
+			if !found {
+				t.Fatal("fixture did not retain requested pending delivery")
+			}
+			f.do(t, 0, http.MethodPost, "/v1/tasks/"+task.ID+"/control", "cancel", core.Control{Action: "cancel"}, nil)
+			r := &cancellationBudgetRuntime{outcomeRuntime: &outcomeRuntime{Fake: f.runtime}, fail: true}
+			e := core.New(f.store, r, f.workspace, core.Options{RuntimeID: "fake"})
+			for range 10 {
+				if err := e.Tick(f.ctx); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.runtime.SetState(attempt.SessionRef, "idle")
+			if err := e.Tick(f.ctx); err != nil {
+				t.Fatal(err)
+			}
+			s := f.snapshot(t, 1)
+			for _, message := range []string{s.Tasks[task.ID].Error, s.Attempts[attempt.ID].Error} {
+				if !strings.Contains(message, "native cancellation rejected") || !strings.Contains(message, "repeat cancel") || strings.Contains(message, "resume") {
+					t.Fatal("lost actionable cancellation failure", message)
+				}
+			}
+			if r.calls != 8 || s.Tasks[task.ID].State != "recovering" {
+				t.Fatal("cancellation budget not enforced", r.calls, s.Tasks[task.ID])
+			}
+			if _, err := f.engine.Control(f.ctx, "invalid-resume", task.ID, core.Control{Action: "resume"}); err == nil {
+				t.Fatal("cancelled task accepted resume")
+			}
+			r.fail = false
+			f.run(t, 1, &task, "tasks", "cancel", task.ID, "--operation-id", "repeat-cancel")
+			for range 2 {
+				if err := e.Tick(f.ctx); err != nil {
+					t.Fatal(err)
+				}
+			}
+			s = f.snapshot(t, 0)
+			if s.Tasks[task.ID].State != "cancelled" || s.Tasks[task.ID].Error != "" || s.Attempts[attempt.ID].Error != "" || r.calls != 9 || len(r.prompts) != 0 || r.replies != 0 || len(s.Attempts) != 1 {
+				t.Fatal("repeat cancel did not settle without re-admitting work", s.Tasks[task.ID], r.calls)
+			}
+			for _, c := range s.Commands {
+				if c.Status == "pending" || c.Status == "parked" || c.Status == "sending" {
+					t.Fatal("cancelled prompt remained eligible", c)
+				}
+			}
+		})
+	}
+}

@@ -3,7 +3,7 @@ package core
 import "fmt"
 
 func dispatchBudgetError(s *State, a Attempt) string {
-	if a.FailureCount < 8 {
+	if a.FailureCount < 8 || s.Tasks[a.TaskID].Desired == "cancelled" {
 		return ""
 	}
 	for _, c := range s.Commands {
