@@ -265,9 +265,11 @@ func (e *Engine) Followup(ctx context.Context, op, id string, input Followup) (T
 			a.Generation = t.Generation
 			a.FailureCount = 0
 			s.Attempts[a.ID] = a
-			c := Command{ID: ID("cmd_"), TaskID: t.ID, AttemptID: a.ID, Kind: "prompt", Text: fmt.Sprintf("Task generation %d.\n%s", t.Generation, input.Text), Status: "pending", Generation: t.Generation, Sequence: s.Revision + 1}
-			s.Commands[c.ID] = c
-			t.State = "running"
+			if _, initialized := s.Commands["initial_"+a.ID]; initialized {
+				c := Command{ID: ID("cmd_"), TaskID: t.ID, AttemptID: a.ID, Kind: "prompt", Text: fmt.Sprintf("Task generation %d.\n%s", t.Generation, input.Text), Status: "pending", Generation: t.Generation, Sequence: s.Revision + 1}
+				s.Commands[c.ID] = c
+				t.State = "running"
+			}
 		}
 		s.Tasks[id] = t
 		return t, nil
@@ -1085,6 +1087,8 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				return err
 			}
 			if err = e.runtime.Reply(ctx, sp, d, d.Reply); err != nil {
+				ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+				defer cancel()
 				var undelivered *NotDelivered
 				var rejected *Error
 				if errors.As(err, &rejected) && rejected.Code == "invalid_request" {
@@ -1166,6 +1170,8 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			err = e.runtime.Prompt(ctx, sp, c.ID, c.Text)
 		}
 		if err != nil {
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
 			var undelivered *NotDelivered
 			if errors.As(err, &undelivered) {
 				if x := e.store.Update(ctx, func(s *State) error { v := s.Commands[c.ID]; v.Status = "pending"; s.Commands[c.ID] = v; return nil }); x != nil {

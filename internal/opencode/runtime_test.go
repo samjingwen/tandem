@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/samjingwen/tandem/core"
 )
@@ -334,6 +335,48 @@ func TestPromptPreflightAndRejectedWritesProveNonDelivery(t *testing.T) {
 				t.Fatalf("known undelivered prompt could not retry: %v, writes=%d", err, posts)
 			}
 		})
+	}
+}
+
+func TestExpiredPreflightNeverPosts(t *testing.T) {
+	for _, operation := range []string{"prompt", "reply"} {
+		for _, stage := range []string{"ownership", "admission"} {
+			for _, expiry := range []string{"cancel", "deadline"} {
+				t.Run(operation+"/"+stage+"/"+expiry, func(t *testing.T) {
+					spec := testSpec()
+					ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+					defer cancel()
+					var posts, blocked atomic.Int32
+					r := testRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+						if req.Method == http.MethodPost {
+							posts.Add(1)
+							w.WriteHeader(http.StatusInternalServerError)
+							return
+						}
+						ownership := req.URL.Path == sessionPath(spec)
+						if ownership && stage == "ownership" || !ownership && stage == "admission" {
+							blocked.Add(1)
+							if expiry == "cancel" {
+								cancel()
+							}
+							<-req.Context().Done()
+							return
+						}
+						writeData(w, ownedSession(spec))
+					})
+					var err error
+					if operation == "prompt" {
+						err = r.Prompt(ctx, spec, "command", "payload")
+					} else {
+						err = r.Reply(ctx, spec, core.Decision{TaskID: spec.TaskID, AttemptID: spec.AttemptID, RuntimeRef: "form_1", Kind: "form"}, json.RawMessage(`{"answer":{"field":"value"}}`))
+					}
+					var undelivered *core.NotDelivered
+					if !errors.As(err, &undelivered) || !errors.Is(err, ctx.Err()) || blocked.Load() != 1 || posts.Load() != 0 {
+						t.Fatalf("expired preflight err=%v blocked=%d posts=%d", err, blocked.Load(), posts.Load())
+					}
+				})
+			}
+		}
 	}
 }
 

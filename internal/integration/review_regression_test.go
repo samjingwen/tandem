@@ -1,15 +1,224 @@
 package integration_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/samjingwen/tandem/core"
+	"github.com/samjingwen/tandem/internal/testruntime"
 )
+
+type outcomeRuntime struct {
+	*testruntime.Fake
+	promptOutcome func(context.Context) error
+	replyOutcome  func(context.Context) error
+	prompts       []string
+	replies       int
+}
+
+func (r *outcomeRuntime) Prompt(ctx context.Context, spec core.SessionSpec, id, text string) error {
+	r.prompts = append(r.prompts, text)
+	if r.promptOutcome != nil {
+		return r.promptOutcome(ctx)
+	}
+	return r.Fake.Prompt(ctx, spec, id, text)
+}
+
+func (r *outcomeRuntime) Reply(ctx context.Context, spec core.SessionSpec, d core.Decision, answer json.RawMessage) error {
+	r.replies++
+	if r.replyOutcome != nil {
+		return r.replyOutcome(ctx)
+	}
+	return r.Fake.Reply(ctx, spec, d, answer)
+}
+
+func TestExpiredDispatchContextPreservesOutcome(t *testing.T) {
+	for _, expiry := range []string{"cancel", "deadline"} {
+		for _, operation := range []string{"prompt", "reply"} {
+			for _, outcome := range []string{"undelivered", "rejected", "ambiguous"} {
+				t.Run(expiry+"/"+operation+"/"+outcome, func(t *testing.T) {
+					f := setup(t)
+					task, attempt := f.task(t)
+					var decision core.Decision
+					if operation == "prompt" {
+						f.do(t, 1, http.MethodPost, "/v1/tasks/"+task.ID+"/followup", "continue", core.Followup{Text: "Continue after preflight"}, nil)
+					} else {
+						f.runtime.SetDecisions(attempt.SessionRef, core.Decision{RuntimeRef: "form_expiry", Kind: "form"})
+						f.tick(t)
+						for _, d := range f.snapshot(t, 1).Decisions {
+							decision = d
+						}
+						f.do(t, 1, http.MethodPost, "/v1/decisions/"+decision.ID+"/reply", "answer", core.ReplyDecision{Answer: json.RawMessage(`{"answer":{"field":"value"}}`)}, nil)
+					}
+					var callCtx context.Context
+					var cancel context.CancelFunc
+					if expiry == "cancel" {
+						callCtx, cancel = context.WithCancel(f.ctx)
+					} else {
+						callCtx, cancel = context.WithTimeout(f.ctx, time.Second)
+					}
+					defer cancel()
+					injected := false
+					fail := func(ctx context.Context) error {
+						injected = true
+						if expiry == "cancel" {
+							cancel()
+						}
+						<-ctx.Done()
+						if outcome == "ambiguous" {
+							return ctx.Err()
+						}
+						if outcome == "rejected" {
+							return &core.NotDelivered{Err: core.Invalid("deterministically rejected")}
+						}
+						return &core.NotDelivered{Err: ctx.Err()}
+					}
+					r := &outcomeRuntime{Fake: f.runtime}
+					if operation == "prompt" {
+						r.promptOutcome = fail
+					} else {
+						r.replyOutcome = fail
+					}
+					engine := core.New(f.store, r, f.workspace, core.Options{RuntimeID: "fake"})
+					if err := engine.Tick(callCtx); err == nil || !injected {
+						t.Fatalf("dispatch context did not expire at the runtime boundary: %v", err)
+					}
+					s := f.snapshot(t, 0)
+					if operation == "prompt" {
+						want := "pending"
+						if outcome == "ambiguous" {
+							want = "sending"
+						}
+						for _, c := range s.Commands {
+							if c.ID != "initial_"+attempt.ID && c.Kind == "prompt" && c.Status != want {
+								t.Fatalf("prompt status=%s want %s", c.Status, want)
+							}
+						}
+					} else {
+						want := "reply_pending"
+						if outcome == "rejected" {
+							want = "pending"
+						} else if outcome == "ambiguous" {
+							want = "uncertain"
+						}
+						if got := s.Decisions[decision.ID]; got.Status != want || (outcome == "rejected" && (got.Reply != nil || got.Error == "")) {
+							t.Fatalf("decision=%+v want %s", got, want)
+						}
+					}
+					if operation != "reply" || outcome != "rejected" {
+						if a := s.Attempts[attempt.ID]; a.FailureCount != 1 || a.Error == "" || s.Tasks[task.ID].State != "recovering" {
+							t.Fatalf("failure bookkeeping lost: %+v", a)
+						}
+					} else if s.Tasks[task.ID].State != "waiting_for_input" {
+						t.Fatal("rejected answer did not allow correction")
+					}
+					r.promptOutcome, r.replyOutcome = nil, nil
+					if operation == "reply" && outcome == "rejected" {
+						f.do(t, 0, http.MethodPost, "/v1/decisions/"+decision.ID+"/reply", "correct-answer", core.ReplyDecision{Answer: json.RawMessage(`{"answer":{"field":"corrected"}}`)}, nil)
+					}
+					for range 2 {
+						if err := engine.Tick(f.ctx); err != nil {
+							t.Fatal(err)
+						}
+					}
+					s = f.snapshot(t, 1)
+					creates, prompts, _ := f.runtime.Counts()
+					if creates != 1 || len(s.Attempts) != 1 || s.Tasks[task.ID].AttemptID != attempt.ID {
+						t.Fatal("outcome recovery replaced the existing attempt")
+					}
+					if operation == "prompt" {
+						want := 2
+						if outcome == "ambiguous" {
+							want = 1
+						}
+						if len(r.prompts) != want || prompts != want {
+							t.Fatalf("prompt mutations=%d admitted=%d want %d", len(r.prompts), prompts, want)
+						}
+					} else if outcome == "ambiguous" {
+						if r.replies != 1 || s.Decisions[decision.ID].Status != "uncertain" {
+							t.Fatal("ambiguous reply was retried")
+						}
+					} else if r.replies != 2 || s.Decisions[decision.ID].Status != "answered" {
+						t.Fatal("proven undelivered reply did not recover")
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestFollowupBeforeInitialCommandCoalescesAfterCreateCrash(t *testing.T) {
+	for _, viaCLI := range []bool{false, true} {
+		t.Run(fmt.Sprint(viaCLI), func(t *testing.T) {
+			f := setup(t)
+			f.do(t, 0, http.MethodPost, "/v1/projects", "project-policy", core.RegisterProject{Name: "fixture", Path: f.repo, BaseRef: "master", Instructions: "Project policy payload"}, nil)
+			var task core.Task
+			f.do(t, 0, http.MethodPost, "/v1/tasks", "create", core.CreateTask{ProjectID: f.project.ID, Title: "Crash window", Instructions: "Original task context"}, &task)
+			crashing := core.New(f.store, f.runtime, f.workspace, core.Options{RuntimeID: "fake", AfterCreate: func(core.Attempt) error {
+				return errors.New("crash before binding commit")
+			}})
+			if err := crashing.Tick(f.ctx); err != nil {
+				t.Fatal(err)
+			}
+			s := f.snapshot(t, 1)
+			attempt := s.Attempts[s.Tasks[task.ID].AttemptID]
+			if attempt.Phase != "session_pending" || len(s.Commands) != 0 {
+				t.Fatal("did not reach session-create/binding crash window")
+			}
+			f.server.Close()
+			if err := f.store.Close(); err != nil {
+				t.Fatal(err)
+			}
+			f.open(t)
+			follow := func(op, text string) {
+				if viaCLI {
+					var got core.Task
+					f.run(t, 1, &got, "tasks", "followup", task.ID, "--text", text, "--operation-id", op)
+				} else {
+					f.do(t, 1, http.MethodPost, "/v1/tasks/"+task.ID+"/followup", op, core.Followup{Text: text}, nil)
+				}
+			}
+			follow("early", "Early followup payload")
+			follow("early", "Early followup payload")
+			if len(f.snapshot(t, 0).Commands) != 0 {
+				t.Fatal("followup created a command before the initial prompt")
+			}
+			r := &outcomeRuntime{Fake: f.runtime}
+			engine := core.New(f.store, r, f.workspace, core.Options{RuntimeID: "fake"})
+			if err := engine.Tick(f.ctx); err != nil {
+				t.Fatal(err)
+			}
+			follow("late", "Later continuation payload")
+			follow("late", "Later continuation payload")
+			for range 2 {
+				if err := engine.Tick(f.ctx); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if len(r.prompts) != 2 {
+				t.Fatalf("delivered %d prompts, want initial then continuation", len(r.prompts))
+			}
+			initial, continuation := r.prompts[0], r.prompts[1]
+			if !strings.Contains(initial, "Project policy payload") || !strings.Contains(initial, "Instruction generation: 2") || strings.Index(initial, "Original task context") < 0 || strings.Index(initial, "Original task context") > strings.Index(initial, "Early followup payload") || strings.Count(initial, "Early followup payload") != 1 {
+				t.Fatalf("initial prompt lost or reordered context: %s", initial)
+			}
+			if strings.Contains(initial, "Later continuation payload") || strings.Contains(continuation, "Early followup payload") || strings.Count(continuation, "Later continuation payload") != 1 || !strings.Contains(continuation, "Task generation 3.") {
+				t.Fatalf("followup duplicated or delivered out of order: %q", r.prompts)
+			}
+			creates, prompts, _ := f.runtime.Counts()
+			if creates != 1 || prompts != 2 || len(f.snapshot(t, 1).Attempts) != 1 {
+				t.Fatal("crash recovery duplicated the worker")
+			}
+		})
+	}
+}
 
 func TestUndeliveredPromptRetriesWithoutReplacingAttempt(t *testing.T) {
 	for _, failure := range []error{errors.New("preflight read disconnected"), core.Invalid("request rejected")} {
