@@ -54,6 +54,7 @@ Identical retries return the original receipt; conflicting reuse fails.
 External calls and commits are not one transaction.
 Dispatch intent, worktree ownership, and runtime references are persisted before their external effects.
 Recoverable external calls use the same verified identifiers, never a speculative replacement session.
+After an external call returns, effects-owned outcome/failure bookkeeping uses a separate five-second context before releasing effect ownership, so cancellation of the call context does not erase its outcome.
 
 ## Ownership and concurrency
 
@@ -96,7 +97,7 @@ Acknowledged control intent is not proof that asynchronous runtime interruption 
 Late or stale-generation results are retained without completing newer or cancelled work.
 Resume inspects the same session before admitting a new continuation command.
 Cancellation tombstones prevent re-admitting cancelled pending commands.
-Cascade controls apply to the task tree; without cascade, existing children continue but new child starts remain blocked by the parent's desired state.
+See [control semantics](OPERATIONS.md#pause-resume-and-cancel) for cascade and ancestor-hold behavior.
 
 Permission replies remain the runtime's decisions and are never automatically approved.
 A reply intent is persisted before delivery.

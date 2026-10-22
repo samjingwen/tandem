@@ -52,8 +52,11 @@ The engine never asks a model repeatedly whether work has finished.
 It wakes a coordinator only for newly recorded child outcomes or questions, using persisted signal IDs so restart does not repeat the same notification.
 The default automatic-notification budget is 32 per coordinator attempt; after that, inspect the task's warning and use explicit follow-ups rather than an unbounded model loop.
 External dispatch writes have a finite automatic retry budget; uncertainty does not become a speculative new worker.
-The default budget is eight failed automatic dispatch writes; read-only reconciliation can still discover a previously admitted request.
+Automatic mutation retries stop after eight recorded attempt failures, including runtime-availability or inspection failures as well as failed writes.
+Read-only reconciliation and local pause/cancel settlement remain available after that budget is exhausted.
 An explicit resume reconciles the existing binding before admitting a continuation.
+Pending prompt/reply delivery retains an exhausted-budget diagnostic until explicit recovery or successful delivery.
+If cancellation exhausts its budget, repeat cancel with a new operation ID to request another bounded cancellation attempt; cancelled tasks cannot resume.
 Missing sessions, conflicting metadata, changed allocator/runtime bindings, or missing/unowned worktrees remain recovering until their ownership is resolved.
 Do not manually rewrite runtime references or database rows to make diagnostics green.
 
@@ -62,9 +65,11 @@ Do not manually rewrite runtime references or database rows to make diagnostics 
 Controls commit a barrier serialized with external admission.
 An already admitted/in-flight request can have produced work before that barrier takes effect.
 The engine accounts for it, interrupts applicable execution, and confirms quiescence before reporting paused/cancelled.
+An owned idle or failed native observation can settle a control; a historical runtime failure need not become idle and is never completion evidence.
 If interruption cannot be confirmed, the task remains recovering with its requested desired state.
 
-Without cascade, a parent hold blocks new child starts but does not interrupt children already executing.
+Without cascade, a paused or cancelled ancestor blocks first execution of unstarted descendants but does not interrupt descendants that have already started.
+An explicitly resumed, already-started descendant continues its existing attempt even while that ancestor remains held.
 Use `--cascade` to apply the control to the task tree.
 Resume never silently creates a replacement attempt.
 A conclusively failed attempt requires the explicit retry control to create another attempt; its prior history and worktree remain retained.

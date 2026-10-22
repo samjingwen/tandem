@@ -6,6 +6,7 @@ Fake-runtime success is not evidence of model/provider availability.
 Previously recorded native/model evaluations predate the dispatch, capacity, cleanup, graph, and generation corrections and do not verify those revised paths.
 They also predate the isolated daemon-store and exact Sum/Product aggregate-oracle corrections; neither changed live evaluation has been rerun as part of review.
 They also predate the bounded read and plugin pagination changes and do not verify that revised live path.
+The subsequent admission-evidence retention, failed-session control settlement, and paused-child continuation corrections likewise have no new native/model acceptance.
 Native/model revalidation remains opt-in using the commands below; review-phase regression checks use disposable fake-runtime and HTTP fixtures only.
 
 ## Required acceptance cases
@@ -32,6 +33,9 @@ Additional tests cover instruction-generation staleness, ancestor dependency cyc
 `TestEffectsBookkeepingAfterExpiry`, `TestExpiredExternalFailuresBoundMutations`, and `TestSuccessfulDispatchAfterExpiry` inject cancelled/deadline-expired external calls against disposable SQLite/Git fixtures and check durable outcomes and bounded writes.
 `TestDispatchBudgetSurvivesIdleAndResume` exercises API/CLI prompt/reply exhaustion, stable idle diagnostics, and same-attempt recovery through explicit resume.
 `TestPauseSettlesAfterInterruptBudget` covers individual and cascade read-only pause settlement after eight failed interrupts, including parked continuations.
+`TestCancellationPreservesUnreconciledInbox` checks that a lost admission response and transient read failure cannot cause cancellation to delete its only admission evidence.
+`TestFailedNativeControlSettlement` and `TestControlRequiresOwnedQuiescentReadback` cover failed-but-quiescent control settlement without accepting missing, foreign, or active sessions.
+`TestPausedAdmissionRetainsStartedChild` covers read-only admission recovery while paused, then explicit continuation under a held ancestor without a duplicate initial prompt.
 `TestDaemonFixtureLeavesPopulatedSourceUntouched` runs production daemon processes against a fresh store with a fake HTTP runtime, checking that supplied populated state remains byte-for-byte unchanged and no task/session operation occurs.
 `TestArithmeticWorkloadCoverage` rejects missing, duplicate, and ambiguous Sum/Product coverage, while `TestArithmeticBehavioralOracles` executes independent Go checks against correct and deliberately incorrect arithmetic fixtures without models.
 The bounded-read regression first reproduces CLI failure after admitting 65 actual valid 128-KiB Unicode tasks through the API, without invoking the fake runtime's mutation methods.
@@ -109,5 +113,6 @@ Inspect the actual request and generated fixture code before making an explicit 
 
 Tenaxe's integration is delivered separately from this public engine repository.
 Its controlled acceptance uses the real Go API and SQLite with a deliberately simulated execution runtime, a minimal Spring context without native bridge beans, and browser reconnect checks.
-That proves the request/projection/reconnect contract, not native-model execution through the full application, remote authentication, production deployment, or real-phone behavior.
+That earlier acceptance predates the additive bounded-read contract in [API.md](API.md#bounded-reads-and-compatibility); compatibility with that contract requires validation by the separate consumer owner.
+It does not prove native-model execution through the full application, remote authentication, production deployment, or real-phone behavior.
 Private application source, runtime data, credentials, and machine-local acceptance handoffs do not belong in this repository.

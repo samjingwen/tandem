@@ -144,7 +144,7 @@ Each record is `{"key":"...","summary":{...},"content":{"cursor":"...","bytes":1
 
 `summary` is an explicitly incomplete navigation/status projection, never a substitute core record or result evidence.
 Decision summaries include `prompt`: up to 1024 UTF-8 bytes of preview, followed by ` [content]` when longer; readable CLI lists sanitize terminal controls and complete prompts remain in the content record.
-Its allowed scalar fields are `id`, `projectId`, `taskId`, `parentId`, `attemptId`, `generation`, `role`, `state`, `desired`, `status`, `kind`, `sequence`, `accepted`, `late`, `phase`, `observed`, `sessionRef`, `title`, `name`, `path`, and `baseRef`.
+Its other scalar fields are `id`, `projectId`, `taskId`, `parentId`, `attemptId`, `generation`, `role`, `state`, `desired`, `status`, `kind`, `sequence`, `accepted`, `late`, `phase`, `observed`, `sessionRef`, `title`, `name`, `path`, and `baseRef`.
 String fields exceeding 1024 UTF-8 bytes are omitted entirely from this projection; an attempt can additionally expose `workspacePath` up to 4096 bytes.
 All omitted fields and original values remain available in the referenced complete JSON record, including dependencies, instructions, command text, errors, decision details/replies, result summaries, and every evidence entry.
 An empty page uses `records: []`; an exact key lookup that does not exist returns 404.

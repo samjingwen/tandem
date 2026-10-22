@@ -100,6 +100,7 @@ Another explicit prompt admission can subsequently wake pending work.
 
 `CancelPending(ctx, spec)` is an optional concrete-adapter extension, not a `core.Runtime` method.
 Use it only after durable engine cancellation, not for pause.
+The engine must durably reconcile every uncertain prompt admission before allowing this deletion; until then it uses only non-deleting interruption and keeps cancellation recovering.
 It first interrupts with `resume=false`, then deletes only pending user items whose session, deterministic message ID, command ID, and Tandem ownership all match.
 Foreign user input, native compaction controls, moves, and synthetic items are preserved.
 Canceled command IDs must remain canceled in Tandem and must never be re-dispatched after their native inbox item disappears.
@@ -189,7 +190,7 @@ The default is **managed-only**, not implicit global coordinator access for ever
 For a trusted development hub, explicitly set `coordinatorDirectory` to that hub's canonical absolute existing directory, such as the canonical path corresponding to the user's `~/code/dev`.
 Only an unbound session whose actual native location equals that exact directory receives global hub authority.
 Ancestor configuration inheritance does not grant those rights to descendant project locations, and symlink aliases, relative paths, missing directories, and prefix matching are not accepted.
-An unbound session outside the configured hub is rejected from Tandem tools before the plugin fetches the global snapshot.
+An unbound session outside the configured hub is rejected from Tandem tools before any Tandem read.
 Managed or malformed/stale/foreign metadata never falls back to hub authority, even at the hub location.
 Omit this option when no global conversational hub is desired.
 
@@ -266,7 +267,7 @@ The plugin is a model privilege boundary layered over the single-user administra
 ## Verification
 
 The Go tests use `httptest` to cover exact envelopes, Basic auth, version rejection, ownership collisions, lost-response recovery across fresh adapter instances, prompt read/delivery races, decisions, interrupt/cancellation semantics, malformed responses, and bounded SSE parsing.
-The plugin tests exercise service routes, exact operation-ID constraints, secure owned token fixtures, explicit hub opt-in and descendant denial before snapshot fetch, project filtering across every map, immutable role/directory bindings, controls, self-answer denial, generation forwarding, result ownership, and blocking/rejected native confirmations.
+The plugin tests exercise service routes, exact operation-ID constraints, secure owned token fixtures, explicit hub opt-in and descendant denial before service reads, project-scoped record/content pages, immutable role/directory bindings, controls, self-answer denial, generation forwarding, result ownership, and blocking/rejected native confirmations.
 Executable quality probes verify that representative formatter, ESLint, and TypeScript violations fail while conforming fixtures pass.
 
 ```sh
