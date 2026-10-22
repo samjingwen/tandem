@@ -143,6 +143,7 @@ Each record page contains `instanceId`, `revision`, `collection`, `records`, and
 Each record is `{"key":"...","summary":{...},"content":{"cursor":"...","bytes":12345,"sha256":"..."}}`.
 
 `summary` is an explicitly incomplete navigation/status projection, never a substitute core record or result evidence.
+Decision summaries include `prompt`: up to 1024 UTF-8 bytes of preview, followed by ` [content]` when longer; readable CLI lists sanitize terminal controls and complete prompts remain in the content record.
 Its allowed scalar fields are `id`, `projectId`, `taskId`, `parentId`, `attemptId`, `generation`, `role`, `state`, `desired`, `status`, `kind`, `sequence`, `accepted`, `late`, `phase`, `observed`, `sessionRef`, `title`, `name`, `path`, and `baseRef`.
 String fields exceeding 1024 UTF-8 bytes are omitted entirely from this projection; an attempt can additionally expose `workspacePath` up to 4096 bytes.
 All omitted fields and original values remain available in the referenced complete JSON record, including dependencies, instructions, command text, errors, decision details/replies, result summaries, and every evidence entry.
@@ -173,6 +174,12 @@ When that exact outcome exceeds 256 KiB, the response is a bounded `{"instanceId
 The record's content references the exact durable operation outcome, not a later current task substituted for an old replay.
 Small negotiated responses keep their original shape.
 Receipt content uses the same chunk interface; `collection=receipts` additionally permits an exact caller-retained operation `key`, never journal enumeration or fingerprint access.
+Receipt content cursors bind the project derived from the durable outcome's project identity or immutable task/attempt binding, not a caller-supplied project claim.
+Exact recovery uses `GET /v1/reads/records?collection=receipts&key=OPERATION_ID&instanceId=INSTANCE&revision=REVISION&projectId=PROJECT` after fetching a current manifest; `projectId` is optional for unscoped API clients and mandatory for managed plugin reads.
+The response is the ordinary one-record page, containing the original outcome's content reference, byte length and checksum, never a newer task representation.
+Unknown or foreign-project operation keys return 404; receipt enumeration and task/state/status/session filters are rejected.
+The managed `tandem_status` tool accepts `collection: "receipts"` with the retained operation ID as `key`, and follows receipt `contentCursor` values while repeating its verified assignment project guard.
+Revision changes or handler restart invalidate receipt cursors just like other read cursors; discard partial bytes, fetch a new manifest and recover the same exact operation key without reposting a mutation.
 The six-count manifest does not expose the operation journal.
 As with any other uncertain mutation response, a failed receipt traversal retains the original operation ID and exact input for explicit reconciliation; it never authorizes an automatic POST retry or replacement operation ID.
 

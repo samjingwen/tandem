@@ -165,9 +165,10 @@ func (cursor readCursor) values() url.Values {
 }
 
 type readRow struct {
-	key   string
-	value any
-	order int64
+	key       string
+	projectID string
+	value     any
+	order     int64
 }
 
 func readRows(state core.State, cursor readCursor) ([]readRow, bool) {
@@ -176,7 +177,7 @@ func readRows(state core.State, cursor readCursor) ([]readRow, bool) {
 		if (cursor.Key != "" && cursor.Key != key) || (cursor.ProjectID != "" && cursor.ProjectID != projectID) || (cursor.TaskID != "" && cursor.TaskID != taskID) || (cursor.State != "" && cursor.State != status) || (cursor.Status != "" && cursor.Status != status) || (cursor.SessionRef != "" && cursor.SessionRef != sessionRef) {
 			return
 		}
-		rows = append(rows, readRow{key: key, value: value, order: order})
+		rows = append(rows, readRow{key: key, projectID: projectID, value: value, order: order})
 	}
 	project := func(taskID string) string { return state.Tasks[taskID].ProjectID }
 	if cursor.State != "" && cursor.Collection != "tasks" || cursor.Status != "" && cursor.Collection != "decisions" || cursor.SessionRef != "" && cursor.Collection != "attempts" || cursor.TaskID != "" && cursor.Collection == "projects" {
@@ -210,11 +211,11 @@ func readRows(state core.State, cursor readCursor) ([]readRow, bool) {
 	case "receipts":
 		// Receipts are addressable only by a caller-retained exact operation ID.
 		// Never enumerate the private journal or expose its fingerprint metadata.
-		if cursor.Key == "" || cursor.ProjectID != "" || cursor.TaskID != "" {
+		if cursor.Key == "" || cursor.TaskID != "" || cursor.State != "" || cursor.Status != "" || cursor.SessionRef != "" {
 			return nil, false
 		}
 		if value, exists := state.Operations[cursor.Key]; exists {
-			add(cursor.Key, "", "", "", "", value.Outcome, 0)
+			add(cursor.Key, receiptProject(state, value.Outcome), "", "", "", value.Outcome, 0)
 		}
 	default:
 		return nil, false
@@ -226,6 +227,31 @@ func readRows(state core.State, cursor readCursor) ([]readRow, bool) {
 		return rows[i].key < rows[j].key
 	})
 	return rows, true
+}
+
+func receiptProject(state core.State, outcome json.RawMessage) string {
+	var binding struct {
+		ID        string `json:"id"`
+		ProjectID string `json:"projectId"`
+		TaskID    string `json:"taskId"`
+		Owner     string `json:"owner"`
+	}
+	if json.Unmarshal(outcome, &binding) != nil {
+		return ""
+	}
+	if binding.ProjectID != "" {
+		return binding.ProjectID
+	}
+	if binding.TaskID != "" {
+		return state.Tasks[binding.TaskID].ProjectID
+	}
+	if binding.Owner != "" {
+		return state.Tasks[state.Attempts[binding.Owner].TaskID].ProjectID
+	}
+	if project, ok := state.Projects[binding.ID]; ok {
+		return project.ID
+	}
+	return ""
 }
 
 func (h *handler) readRecords(w http.ResponseWriter, cursor readCursor, rows []readRow) {
@@ -243,6 +269,9 @@ func (h *handler) readRecords(w http.ResponseWriter, cursor readCursor, rows []r
 		}
 		content := cursor
 		content.Type, content.Key, content.Offset = "content", row.key, 0
+		if cursor.Collection == "receipts" {
+			content.ProjectID = row.projectID
+		}
 		h.readCache.put(content, data)
 		hash := sha256.Sum256(data)
 		record := readmodel.Record{Key: row.key, Summary: readSummary(data), Content: readmodel.ContentRef{Cursor: h.signCursor(content), Bytes: len(data), SHA256: hex.EncodeToString(hash[:])}}
@@ -287,6 +316,16 @@ func readSummary(data []byte) map[string]any {
 			continue
 		}
 		summary[key] = value
+	}
+	if prompt, ok := full["prompt"].(string); ok {
+		if len(prompt) > 1024 {
+			end := 1024
+			for !utf8.RuneStart(prompt[end]) {
+				end--
+			}
+			prompt = prompt[:end] + " [content]"
+		}
+		summary["prompt"] = prompt
 	}
 	if workspace, ok := full["workspace"].(map[string]any); ok {
 		if path, ok := workspace["path"].(string); ok && len(path) <= 4096 {
@@ -388,7 +427,7 @@ func (h *handler) mutationResult(w http.ResponseWriter, r *http.Request, value a
 		return
 	}
 	revision := readmodel.Revision{InstanceID: state.InstanceID, Revision: state.Revision}
-	cursor := readCursor{Revision: revision, Type: "content", Collection: "receipts", Key: op, Limit: 1}
+	cursor := readCursor{Revision: revision, Type: "content", Collection: "receipts", Key: op, ProjectID: receiptProject(state, outcome.Outcome), Limit: 1}
 	h.readCache.put(cursor, data)
 	hash := sha256.Sum256(data)
 	w.Header().Set("Preference-Applied", "return=bounded")

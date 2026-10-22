@@ -230,6 +230,8 @@ Use a record's `content.cursor` as `contentCursor` to inspect a complete-record 
 Record page continuations use `cursor` and the same collection; no tool reconstructs a global snapshot or silently follows every content reference.
 The client's response reader enforces 256 KiB for bounded read envelopes and 8 MiB for legacy/small mutation envelopes, with no larger-cap workaround.
 Mutation requests explicitly negotiate `Prefer: return=bounded`; a large result returns its exact durable receipt reference rather than filling the model context with accumulated task text.
+Managed receipt references bind the project's durable identity and can be traversed through `tandem_status` with `contentCursor`, without dropping the project guard.
+To recover after a stale cursor or handler restart, use `collection: "receipts"` and the retained operation ID as `key`, then traverse the new content reference; this returns the original outcome, not the task's current state, and never enumerates operation IDs.
 Authority reads a manifest, at most two session-matching attempt summaries to reject ambiguity, and individually requested task/decision records at that revision, not all retained instructions/history.
 Project scope is repeated as an exact-match cursor guard on both status record and content pages.
 Decision forwarding hydrates only its explicit request record, capped at 8 MiB of decoded JSON; larger requests remain fully inspectable through bounded status content pages and require the native user interface rather than automatic forwarding.

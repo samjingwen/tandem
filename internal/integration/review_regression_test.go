@@ -20,6 +20,7 @@ type outcomeRuntime struct {
 	promptOutcome  func(context.Context) error
 	replyOutcome   func(context.Context) error
 	afterDelivery  func(context.Context)
+	deliveryError  error
 	afterReconcile func(context.Context)
 	prompts        []string
 	replies        int
@@ -33,6 +34,9 @@ func (r *outcomeRuntime) Prompt(ctx context.Context, spec core.SessionSpec, id, 
 	err := r.Fake.Prompt(ctx, spec, id, text)
 	if err == nil && r.afterDelivery != nil {
 		r.afterDelivery(ctx)
+	}
+	if err == nil && r.deliveryError != nil {
+		return r.deliveryError
 	}
 	return err
 }

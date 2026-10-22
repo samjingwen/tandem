@@ -1140,6 +1140,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 			}); err != nil {
 				return err
 			}
+			a.Phase = "executing"
 		}
 	}
 	commands := make([]Command, 0)
@@ -1166,6 +1167,13 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 				err = reconciler.ReconcilePrompt(ctx, sp, c.ID, c.Text)
 			}
 		} else {
+			if a.Phase == "session_bound" {
+				for parent := t.ParentID; parent != ""; parent = s.Tasks[parent].ParentID {
+					if s.Tasks[parent].Desired != "active" {
+						return nil
+					}
+				}
+			}
 			if (o.State == "idle" || o.State == "failed") && !e.capacityAvailable(&s, a) {
 				return nil
 			}
@@ -1205,6 +1213,7 @@ func (e *Engine) reconcile(ctx context.Context, id string) error {
 		}); err != nil {
 			return err
 		}
+		a.Phase = "executing"
 	}
 	return nil
 }

@@ -229,11 +229,11 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
     {
       name: "status",
       description:
-        "Read one bounded revision-pinned record or content page. Follow nextCursor explicitly; omitted record fields remain available through content.cursor. Idle native sessions are not completion evidence.",
+        "Read one bounded revision-pinned record or content page. Receipts require an exact retained operation ID as key. Follow nextCursor explicitly; omitted record fields remain available through content.cursor. Idle native sessions are not completion evidence.",
       input: schema({
         collection: {
           type: "string",
-          enum: ["projects", "tasks", "attempts", "commands", "decisions", "results"],
+          enum: ["projects", "tasks", "attempts", "commands", "decisions", "results", "receipts"],
         },
         cursor: string,
         contentCursor: string,
@@ -254,7 +254,11 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
             ),
           )
         const collection = input.collection === undefined ? "tasks" : text(input.collection, "collection")
-        if (!["projects", "tasks", "attempts", "commands", "decisions", "results"].includes(collection))
+        if (
+          !["projects", "tasks", "attempts", "commands", "decisions", "results", "receipts"].includes(
+            collection,
+          )
+        )
           throw new Error("Unsupported collection")
         const filters: Record<string, string> = owned ? { projectId: owned.task.projectId } : {}
         for (const key of ["cursor", "key", "taskId"])
