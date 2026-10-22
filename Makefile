@@ -40,7 +40,7 @@ build: build-core plugin-build
 
 build-core:
 	mkdir -p bin
-	CGO_ENABLED=0 go build -trimpath -o bin/tandem ./cmd/tandem
+	CGO_ENABLED=0 go build -buildvcs=false -trimpath -o bin/tandem ./cmd/tandem
 
 plugin-build:
 	npm --prefix plugin run build
