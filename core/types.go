@@ -131,6 +131,13 @@ type Store interface {
 	Close() error
 }
 
+// RevisionSource permits a cheap atomic invalidation check without loading
+// retained content or the operation journal. Implementations must serialize it
+// with updates just as they serialize Snapshot. It does not expose storage APIs.
+type RevisionSource interface {
+	ReadRevision(context.Context) (string, int64, error)
+}
+
 type RuntimeInfo struct {
 	ID         string `json:"id"`
 	Version    string `json:"version"`

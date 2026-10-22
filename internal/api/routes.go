@@ -49,6 +49,12 @@ func (h *handler) route(w http.ResponseWriter, r *http.Request) {
 }
 
 func routeMethods(parts []string) string {
+	if len(parts) == 2 && parts[0] == "reads" {
+		switch parts[1] {
+		case "snapshot", "records", "content":
+			return "GET"
+		}
+	}
 	if len(parts) == 1 {
 		switch parts[0] {
 		case "health", "ready", "version", "runtime", "doctor", "snapshot", "events", "decisions", "openapi.json":
@@ -79,6 +85,10 @@ func routeMethods(parts []string) string {
 }
 
 func (h *handler) read(w http.ResponseWriter, r *http.Request, parts []string) {
+	if parts[0] == "reads" {
+		h.boundedRead(w, r, parts[1])
+		return
+	}
 	path := strings.Join(parts, "/")
 	switch path {
 	case "openapi.json":
@@ -239,13 +249,13 @@ func (h *handler) mutate(w http.ResponseWriter, r *http.Request, parts []string)
 		case "projects":
 			if body, ok := decode[core.RegisterProject](w, r, false); ok {
 				value, err := h.service.Register(r.Context(), op, body)
-				respond(w, value, err)
+				h.mutationResult(w, r, value, err)
 			}
 			return
 		case "tasks":
 			if body, ok := decode[core.CreateTask](w, r, false); ok {
 				value, err := h.service.Create(r.Context(), op, body)
-				respond(w, value, err)
+				h.mutationResult(w, r, value, err)
 			}
 			return
 		}
@@ -255,7 +265,7 @@ func (h *handler) mutate(w http.ResponseWriter, r *http.Request, parts []string)
 		if parts[0] == "decisions" && parts[2] == "reply" {
 			if body, ok := decode[core.ReplyDecision](w, r, false); ok {
 				value, err := h.service.Reply(r.Context(), op, id, body)
-				respond(w, value, err)
+				h.mutationResult(w, r, value, err)
 			}
 			return
 		}
@@ -271,23 +281,23 @@ func (h *handler) taskMutation(w http.ResponseWriter, r *http.Request, op, id, a
 	case "followup":
 		if body, ok := decode[core.Followup](w, r, false); ok {
 			value, err := h.service.Followup(r.Context(), op, id, body)
-			respond(w, value, err)
+			h.mutationResult(w, r, value, err)
 		}
 	case "control":
 		if body, ok := decode[core.Control](w, r, false); ok {
 			value, err := h.service.Control(r.Context(), op, id, body)
-			respond(w, value, err)
+			h.mutationResult(w, r, value, err)
 		}
 	case "results":
 		if body, ok := decode[core.SubmitResult](w, r, false); ok {
 			value, err := h.service.SubmitResult(r.Context(), op, id, body)
-			respond(w, value, err)
+			h.mutationResult(w, r, value, err)
 		}
 	case "accept", "cleanup":
 		if _, ok := decode[struct{}](w, r, true); ok {
 			if action == "accept" {
 				value, err := h.service.Accept(r.Context(), op, id)
-				respond(w, value, err)
+				h.mutationResult(w, r, value, err)
 			} else {
 				h.cleanup(w, r, op, id)
 			}
@@ -318,5 +328,5 @@ func (h *handler) cleanup(w http.ResponseWriter, r *http.Request, op, taskID str
 	// and the operation fingerprint before any external cleanup. Never retry a
 	// rejected binding with a replacement attempt or a new operation ID.
 	value, err := h.service.Cleanup(r.Context(), op, attempt.ID)
-	respond(w, value, err)
+	h.mutationResult(w, r, value, err)
 }

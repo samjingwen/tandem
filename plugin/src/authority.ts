@@ -67,7 +67,7 @@ export async function authority(client: TandemClient, native: NativeAccess, cont
   const hub = metadata === undefined && isHub(session, native.coordinatorDirectory)
   if (metadata === undefined && !hub)
     throw new Error("Unbound session is outside the explicitly configured coordinator directory")
-  const state = await client.snapshot(context.signal)
+  const state = await client.snapshot(context.signal, context.sessionID)
   const owned = currentWorker(state, context.sessionID)
   if (!owned && metadata) throw new Error("Managed native session is not a current Tandem attempt")
   if (

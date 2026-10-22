@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/samjingwen/tandem/core"
+	"github.com/samjingwen/tandem/internal/readmodel"
 )
 
 const (
@@ -30,9 +31,10 @@ type Options struct {
 }
 
 type Client struct {
-	base  *url.URL
-	token string
-	http  *http.Client
+	base             *url.URL
+	token            string
+	http             *http.Client
+	boundedMutations bool
 }
 
 // New uses explicit options only. FromEnv is available to opt into environment
@@ -151,6 +153,9 @@ func (c *Client) Do(ctx context.Context, method, path, operationID string, input
 	if mutation {
 		req.GetBody = nil
 		req.Header.Set("X-Operation-ID", operationID)
+		if c.boundedMutations {
+			req.Header.Set("Prefer", "return=bounded")
+		}
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "tandem/"+core.Version)
@@ -165,12 +170,16 @@ func (c *Client) Do(ctx context.Context, method, path, operationID string, input
 		return &TransportError{OperationID: operationID, Uncertain: mutation, Cause: err}
 	}
 	defer func() { _ = response.Body.Close() }()
-	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
+	limit := maxResponseBytes
+	if strings.HasPrefix(rel.Path, "/v1/reads/") || c.boundedMutations {
+		limit = readmodel.MaxPageBytes
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, int64(limit)+1))
 	if err != nil {
 		return &TransportError{OperationID: operationID, Uncertain: mutation, Cause: err}
 	}
-	if len(data) > maxResponseBytes {
-		return &Error{StatusCode: response.StatusCode, Code: "response_too_large", Message: "response exceeds 8 MiB; mutation outcome may need reconciliation", OperationID: operationID}
+	if len(data) > limit {
+		return &Error{StatusCode: response.StatusCode, Code: "response_too_large", Message: "response exceeds the safe byte limit; mutation outcome may need reconciliation", OperationID: operationID}
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		var payload struct {

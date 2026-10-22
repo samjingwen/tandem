@@ -43,6 +43,10 @@ SQLite migrations are append-only, transactional, and version-checked.
 The store has typed document tables, path/session uniqueness indexes, a durable operation journal, and append-only history.
 The first MVP loads the bounded task inventory when applying changes; this favors a small auditable transaction boundary over an ORM.
 This is not intended as an unbounded multi-tenant task warehouse.
+The additive HTTP read interface keeps the manifest and every record/content response byte-bounded independently of inventory and retained text sizes.
+It never silently projects legacy HTTP responses; clients migrate explicitly and traverse complete records with revision-bound cursors.
+A capped per-handler immutable-content cache avoids reloading complete state for every small chunk; a storage-independent revision interface rechecks instance/revision atomically before cached content is served.
+Cache eviction changes performance only, not content availability, revision validation, or admission limits.
 
 Every mutating API request requires a caller-stable operation ID.
 The operation's normalized input fingerprint and outcome commit with the state transition.

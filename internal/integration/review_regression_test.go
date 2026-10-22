@@ -224,7 +224,7 @@ func TestFollowupBeforeInitialCommandCoalescesAfterCreateCrash(t *testing.T) {
 				t.Fatalf("delivered %d prompts, want initial then continuation", len(r.prompts))
 			}
 			initial, continuation := r.prompts[0], r.prompts[1]
-			if !strings.Contains(initial, "Project policy payload") || !strings.Contains(initial, "Instruction generation: 2") || strings.Index(initial, "Original task context") < 0 || strings.Index(initial, "Original task context") > strings.Index(initial, "Early followup payload") || strings.Count(initial, "Early followup payload") != 1 {
+			if !strings.Contains(initial, "Project policy payload") || !strings.Contains(initial, "Instruction generation: 2") || !strings.Contains(initial, "Original task context") || strings.Index(initial, "Original task context") > strings.Index(initial, "Early followup payload") || strings.Count(initial, "Early followup payload") != 1 {
 				t.Fatalf("initial prompt lost or reordered context: %s", initial)
 			}
 			if strings.Contains(initial, "Later continuation payload") || strings.Contains(continuation, "Early followup payload") || strings.Count(continuation, "Later continuation payload") != 1 || !strings.Contains(continuation, "Task generation 3.") {

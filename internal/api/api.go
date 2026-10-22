@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
@@ -30,13 +31,17 @@ type Options struct {
 }
 
 type handler struct {
-	service core.Service
-	token   string
+	service   core.Service
+	token     string
+	cursorKey [32]byte
+	readCache readCache
 }
 
 // New returns a handler without starting a server, scheduler, or runtime.
 func New(service core.Service, options Options) http.Handler {
-	return &handler{service: service, token: options.Token}
+	h := &handler{service: service, token: options.Token}
+	_, _ = rand.Read(h.cursorKey[:])
+	return h
 }
 
 type errorResponse struct {

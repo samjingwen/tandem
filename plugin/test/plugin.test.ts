@@ -4,6 +4,7 @@ import type { ToolContext } from "@opencode/plugin/promise/tool"
 import { currentWorker, TandemClient } from "../src/client.ts"
 import { tools } from "../src/tools.ts"
 import type { AssertPermission, NativeAccess } from "../src/authority.ts"
+import { readFixture } from "./read-fixture.ts"
 
 const state = {
   instanceId: "instance",
@@ -50,7 +51,7 @@ function fixture(
       body: typeof init?.body === "string" ? (JSON.parse(init.body) as unknown) : undefined,
       signal: init?.signal,
     })
-    return Promise.resolve(Response.json(url.pathname === "/v1/snapshot" ? snapshot : { ok: true }))
+    return Promise.resolve(readFixture(snapshot, url))
   }
   const client = new TandemClient("http://127.0.0.1:7000", "test-secret", request)
   const native: NativeAccess = {
@@ -113,7 +114,7 @@ await test("worker proposals are parented to their current task and cannot chang
   const { tool, calls } = fixture()
   const proposal = { operationId: "op", projectId: "project", title: "child", instructions: "do work" }
   await tool("create").execute(proposal, context())
-  assert.deepEqual(calls[1]?.body, {
+  assert.deepEqual(calls.find((call) => call.path === "/v1/tasks")?.body, {
     projectId: "project",
     parentId: "task",
     title: "child",
@@ -136,7 +137,11 @@ await test("explicitly opted-in hub may create an unparented root task", async (
     { operationId: "op", projectId: "project", title: "root", instructions: "plan" },
     context("ses_coordinator"),
   )
-  assert.deepEqual(calls[1]?.body, { projectId: "project", title: "root", instructions: "plan" })
+  assert.deepEqual(calls.find((call) => call.path === "/v1/tasks")?.body, {
+    projectId: "project",
+    title: "root",
+    instructions: "plan",
+  })
 })
 
 await test("structured result derives task/attempt only from current native ownership", async () => {
@@ -153,8 +158,12 @@ await test("structured result derives task/attempt only from current native owne
     },
     context(),
   )
-  assert.equal(calls[1]?.path, "/v1/tasks/task/results")
-  assert.deepEqual(calls[1].body, { attemptId: "attempt", generation: 2, summary: "done", evidence })
+  assert.deepEqual(calls.find((call) => call.path === "/v1/tasks/task/results")?.body, {
+    attemptId: "attempt",
+    generation: 2,
+    summary: "done",
+    evidence,
+  })
   await assert.rejects(
     tool("result").execute(
       { operationId: "bad", generation: 2, summary: "done", evidence },
@@ -199,7 +208,7 @@ await test("stale, ambiguous, malformed, and native metadata collisions reject r
   )
   assert.equal(calls.filter((call) => call.path.endsWith("/results")).length, 0)
   const malformed = fixture({ ...state, tasks: [] })
-  await assert.rejects(malformed.client.snapshot(context().signal), /JSON object/u)
+  await assert.rejects(malformed.client.snapshot(context().signal, "ses_worker"), /instanceId|manifest/u)
 })
 
 await test("uncertain writes are never retried and error text never reveals token or payload", async () => {
@@ -298,12 +307,15 @@ await test("project filtering covers every task-bearing map and drops unknown gl
     futureGlobalExtension: "PRIVATE OTHER PROJECT",
   }
   const f = fixture(snapshot, undefined, { coordinatorDirectory: "/work/task" })
-  const managed = await f.tool("status").execute({}, context())
-  assert.ok(!managed.content.includes("PRIVATE OTHER PROJECT"))
-  assert.ok(managed.content.includes("OWN PROJECT"))
-  assert.ok(managed.content.includes("OWN RESULT"))
+  for (const collection of ["projects", "tasks", "attempts", "commands", "decisions", "results"]) {
+    const managed = await f.tool("status").execute({ collection }, context())
+    const page = JSON.parse(managed.content) as { records: { key: string }[] }
+    assert.ok(!page.records.some((record) => record.key === "foreign" || record.key === "foreign/7"))
+    assert.ok(!managed.content.includes("PRIVATE OTHER PROJECT"))
+  }
   const unbound = await f.tool("status").execute({}, context("ses_dev_coordinator"))
-  assert.ok(unbound.content.includes("PRIVATE OTHER PROJECT"))
+  const page = JSON.parse(unbound.content) as { records: { key: string }[] }
+  assert.ok(page.records.some((record) => record.key === "foreign"))
 })
 
 await test("missing or stale native bindings never fall back to global coordinator authority", async () => {

@@ -56,7 +56,8 @@ Service implementations must honor cancellation; cancellation is not evidence th
 
 All paths below start with `/v1`.
 Successful command responses use HTTP 200, including replays delegated to core.
-List responses are ID-sorted JSON arrays, including `[]` when empty.
+Legacy list responses are ID-sorted JSON arrays, including `[]` when empty.
+Their existing shapes remain unchanged; new clients should use the additive bounded read surface below, not unrestricted inventories.
 
 | Method | Path | Input or query | Response |
 | --- | --- | --- | --- |
@@ -81,6 +82,9 @@ List responses are ID-sorted JSON arrays, including `[]` when empty.
 | POST | `/decisions/{id}/reply` | `{"answer": JSON_VALUE}` | Core `Decision` |
 | GET | `/snapshot` | None | Core `State`, excluding `Operations` |
 | GET | `/events` | None | Live-only SSE revision hints |
+| GET | `/reads/snapshot` | None | Fixed-size instance/revision manifest and six collection counts |
+| GET | `/reads/records` | `collection`, `instanceId`, `revision`, exact filters; or issued `cursor` | One bounded projected record page |
+| GET | `/reads/content` | Issued content `cursor` | One UTF-8-safe chunk of the complete retained JSON record |
 
 `RegisterProject` contains `name`, `path`, `baseRef`, optional `instructions`, and optional `instructionFiles` (up to 16 explicit Markdown paths).
 Registration of an existing canonical path with a new operation ID refreshes its configuration while preserving its stable project ID and already assigned worktrees/sessions.
@@ -109,6 +113,68 @@ Inspect the attempt's `cleanup_pending`/`cleaned` phase and error for the observ
 Task cleanup resolves and verifies the task's current owned attempt from a snapshot, then passes the attempt ID to core.
 Core rechecks terminal task state, runtime ownership/quiescence, clean checkout, and operation fingerprint before changing a workspace.
 The cleanup receipt binds the resolved attempt; a later changed task binding can conflict on retry rather than silently cleaning a replacement attempt.
+
+## Bounded reads and compatibility
+
+The `/v1/reads/` surface is additive: no legacy HTTP read silently changes from a full record/array/State to a projection.
+Existing consumers can migrate explicitly, using the served OpenAPI contract.
+Legacy full reads can still exceed a consumer's safe response limit; they are not the large-inventory traversal interface.
+Valid 128-KiB task instructions, valid followups, configured inventory limits, and all persisted content remain supported without an aggregate admission restriction.
+No task, followup, decision, result, or evidence is truncated or discarded to fit a response.
+
+Start with `GET /v1/reads/snapshot`:
+
+```json
+{"instanceId":"instance","revision":42,"collections":{"projects":1,"tasks":65,"attempts":2,"commands":2,"decisions":0,"results":0},"maxPageBytes":262144,"contentBytes":32768,"maxRecords":64}
+```
+
+The manifest has six counts, not record inventories, so its field count is independent of the configured task count and accumulated history/content.
+Every bounded response is at most 256 KiB, including JSON escaping, envelope fields, and final newline.
+Collection pages default to 32 records and accept `limit=1..64`; the byte budget may end a page earlier.
+Invalid limits are rejected rather than clamped.
+
+For example, request `/v1/reads/records?collection=tasks&instanceId=instance&revision=42&projectId=PROJECT_ID&limit=16`.
+Supported collections are `projects`, `tasks`, `attempts`, `commands`, `decisions`, and `results`.
+Optional exact filters are `key`, `projectId`, and `taskId` (not for projects), plus task-only `state`, decision-only `status`, and attempt-only `sessionRef`.
+Project filtering also applies to attempts, commands, decisions, and results through their owning task.
+The result key remains `attemptId + "/" + generation`.
+Commands sort by durable sequence then key, results by generation then key, and other collections by key.
+Each record page contains `instanceId`, `revision`, `collection`, `records`, and an optional `nextCursor`.
+Each record is `{"key":"...","summary":{...},"content":{"cursor":"...","bytes":12345,"sha256":"..."}}`.
+
+`summary` is an explicitly incomplete navigation/status projection, never a substitute core record or result evidence.
+Its allowed scalar fields are `id`, `projectId`, `taskId`, `parentId`, `attemptId`, `generation`, `role`, `state`, `desired`, `status`, `kind`, `sequence`, `accepted`, `late`, `phase`, `observed`, `sessionRef`, `title`, `name`, `path`, and `baseRef`.
+String fields exceeding 1024 UTF-8 bytes are omitted entirely from this projection; an attempt can additionally expose `workspacePath` up to 4096 bytes.
+All omitted fields and original values remain available in the referenced complete JSON record, including dependencies, instructions, command text, errors, decision details/replies, result summaries, and every evidence entry.
+An empty page uses `records: []`; an exact key lookup that does not exist returns 404.
+
+Fetch `/v1/reads/content?cursor=CONTENT_CURSOR` to read the complete JSON record in byte-bounded chunks.
+Each response contains `instanceId`, `revision`, `collection`, `key`, byte `offset`, `totalBytes`, `text`, `sha256`, and optional `nextCursor`.
+`text` contains at most 32 KiB of original JSON UTF-8 bytes and never splits a UTF-8 code point.
+A chunk need not be independently parseable JSON; concatenate its text bytes in contiguous offset order, verify the declared byte count and SHA-256, then decode the complete record.
+This preserves escaped/control characters, Unicode, arbitrary nested decision JSON, evidence arrays, and single records larger than 8 MiB.
+Stream explicit full output when appropriate instead of retaining a complete inventory in client memory.
+
+Cursors are opaque authenticated claims bound to the instance, global store revision, collection, exact filters, limit, offset, and record/content mode.
+Follow the issued cursor unchanged, using the same endpoint.
+Repeated scope parameters are accepted only when they exactly match the cursor; unknown/repeated query parameters are rejected.
+Changing collection, filter, instance, revision, or limit cannot widen or repurpose a cursor.
+Each page reads one atomic durable revision, not an indefinitely retained historical snapshot.
+Any instance/revision change returns HTTP 409 `stale_read`; invalid, modified, or process-restarted cursors return HTTP 400 `invalid_cursor`.
+Discard the entire partial traversal, fetch a new manifest, and start again; never append a new revision to old partial output.
+Cursor-signing keys rotate when the handler/process restarts, even when the durable instance and revision remain unchanged.
+Cursors are not bearer-token replacements or authorization grants, and every page still requires normal API authentication.
+
+### Large exact mutation receipts
+
+Mutation request bodies, operation fingerprints, durable outcomes, replay identity, and default legacy response shapes are unchanged.
+An accumulated task can also make a mutation's original outcome large, so clients may explicitly send `Prefer: return=bounded`.
+When that exact outcome exceeds 256 KiB, the response is a bounded `{"instanceId":"...","revision":42,"representation":"operation-receipt","operationId":"...","record":{...}}` with `Preference-Applied: return=bounded`.
+The record's content references the exact durable operation outcome, not a later current task substituted for an old replay.
+Small negotiated responses keep their original shape.
+Receipt content uses the same chunk interface; `collection=receipts` additionally permits an exact caller-retained operation `key`, never journal enumeration or fingerprint access.
+The six-count manifest does not expose the operation journal.
+As with any other uncertain mutation response, a failed receipt traversal retains the original operation ID and exact input for explicit reconciliation; it never authorizes an automatic POST retry or replacement operation ID.
 
 Diagnostics contain `ready`, `version`, `instanceId`, `revision`, and `runtime`.
 Readiness requires a successful durable snapshot and compatible runtime information.
@@ -155,7 +221,8 @@ These are invalidation hints, not a durable event log.
 There are no SSE `id` fields and no replay guarantee.
 `Last-Event-ID` is ignored.
 Changes may coalesce, and a notification may be lost on disconnect.
-Fetch `/v1/snapshot` to reconcile authoritative state after connecting, receiving a hint, or reconnecting.
+Fetch `/v1/reads/snapshot` and reconcile authoritative revision-bound pages after connecting, receiving a hint, or reconnecting.
+Legacy consumers may continue using `/v1/snapshot` only when their inventory fits their existing response budget.
 The stream closes on cancellation, storage failure, or its 30-second context deadline.
 Writes are bounded by a five-second deadline capped at the request deadline.
 Clients must reconnect and refetch state rather than treating stream continuity as completion evidence.
@@ -174,6 +241,10 @@ URLs must be HTTP(S) server roots without user information, paths, queries, or f
 POST requests with nil input send `{}` and disable transport body replay, including for bodyless commands.
 The default request timeout is 35 seconds, with an optional caller-supplied `HTTPClient`.
 Responses are bounded to 8 MiB.
+The `/v1/reads/` client boundary is stricter at 256 KiB.
+`Manifest`, `ReadPage`, `Walk`, and `WriteRecord` expose explicit bounded traversal without constructing a full State or inventory.
+`WriteMutation` opts into bounded exact receipts and streams large outcomes after one POST, with no mutation retry.
+An accepted mutation followed by a failed content read returns `*client.ReceiptReadError`, preserving the original `OperationID` and wrapped read failure instead of presenting the GET as a rejected mutation.
 The client never logs credentials, follows redirects, or automatically retries a failed mutation.
 Structured failures are `*client.Error`, retaining HTTP status, code, message, and caller operation ID.
 Transport failures are `*client.TransportError`, retaining the cause for `errors.Is`, the operation ID, and a conservative mutation `Uncertain` flag without printing transport internals.
@@ -188,7 +259,11 @@ Mutation output starts with `Operation ID: ID` on stderr before any network disp
 If no ID is supplied, the CLI generates a cryptographically random ID and prints it first.
 Keep that receipt and the exact command data for any manual retry, including stdin data.
 If the receipt cannot be written, no mutation is dispatched.
-List commands use terminal-control-sanitized tables without `--json`; other responses use formatted JSON.
+List commands use terminal-control-sanitized projected tables without `--json`.
+JSON lists, task details/results, and explicit full snapshots stream complete records through bounded content pages, not an unbounded in-memory aggregate.
+Default `snapshot` returns the lean manifest; `snapshot --full` explicitly requests a streamed full State-shaped export.
+Unlike a successful buffered command, a failed streaming command may leave partial output; discard it on a nonzero exit, including `stale_read`, and restart the whole read rather than appending.
+CLI mutations negotiate bounded exact receipts but still print the original complete outcome, streamed when necessary.
 
 ```text
 projects register --name NAME --path PATH --base-ref REF [--instructions TEXT]
@@ -203,7 +278,7 @@ tasks result ID
 tasks result ID --attempt ID --generation N --summary TEXT [--evidence JSON_ARRAY]
 decisions list [--task ID] [--status STATUS]
 decisions reply ID --answer JSON
-snapshot
+snapshot [--full]
 doctor
 version
 ```

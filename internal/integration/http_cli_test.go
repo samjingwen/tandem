@@ -137,7 +137,7 @@ func (f *fixture) tick(t *testing.T) {
 func (f *fixture) snapshot(t *testing.T, index int) core.State {
 	t.Helper()
 	var state core.State
-	f.run(t, index, &state, "snapshot")
+	f.run(t, index, &state, "snapshot", "--full")
 	return state
 }
 

@@ -211,7 +211,9 @@ The client never retries mutations itself.
 
 Tools use these service routes:
 
-- `GET /v1/snapshot`
+- `GET /v1/reads/snapshot`
+- `GET /v1/reads/records`
+- `GET /v1/reads/content`
 - `POST /v1/tasks`
 - `POST /v1/tasks/{id}/followup`
 - `POST /v1/tasks/{id}/control`
@@ -221,8 +223,17 @@ Tools use these service routes:
 Managed task proposals are parented to their current Tandem task and constrained to its project, including dependencies.
 Ordinary workers cannot propose a coordinator role as a privilege escalation.
 The service remains authoritative for project, parent, role, and dependency validation.
-Managed status responses contain only the owned project's projects/tasks/attempts/commands/decisions/results, preserving composite attempt/generation result keys while dropping unknown global extensions.
-Only an explicitly opted-in unbound hub may read the complete snapshot or create unparented root tasks.
+Managed status responses contain one bounded page of the owned project's projected records, preserving composite attempt/generation result keys and complete-content references while dropping unknown global extensions.
+Only an explicitly opted-in unbound hub may page across projects or create unparented root tasks.
+`tandem_status` defaults to a task page and accepts explicit `collection`, `cursor`, `key`, and `taskId` selectors.
+Use a record's `content.cursor` as `contentCursor` to inspect a complete-record JSON chunk, then pass its `nextCursor` as the next `contentCursor`.
+Record page continuations use `cursor` and the same collection; no tool reconstructs a global snapshot or silently follows every content reference.
+The client's response reader enforces 256 KiB for bounded read envelopes and 8 MiB for legacy/small mutation envelopes, with no larger-cap workaround.
+Mutation requests explicitly negotiate `Prefer: return=bounded`; a large result returns its exact durable receipt reference rather than filling the model context with accumulated task text.
+Authority reads a manifest, at most two session-matching attempt summaries to reject ambiguity, and individually requested task/decision records at that revision, not all retained instructions/history.
+Project scope is repeated as an exact-match cursor guard on both status record and content pages.
+Decision forwarding hydrates only its explicit request record, capped at 8 MiB of decoded JSON; larger requests remain fully inspectable through bounded status content pages and require the native user interface rather than automatic forwarding.
+Stale revisions or invalid/restarted cursors fail explicitly and require starting a new traversal, never a mixed-revision reconstruction.
 Missing, stale, or conflicting managed native metadata never falls back to unbound coordinator authority.
 API authority verifies the native binding before fetching state, then checks its assigned directory against persisted `attempt.workspace.path` and its logical role against the task role.
 Ordinary workers can follow up only their own task and cannot answer any decisions, including their own planning form/question.
@@ -241,7 +252,7 @@ Nothing is forwarded until that assertion succeeds, and native user rejection pr
 After confirmation, coordinator ownership/project scope and the pending decision are checked again; cancellation or a stale binding cannot reuse an earlier ask to forward a reply.
 This gate is separate from the original runtime request and does not grant accept, merge, publication, or cleanup authority.
 
-Results derive task/attempt IDs from `context.sessionID`, the current snapshot's `attempts[].sessionRef`, and the task's current `attemptId`.
+Results derive task/attempt IDs from `context.sessionID`, the pinned attempt's `sessionRef`, and the task's current `attemptId`.
 All tools verify native session metadata against the service instance, task, and attempt before treating a session as managed.
 Unknown sessions, stale attempts, duplicate mappings, and metadata collisions cannot submit another worker's result.
 Result inputs do not select a target task or attempt.

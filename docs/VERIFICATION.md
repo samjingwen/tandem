@@ -5,6 +5,7 @@ Only execution is simulated where a controlled fake runtime is named.
 Fake-runtime success is not evidence of model/provider availability.
 Previously recorded native/model evaluations predate the dispatch, capacity, cleanup, graph, and generation corrections and do not verify those revised paths.
 They also predate the isolated daemon-store and exact Sum/Product aggregate-oracle corrections; neither changed live evaluation has been rerun as part of review.
+They also predate the bounded read and plugin pagination changes and do not verify that revised live path.
 Native/model revalidation remains opt-in using the commands below; review-phase regression checks use disposable fake-runtime and HTTP fixtures only.
 
 ## Required acceptance cases
@@ -25,6 +26,7 @@ Native/model revalidation remains opt-in using the commands below; review-phase 
 | Dirty/unowned/live-process cleanup refused | `TestDirtyAndUnownedWorktreesRefuseCleanup`; `TestCleanupDoesNotRemoveWorkspaceWithLiveProcess`; `TestTaskCleanupResolvesOwnedAttempt` |
 | Real supported OpenCode contract | Opt-in `TestLiveIsolated210`; separate model-backed evaluation |
 | CLI/API and external clients share contract | `internal/integration` HTTP/CLI tests; OpenAPI consumer validation; external consumer acceptance |
+| Large inventory and complete content traversal | `TestLargeInventoryCLIReads`; `TestAccumulatedContentAndExactMutationReceipts`; `TestReadCursorBindingAndRecovery` |
 
 Additional tests cover instruction-generation staleness, ancestor dependency cycles, finite write/model-notification budgets, read-only uncertain-prompt recovery, preserved native permission choices, explicit shared-policy delivery, and quiet persistence when observations do not change.
 `TestEffectsBookkeepingAfterExpiry`, `TestExpiredExternalFailuresBoundMutations`, and `TestSuccessfulDispatchAfterExpiry` inject cancelled/deadline-expired external calls against disposable SQLite/Git fixtures and check durable outcomes and bounded writes.
@@ -32,6 +34,11 @@ Additional tests cover instruction-generation staleness, ancestor dependency cyc
 `TestPauseSettlesAfterInterruptBudget` covers individual and cascade read-only pause settlement after eight failed interrupts, including parked continuations.
 `TestDaemonFixtureLeavesPopulatedSourceUntouched` runs production daemon processes against a fresh store with a fake HTTP runtime, checking that supplied populated state remains byte-for-byte unchanged and no task/session operation occurs.
 `TestArithmeticWorkloadCoverage` rejects missing, duplicate, and ambiguous Sum/Product coverage, while `TestArithmeticBehavioralOracles` executes independent Go checks against correct and deliberately incorrect arithmetic fixtures without models.
+The bounded-read regression first reproduces CLI failure after admitting 65 actual valid 128-KiB Unicode tasks through the API, without invoking the fake runtime's mutation methods.
+It then traverses all task content through byte-budgeted API pages and checks exact admitted IDs and text, not only a lean count or source shape.
+The accumulated-record fixture seeds a valid retained single-task history above 8 MiB, continues it through the real CLI, verifies exact replay receipts after a later followup, and checks complete task/command/decision/result/evidence content.
+Cursor checks cover unchanged-revision continuation, scope tampering, malformed and restarted cursors, mutation invalidation, and recovery from a new manifest.
+These disposable fake-runtime/API/CLI fixtures are not evidence of new native/model/cloud acceptance or compatibility validation by a separately owned integration.
 Formatter, analyzer, and compiler enforcement probes execute their real consumers against conforming and violating disposable fixtures.
 They are Lint-phase proof rather than string searches over configuration files.
 

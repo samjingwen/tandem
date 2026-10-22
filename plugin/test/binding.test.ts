@@ -9,6 +9,7 @@ import { TandemClient } from "../src/client.ts"
 import { validateCoordinatorDirectory } from "../src/credentials.ts"
 import { permissionGuard, toolGuard } from "../src/guards.ts"
 import { tools } from "../src/tools.ts"
+import { readFixture } from "./read-fixture.ts"
 
 function context(sessionID: string) {
   return {
@@ -96,7 +97,7 @@ async function fixture(optIn = false) {
       operation: new Headers(options?.headers).get("X-Operation-ID"),
     })
     if (down) return Promise.reject(new Error("Tandem unavailable"))
-    return Promise.resolve(Response.json(url.pathname === "/v1/snapshot" ? state : { ok: true }))
+    return Promise.resolve(readFixture(state, url))
   }
   const client = new TandemClient("http://127.0.0.1:7777", "owned-fixture-token", request)
   const confirmations: Parameters<NativeAccess["assert"]>[0][] = []
@@ -181,7 +182,11 @@ await test("managed-only defaults and exact hub opt-in deny descendant tools bef
       assert.equal(f.calls.length, 0)
       if (optIn) {
         const global = await f.call("status", {}, "ses_hub")
-        assert.ok(global.content.includes("FOREIGN PRIVATE INSTRUCTIONS"))
+        assert.ok(
+          (JSON.parse(global.content) as { records: { key: string }[] }).records.some(
+            (record) => record.key === "foreign",
+          ),
+        )
         const scoped = await f.call("status", {}, "ses_managed")
         assert.ok(!scoped.content.includes("FOREIGN PRIVATE INSTRUCTIONS"))
       }

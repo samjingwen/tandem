@@ -137,6 +137,9 @@ Existing sessions, validation gates, and services are never automatically import
 This MVP is single-host and single-user, for trusted local projects.
 Worktrees isolate checkouts, not operating-system authority.
 The client SSE stream is live-only and does not replay missed events; reconnecting clients fetch snapshots.
+New clients use the additive byte-bounded `/v1/reads/` manifest, record pages, and complete-content pages rather than unrestricted inventories.
+The CLI's `snapshot` is a lean manifest; `snapshot --full` explicitly streams complete retained records without assembling an unbounded State in memory.
+Legacy HTTP read shapes remain available unchanged; see [the read contract](docs/API.md#bounded-reads-and-compatibility) for explicit migration and stale-cursor recovery.
 The default retained-task bound is 128, configurable at startup; there is no task archival UI yet.
 Result evidence is submitted for explicit review, not automatically treated as independently verified.
 Acceptance is not permission to merge, publish, deploy, or remove artifacts.

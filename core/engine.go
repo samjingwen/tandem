@@ -63,6 +63,14 @@ func ID(prefix string) string {
 }
 func now() time.Time                                          { return time.Now().UTC() }
 func (e *Engine) Snapshot(ctx context.Context) (State, error) { return e.store.Snapshot(ctx) }
+
+func (e *Engine) ReadRevision(ctx context.Context) (string, int64, error) {
+	if reader, ok := e.store.(RevisionSource); ok {
+		return reader.ReadRevision(ctx)
+	}
+	state, err := e.store.Snapshot(ctx)
+	return state.InstanceID, state.Revision, err
+}
 func (e *Engine) RuntimeInfo(ctx context.Context) (RuntimeInfo, error) {
 	info, err := e.runtime.Info(ctx)
 	if err != nil {

@@ -1,11 +1,13 @@
 package integration_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/samjingwen/tandem/core"
+	"github.com/samjingwen/tandem/internal/readmodel"
 )
 
 // A typed OpenAPI consumer, plus a validator for the JSON Schema keywords used
@@ -271,12 +274,29 @@ func TestOpenAPIConsumerValidatesEngineWire(t *testing.T) {
 		"/v1/health": "/v1/health", "/v1/ready": "/v1/ready", "/v1/version": "/v1/version", "/v1/runtime": "/v1/runtime", "/v1/doctor": "/v1/doctor",
 		"/v1/projects": "/v1/projects", "/v1/tasks": "/v1/tasks", "/v1/decisions": "/v1/decisions", "/v1/snapshot": "/v1/snapshot",
 		"/v1/tasks/{taskId}": "/v1/tasks/" + task.ID, "/v1/tasks/{taskId}/results": "/v1/tasks/" + task.ID + "/results", "/v1/openapi.json": "/v1/openapi.json",
+		"/v1/reads/snapshot": "/v1/reads/snapshot",
 	} {
 		var payload any
 		f.do(t, 1, http.MethodGet, concrete, "", nil, &payload)
 		s := doc.Paths[path].Get.Responses["200"].Content["application/json"].Schema
 		if err := doc.validate(s, payload); err != nil {
 			t.Fatalf("real HTTP response violates %s: %v", path, err)
+		}
+	}
+	manifest, err := f.clients[0].Manifest(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"projects", "tasks", "attempts", "commands", "decisions", "results"} {
+		page, err := f.clients[0].ReadPage(f.ctx, manifest.Revision, url.Values{"collection": {kind}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkWireSchema(t, doc, "ReadPage", page)
+		for _, row := range page.Records {
+			var content readmodel.ContentPage
+			f.do(t, 0, http.MethodGet, "/v1/reads/content?cursor="+url.QueryEscape(row.Content.Cursor), "", nil, &content)
+			checkWireSchema(t, doc, "ContentPage", content)
 		}
 	}
 	resultSchema := doc.Paths["/v1/tasks/{taskId}/results"].Post.RequestBody.Content["application/json"].Schema
@@ -299,5 +319,71 @@ func TestOpenAPIConsumerValidatesEngineWire(t *testing.T) {
 	valid["unknown"] = true
 	if err := doc.validate(resultSchema, valid); err == nil {
 		t.Fatal("schema accepted unknown request field")
+	}
+}
+
+func checkWireSchema(t *testing.T, doc openAPI, name string, value any) {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wire any
+	if err := json.Unmarshal(data, &wire); err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.validate(doc.Components.Schemas[name], wire); err != nil {
+		t.Fatalf("%s violates its wire schema: %v", name, err)
+	}
+}
+
+func TestNegotiatedReceiptMatchesSchemaAndLegacyReplay(t *testing.T) {
+	f := setup(t)
+	var task core.Task
+	f.do(t, 0, http.MethodPost, "/v1/tasks", "schema-large-create", core.CreateTask{ProjectID: f.project.ID, Title: "receipt fixture", Instructions: strings.Repeat("x", 128<<10)}, &task)
+	var legacy core.Task
+	f.do(t, 0, http.MethodPost, "/v1/tasks/"+task.ID+"/followup", "schema-large-followup", core.Followup{Text: strings.Repeat("y", 128<<10)}, &legacy)
+	if len(legacy.Instructions) <= 256<<10 {
+		t.Fatal("fixture failed to cross the negotiated representation boundary")
+	}
+	data, err := json.Marshal(core.Followup{Text: strings.Repeat("y", 128<<10)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := http.NewRequestWithContext(f.ctx, http.MethodPost, f.server.URL+"/v1/tasks/"+task.ID+"/followup", bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer integration-test-token")
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Operation-ID", "schema-large-followup")
+	request.Header.Set("Prefer", "return=bounded")
+	response, err := f.runners[1].HTTPClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	var receipt readmodel.Receipt
+	if err := json.NewDecoder(response.Body).Decode(&receipt); err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != 200 || response.Header.Get("Preference-Applied") != "return=bounded" || receipt.OperationID != "schema-large-followup" || receipt.Representation != "operation-receipt" {
+		t.Fatal("missing explicit bounded receipt negotiation", response.StatusCode)
+	}
+	var doc openAPI
+	f.do(t, 0, http.MethodGet, "/v1/openapi.json", "", nil, &doc)
+	checkWireSchema(t, doc, "ReadReceipt", receipt)
+	var content bytes.Buffer
+	if err := f.clients[0].WriteRecord(f.ctx, receipt.Revision, receipt.Record, &content); err != nil {
+		t.Fatal(err)
+	}
+	var decoded core.Task
+	if err := json.Unmarshal(content.Bytes(), &decoded); err != nil || !reflect.DeepEqual(decoded, legacy) {
+		t.Fatal("negotiated receipt differs from the exact legacy replay", err)
+	}
+	var ignored any
+	err = f.clients[0].Do(f.ctx, http.MethodGet, "/v1/reads/records?collection=receipts&instanceId="+url.QueryEscape(receipt.InstanceID)+fmt.Sprintf("&revision=%d", receipt.Revision.Revision), "", nil, &ignored)
+	if err == nil {
+		t.Fatal("receipt read surface enumerated the private journal")
 	}
 }

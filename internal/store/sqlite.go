@@ -167,6 +167,16 @@ func (s *SQLite) Snapshot(ctx context.Context) (core.State, error) {
 	return load(ctx, s.db)
 }
 
+func (s *SQLite) ReadRevision(ctx context.Context) (string, int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var instance string
+	var revision int64
+	// One statement observes the identity and revision at the same SQLite point.
+	err := s.db.QueryRowContext(ctx, "SELECT (SELECT value FROM metadata WHERE key='instance_id'), (SELECT value FROM metadata WHERE key='revision')").Scan(&instance, &revision)
+	return instance, revision, err
+}
+
 func writeMap[T any](ctx context.Context, tx *sql.Tx, table string, values map[string]T, revision int64) error {
 	for id, v := range values {
 		body, err := json.Marshal(v)

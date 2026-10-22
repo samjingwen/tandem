@@ -89,6 +89,12 @@ func (runner Runner) Run(ctx context.Context, args []string, out, errOut io.Writ
 	} else if op != "" {
 		return errors.New("--operation-id applies only to mutations")
 	}
+	if handled, err := readCommand(ctx, httpClient, request, out, options["json"] != "true"); handled {
+		return err
+	}
+	if request.method == http.MethodPost {
+		return httpClient.WriteMutation(ctx, request.path, op, request.body, out)
+	}
 	var response json.RawMessage
 	if err := httpClient.Do(ctx, request.method, request.path, op, request.body, &response); err != nil {
 		return err
@@ -110,6 +116,7 @@ type request struct {
 	path   string
 	body   any
 	table  string
+	full   bool
 }
 
 // globalOptions accepts global flags before or after command arguments.
@@ -167,6 +174,10 @@ func commandValueOption(name string) bool {
 }
 
 func printTable(out io.Writer, kind string, data json.RawMessage) error {
+	return printTableRows(out, kind, data, true)
+}
+
+func printTableRows(out io.Writer, kind string, data json.RawMessage, header bool) error {
 	var rows []map[string]json.RawMessage
 	if err := json.Unmarshal(data, &rows); err != nil {
 		return errors.New("server list response must be an array")
@@ -178,8 +189,10 @@ func printTable(out io.Writer, kind string, data json.RawMessage) error {
 		columns = []string{"id", "taskId", "kind", "status", "prompt"}
 	}
 	table := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	if _, err := fmt.Fprintln(table, strings.ToUpper(strings.Join(columns, "\t"))); err != nil {
-		return err
+	if header {
+		if _, err := fmt.Fprintln(table, strings.ToUpper(strings.Join(columns, "\t"))); err != nil {
+			return err
+		}
 	}
 	for _, row := range rows {
 		values := make([]string, 0, len(columns))
@@ -219,7 +232,7 @@ tasks result ID
 tasks result ID --attempt ID --generation N --summary TEXT [--evidence JSON_ARRAY]
 decisions list [--task ID] [--status STATUS]
 decisions reply ID --answer JSON
-snapshot
+snapshot [--full]
 doctor
 version
 

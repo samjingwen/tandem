@@ -15,7 +15,7 @@ import {
   type Context,
   type NativeAccess,
 } from "./authority.ts"
-import { projectSnapshot, records, scopedTask } from "./scope.ts"
+import { scopedTask } from "./scope.ts"
 import { isDeepStrictEqual } from "node:util"
 
 interface ToolSpec {
@@ -68,34 +68,57 @@ function evidence(value: unknown): Evidence[] {
   })
 }
 
-function dependencies(value: unknown, state: Snapshot, projectId: string): string[] | undefined {
+async function dependencies(
+  client: TandemClient,
+  value: unknown,
+  state: Snapshot,
+  projectId: string,
+  signal: AbortSignal,
+): Promise<string[] | undefined> {
   if (value === undefined) return undefined
-  if (
-    !Array.isArray(value) ||
-    value.some((id: unknown) => typeof id !== "string" || state.tasks[id]?.projectId !== projectId)
-  )
+  if (!Array.isArray(value) || value.some((id: unknown) => typeof id !== "string"))
     throw new Error("Dependencies must belong to the proposed task's project")
+  for (const id of value as string[]) {
+    if ((await client.task(state, id, signal)).projectId !== projectId)
+      throw new Error("Dependencies must belong to the proposed task's project")
+  }
   return value as string[]
 }
 
-function proposalParent(input: Record<string, unknown>, state: Snapshot, projectId: string, owner?: Task) {
+async function proposalParent(
+  client: TandemClient,
+  input: Record<string, unknown>,
+  state: Snapshot,
+  projectId: string,
+  signal: AbortSignal,
+  owner?: Task,
+) {
   if (owner && projectId !== owner.projectId) throw new Error("Worker proposals must use their own project")
   if (owner && input.parentId !== undefined && input.parentId !== owner.id)
     throw new Error("Worker proposals must use their current task as parent")
   const parentId = owner?.id ?? input.parentId
-  if (parentId !== undefined && state.tasks[text(parentId, "parentId")]?.projectId !== projectId)
+  if (
+    parentId !== undefined &&
+    (await client.task(state, text(parentId, "parentId"), signal)).projectId !== projectId
+  )
     throw new Error("Parent must belong to the proposed task's project")
   return parentId
 }
 
-function proposal(input: Record<string, unknown>, state: Snapshot, owner?: Task) {
+async function proposal(
+  client: TandemClient,
+  input: Record<string, unknown>,
+  state: Snapshot,
+  signal: AbortSignal,
+  owner?: Task,
+) {
   const projectId = text(input.projectId, "projectId")
-  const parentId = proposalParent(input, state, projectId, owner)
+  const parentId = await proposalParent(client, input, state, projectId, signal, owner)
   if (owner && owner.role !== "coordinator" && input.role !== undefined && input.role !== "worker")
     throw new Error("Ordinary workers cannot propose coordinator privileges")
   if (input.role !== undefined && input.role !== "worker" && input.role !== "coordinator")
     throw new Error("Task role must be worker or coordinator")
-  const dependencyIDs = dependencies(input.dependencies, state, projectId)
+  const dependencyIDs = await dependencies(client, input.dependencies, state, projectId, signal)
   return {
     projectId,
     title: text(input.title, "title"),
@@ -108,21 +131,33 @@ function proposal(input: Record<string, unknown>, state: Snapshot, owner?: Task)
 
 type Authority = Awaited<ReturnType<typeof authority>>
 
-function coordinatorTask(view: Authority, taskId: string): Task {
+async function coordinatorTask(
+  client: TandemClient,
+  view: Authority,
+  taskId: string,
+  signal: AbortSignal,
+): Promise<Task> {
   if (!view.hub && view.owned?.task.role !== "coordinator")
     throw new Error(
       "Only managed coordinators or the explicitly opted-in hub can control tasks or answer decisions",
     )
-  return scopedTask(view.state, taskId, view.owned?.task)
+  return scopedTask(client, view.state, taskId, signal, view.owned?.task)
 }
 
-function childTask(state: Snapshot, taskId: string, parentId: string): boolean {
+async function childTask(
+  client: TandemClient,
+  state: Snapshot,
+  taskId: string,
+  parentId: string,
+  signal: AbortSignal,
+): Promise<boolean> {
   const visited = new Set<string>()
-  let current = state.tasks[taskId]
+  let current: Task | undefined = await client.task(state, taskId, signal)
   while (current && !visited.has(current.id)) {
     visited.add(current.id)
     if (current.parentId === parentId) return true
-    current = typeof current.parentId === "string" ? state.tasks[current.parentId] : undefined
+    current =
+      typeof current.parentId === "string" ? await client.task(state, current.parentId, signal) : undefined
   }
   return false
 }
@@ -146,8 +181,8 @@ async function recheckPermissionAuthority(
   details: unknown,
 ) {
   const latest = await authority(client, native, context)
-  coordinatorTask(latest, taskId)
-  const current = decisionRequest(id, records(latest.state.raw.decisions)[id])
+  await coordinatorTask(client, latest, taskId, context.signal)
+  const current = decisionRequest(id, await client.jsonRecord(latest.state, "decisions", id, context.signal))
   if (
     current.status !== "pending" ||
     current.kind !== "permission" ||
@@ -185,7 +220,7 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
           await client.request(
             "/v1/tasks",
             context.signal,
-            proposal(input, state, owned?.task),
+            await proposal(client, input, state, context.signal, owned?.task),
             operationID(input.operationId),
           ),
         )
@@ -193,12 +228,38 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
     },
     {
       name: "status",
-      description: "Read Tandem's durable snapshot. Idle native sessions are not completion evidence.",
-      input: schema({}),
+      description:
+        "Read one bounded revision-pinned record or content page. Follow nextCursor explicitly; omitted record fields remain available through content.cursor. Idle native sessions are not completion evidence.",
+      input: schema({
+        collection: {
+          type: "string",
+          enum: ["projects", "tasks", "attempts", "commands", "decisions", "results"],
+        },
+        cursor: string,
+        contentCursor: string,
+        key: string,
+        taskId: string,
+      }),
       options,
-      async execute(_input, context) {
+      async execute(raw, context) {
+        const input = object(raw)
         const { state, owned } = await authority(client, native, context)
-        return output(owned ? projectSnapshot(state, owned.task.projectId) : state.raw)
+        if (input.contentCursor !== undefined)
+          return output(
+            await client.content(
+              state,
+              text(input.contentCursor, "contentCursor"),
+              context.signal,
+              owned?.task.projectId,
+            ),
+          )
+        const collection = input.collection === undefined ? "tasks" : text(input.collection, "collection")
+        if (!["projects", "tasks", "attempts", "commands", "decisions", "results"].includes(collection))
+          throw new Error("Unsupported collection")
+        const filters: Record<string, string> = owned ? { projectId: owned.task.projectId } : {}
+        for (const key of ["cursor", "key", "taskId"])
+          if (input[key] !== undefined) filters[key] = text(input[key], key)
+        return output(await client.page(state, collection, context.signal, filters))
       },
     },
     {
@@ -209,7 +270,13 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
       async execute(raw, context) {
         const input = object(raw)
         const { state, owned } = await authority(client, native, context)
-        const target = scopedTask(state, text(input.taskId, "taskId"), owned?.task)
+        const target = await scopedTask(
+          client,
+          state,
+          text(input.taskId, "taskId"),
+          context.signal,
+          owned?.task,
+        )
         return output(
           await client.request(
             `/v1/tasks/${encodeURIComponent(target.id)}/followup`,
@@ -235,9 +302,9 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
         const view = await authority(client, native, context)
         const { state, owned } = view
         const id = text(input.decisionId, "decisionId")
-        const decision = decisionRequest(id, records(state.raw.decisions)[id])
+        const decision = decisionRequest(id, await client.jsonRecord(state, "decisions", id, context.signal))
         if (decision.status !== "pending") throw new Error("Decision is not pending")
-        coordinatorTask(view, decision.taskId)
+        await coordinatorTask(client, view, decision.taskId, context.signal)
         const answer = structuredClone(object(input.answer))
         const operation = operationID(input.operationId)
         if (decision.kind === "permission") {
@@ -255,7 +322,8 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
           throw new Error("Unsupported decision kind")
         } else if (
           owned &&
-          (decision.taskId === owned.task.id || !childTask(state, decision.taskId, owned.task.id))
+          (decision.taskId === owned.task.id ||
+            !(await childTask(client, state, decision.taskId, owned.task.id, context.signal)))
         ) {
           throw new Error("Managed coordinators may answer only child forms, never their own user questions")
         }
@@ -334,7 +402,7 @@ export function tools(client: TandemClient, native: NativeAccess): ToolSpec[] {
         const input = object(raw)
         const body = controlInput(input)
         const view = await authority(client, native, context)
-        const target = coordinatorTask(view, text(input.taskId, "taskId"))
+        const target = await coordinatorTask(client, view, text(input.taskId, "taskId"), context.signal)
         return output(
           await client.request(
             `/v1/tasks/${encodeURIComponent(target.id)}/control`,

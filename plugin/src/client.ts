@@ -34,6 +34,20 @@ export interface Snapshot {
   raw: Record<string, unknown>
 }
 
+export interface ReadRecord {
+  key: string
+  summary: Record<string, unknown>
+  content: { cursor: string; bytes: number; sha256: string }
+}
+
+export interface ReadPage {
+  instanceId: string
+  revision: number
+  collection: string
+  records: ReadRecord[]
+  nextCursor?: string
+}
+
 export const operationPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u
 
 export function operationID(value: unknown): string {
@@ -53,6 +67,27 @@ export function object(value: unknown): Record<string, unknown> {
 export function text(value: unknown, name: string): string {
   if (typeof value !== "string" || value.length === 0) throw new Error(`Missing ${name}`)
   return value
+}
+
+async function boundedJSON(response: Response, limit: number): Promise<unknown> {
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error("Missing response body")
+  const decoder = new TextDecoder("utf-8", { fatal: true })
+  let size = 0
+  let data = ""
+  try {
+    for (;;) {
+      const part = await reader.read()
+      if (part.done) break
+      size += part.value.byteLength
+      if (size > limit) throw new Error("Tandem response exceeds its byte budget")
+      data += decoder.decode(part.value, { stream: true })
+    }
+    data += decoder.decode()
+  } finally {
+    await reader.cancel()
+  }
+  return JSON.parse(data) as unknown
 }
 
 function taskGeneration(value: unknown): number | undefined {
@@ -131,6 +166,7 @@ export class TandemClient {
     if (body !== undefined) {
       headers["X-Operation-ID"] = operationID(operationId)
       headers["Content-Type"] = "application/json"
+      headers.Prefer = "return=bounded"
     }
     const url = `${this.#url.href.replace(/\/$/u, "")}${path}`
     let response: Response
@@ -153,7 +189,8 @@ export class TandemClient {
       throw new Error(`Tandem HTTP ${String(response.status)}; preserve the operationId on retries`)
     if (response.status === 204) return null
     try {
-      return (await response.json()) as unknown
+      const limit = path.startsWith("/v1/reads/") ? 256 * 1024 : 8 * 1024 * 1024
+      return await boundedJSON(response, limit)
     } catch {
       throw new Error(
         body === undefined
@@ -163,8 +200,157 @@ export class TandemClient {
     }
   }
 
-  async snapshot(signal: AbortSignal): Promise<Snapshot> {
-    return snapshot(await this.request("/v1/snapshot", signal))
+  async manifest(signal: AbortSignal): Promise<Record<string, unknown>> {
+    const value = object(await this.request("/v1/reads/snapshot", signal))
+    text(value.instanceId, "instanceId")
+    if (!Number.isSafeInteger(value.revision) || Number(value.revision) < 0 || value.maxPageBytes !== 262144)
+      throw new Error("Invalid bounded read manifest")
+    return value
+  }
+
+  async page(
+    state: Snapshot,
+    collection: string,
+    signal: AbortSignal,
+    filters: Record<string, string> = {},
+  ): Promise<ReadPage> {
+    const query = new URLSearchParams({
+      collection,
+      instanceId: state.instanceId,
+      revision: String(state.raw.revision),
+      ...filters,
+    })
+    const data = object(await this.request(`/v1/reads/records?${query.toString()}`, signal))
+    if (
+      data.instanceId !== state.instanceId ||
+      data.revision !== state.raw.revision ||
+      data.collection !== collection ||
+      !Array.isArray(data.records) ||
+      data.records.length > 64
+    )
+      throw new Error("Invalid or mixed-revision record page")
+    const records = data.records.map((value: unknown): ReadRecord => {
+      const row = object(value)
+      const content = object(row.content)
+      if (!Number.isSafeInteger(content.bytes) || Number(content.bytes) < 1)
+        throw new Error("Invalid content length")
+      return {
+        key: text(row.key, "record key"),
+        summary: object(row.summary),
+        content: {
+          cursor: text(content.cursor, "content cursor"),
+          bytes: Number(content.bytes),
+          sha256: text(content.sha256, "content checksum"),
+        },
+      }
+    })
+    return {
+      instanceId: state.instanceId,
+      revision: Number(state.raw.revision),
+      collection,
+      records,
+      ...(data.nextCursor ? { nextCursor: text(data.nextCursor, "nextCursor") } : {}),
+    }
+  }
+
+  async record(state: Snapshot, collection: string, key: string, signal: AbortSignal): Promise<ReadRecord> {
+    const page = await this.page(state, collection, signal, { key, limit: "1" })
+    const record = page.records[0]
+    if (!record || record.key !== key || page.records.length !== 1 || page.nextCursor)
+      throw new Error("Record is not available")
+    return record
+  }
+
+  async task(state: Snapshot, id: string, signal: AbortSignal): Promise<Task> {
+    const row = (await this.record(state, "tasks", id, signal)).summary
+    const task = snapshot({ instanceId: state.instanceId, tasks: { [id]: row }, attempts: {} }).tasks[id]
+    if (!task) throw new Error("Task is not available")
+    return task
+  }
+
+  async content(
+    state: Snapshot,
+    cursor: string,
+    signal: AbortSignal,
+    projectId?: string,
+  ): Promise<Record<string, unknown>> {
+    const query = new URLSearchParams({ cursor, ...(projectId === undefined ? {} : { projectId }) })
+    const page = object(await this.request(`/v1/reads/content?${query.toString()}`, signal))
+    if (
+      page.instanceId !== state.instanceId ||
+      page.revision !== state.raw.revision ||
+      typeof page.text !== "string" ||
+      new TextEncoder().encode(page.text).length > 32768
+    )
+      throw new Error("Invalid or mixed-revision content page")
+    return page
+  }
+
+  async jsonRecord(
+    state: Snapshot,
+    collection: string,
+    key: string,
+    signal: AbortSignal,
+  ): Promise<Record<string, unknown>> {
+    const record = await this.record(state, collection, key, signal)
+    if (record.content.bytes > 8 * 1024 * 1024)
+      throw new Error(
+        "Record exceeds the tool's JSON budget; inspect bounded status content pages and answer through the native user interface",
+      )
+    let cursor = record.content.cursor
+    let offset = 0
+    let data = ""
+    while (cursor) {
+      const page = await this.content(state, cursor, signal)
+      if (
+        page.key !== key ||
+        page.offset !== offset ||
+        page.totalBytes !== record.content.bytes ||
+        page.sha256 !== record.content.sha256 ||
+        typeof page.text !== "string" ||
+        page.text === "" ||
+        page.nextCursor === cursor
+      )
+        throw new Error("Invalid content traversal")
+      data += page.text
+      offset += new TextEncoder().encode(page.text).length
+      if (offset > record.content.bytes) throw new Error("Content exceeds its declared length")
+      cursor = page.nextCursor === undefined ? "" : text(page.nextCursor, "nextCursor")
+    }
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data))
+    const checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")
+    if (offset !== record.content.bytes || checksum !== record.content.sha256)
+      throw new Error("Incomplete or damaged content")
+    return object(JSON.parse(data))
+  }
+
+  async snapshot(signal: AbortSignal, sessionId: string): Promise<Snapshot> {
+    const manifest = await this.manifest(signal)
+    const state: Snapshot = {
+      instanceId: text(manifest.instanceId, "instanceId"),
+      tasks: {},
+      attempts: {},
+      raw: manifest,
+    }
+    // At most two rows are needed to reject ambiguous ownership. Do not build a
+    // global inventory, even when the configured task count is very large.
+    const page = await this.page(state, "attempts", signal, { sessionRef: sessionId, limit: "2" })
+    if (page.records.length > 1 || page.nextCursor) throw new Error("Ambiguous native session ownership")
+    const row = page.records[0]
+    if (row) {
+      const attempt = object(row.summary)
+      if (attempt.id !== row.key) throw new Error("Invalid Tandem attempt map")
+      state.attempts[row.key] = {
+        ...attempt,
+        id: row.key,
+        taskId: text(attempt.taskId, "attempt.taskId"),
+        sessionRef: text(attempt.sessionRef, "attempt.sessionRef"),
+        workspace: { path: text(attempt.workspacePath, "workspacePath") },
+      }
+      const task = await this.task(state, text(attempt.taskId, "attempt.taskId"), signal)
+      state.tasks[task.id] = task
+    }
+    return state
   }
 }
 

@@ -17,7 +17,17 @@ func (runner Runner) command(args []string) (request, error) {
 	if len(args) == 0 {
 		return request{}, errors.New("a command is required; use --help")
 	}
-	if args[0] == "snapshot" || args[0] == "doctor" || args[0] == "version" {
+	if args[0] == "snapshot" {
+		opts, ids, err := parse(args[1:], "", "full")
+		if err != nil {
+			return request{}, err
+		}
+		if err := positionals(ids, 0); err != nil {
+			return request{}, err
+		}
+		return request{method: http.MethodGet, path: "/v1/snapshot", full: opts["full"] == "true"}, nil
+	}
+	if args[0] == "doctor" || args[0] == "version" {
 		if len(args) != 1 {
 			return request{}, fmt.Errorf("%s does not accept arguments", args[0])
 		}
