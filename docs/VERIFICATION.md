@@ -58,6 +58,10 @@ make build
 ```
 
 Maintained Go package patterns explicitly exclude upstream Go sources shipped inside npm dependencies.
+Both `make test` (also used by `make check`) and `make test-race` use a shared, bounded 20-minute Go package timeout.
+The complete race-instrumented suite includes multi-MiB receipt and API/CLI content traversals that can legitimately approach or exceed Go's default 10-minute aggregate package budget.
+This package lifetime does not extend individual fixture, request, runtime, or regression deadlines, and Go still emits test/goroutine diagnostics on timeout.
+CI invokes these same Makefile targets; targeted regression and opt-in native commands retain their separate deadlines.
 No live model or shared native service is required by normal CI.
 An absent opt-in fixture is reported skipped, never described as a live pass.
 

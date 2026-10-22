@@ -4,6 +4,11 @@
 # sources shipped inside npm dependencies after plugin installation.
 GO_PACKAGES := ./cmd/... ./core/... ./internal/...
 
+# Race-instrumented large-content traversal can consume most of Go's default
+# 10-minute package budget before the remaining regressions run. Bound the full
+# suite separately from the unchanged fixture and production request deadlines.
+GO_TEST_TIMEOUT := 20m
+
 prepare:
 	go mod download
 	npm --prefix plugin ci --ignore-scripts
@@ -20,10 +25,10 @@ lint: format-check
 	go tool staticcheck $(GO_PACKAGES)
 
 test:
-	go test $(GO_PACKAGES)
+	go test -timeout=$(GO_TEST_TIMEOUT) $(GO_PACKAGES)
 
 test-race:
-	go test -race $(GO_PACKAGES)
+	go test -race -timeout=$(GO_TEST_TIMEOUT) $(GO_PACKAGES)
 
 plugin-check:
 	npm --prefix plugin run check
