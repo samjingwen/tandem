@@ -21,6 +21,10 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: plugin/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.95.0'
+          components: rustfmt, clippy
       - run: make prepare
       - run: make check
       - run: make test-race

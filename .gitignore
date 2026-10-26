@@ -6,6 +6,8 @@
 *.db-shm
 *.db-wal
 *.lock
+!/Cargo.lock
+/target/
 .env
 .env.*
 !.env.example

@@ -1,0 +1,16 @@
+[package]
+name = "tandem-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Runtime-independent Tandem coordination and persistence contracts"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
