@@ -1,0 +1,38 @@
+{
+  "state": {
+    "instanceId": "ba112253d39d3b5cad67bad8cab0ab5d",
+    "revision": 1,
+    "projects": {},
+    "tasks": {
+      "tsk_rust": {
+        "id": "tsk_rust",
+        "projectId": "",
+        "dependencies": [],
+        "title": "Rust created 世界",
+        "instructions": "",
+        "role": "",
+        "desired": "",
+        "state": "",
+        "generation": 7,
+        "createdAt": "0001-01-01T00:00:00Z",
+        "updatedAt": "0001-01-01T00:00:00Z"
+      }
+    },
+    "attempts": {},
+    "commands": {},
+    "decisions": {},
+    "results": {}
+  },
+  "operations": {
+    "rust-operation": {
+      "id": "rust-operation",
+      "fingerprint": "synthetic-rust-fingerprint",
+      "outcome": {
+        "value": 9007199254740993,
+        "answer": null,
+        "text": "<"
+      },
+      "createdAt": "0001-01-01T00:00:00Z"
+    }
+  }
+}

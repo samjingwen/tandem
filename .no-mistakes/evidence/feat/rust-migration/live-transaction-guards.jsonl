@@ -1,0 +1,10 @@
+{"error":{"code":"invalid_request","message":"deliberate consumer abort"},"history_rows":2,"revision":1,"rollback_state_and_history_unchanged":true,"scenario":"callback_error"}
+{"error":{"code":"invalid_request","message":"instance identity and revision are store-owned"},"history_rows":2,"revision":1,"rollback_state_and_history_unchanged":true,"scenario":"instance"}
+{"error":{"code":"invalid_request","message":"instance identity and revision are store-owned"},"history_rows":2,"revision":1,"rollback_state_and_history_unchanged":true,"scenario":"revision"}
+{"error":{"code":"invalid_request","message":"retained records cannot be deleted through a state transaction"},"history_rows":2,"revision":1,"rollback_state_and_history_unchanged":true,"scenario":"delete_task"}
+{"error":{"code":"invalid_request","message":"accepted operation receipts are immutable"},"history_rows":2,"revision":1,"rollback_state_and_history_unchanged":true,"scenario":"delete_receipt"}
+{"error":{"code":"invalid_request","message":"accepted operation receipts are immutable"},"history_rows":2,"revision":1,"rollback_state_and_history_unchanged":true,"scenario":"rewrite_receipt"}
+{"error":{"code":"storage_unavailable","message":"SQLite state operation failed"},"history_rows":2,"revision":1,"rollback_state_and_history_unchanged":true,"scenario":"unique_path"}
+{"error":{"code":"invalid_request","message":"record has conflicting or invalid encoded fields"},"history_rows":2,"revision":1,"rollback_state_and_history_unchanged":true,"scenario":"conflicting_extension"}
+{"history_rows":2,"revision":1,"scenario":"quiet_noop"}
+{"generation":8,"history_rows":10,"identity_stable":true,"instructions_bytes":1600000,"receipt":{"createdAt":"0001-01-01T00:00:00Z","fingerprint":"immutable-contract","id":"receipt","outcome":{"answer":null,"decimal":1.0000000000000000001,"large":9007199254740993,"text":"<"}},"revision":9,"scenario":"concurrent_updates_and_reopen"}

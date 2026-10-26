@@ -1,0 +1,9 @@
+     Locking 41 packages to latest Rust 1.95.0 compatible versions
+   Compiling libc v0.2.191
+   Compiling bitflags v2.13.2
+   Compiling tandem-core v0.1.0 (<managed-checkout>/crates/tandem-core)
+   Compiling rusqlite v0.41.0
+   Compiling getrandom v0.4.3
+   Compiling tandem-store v0.1.0 (<managed-checkout>/crates/tandem-store)
+   Compiling foundation-live-consumer v0.0.0 (<managed-checkout>/.tmp/test-phase-consumer)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.14s

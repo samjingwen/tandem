@@ -1,0 +1,87 @@
+[
+  {
+    "scenario": "legacy_extension_timestamp_and_quiet_noop",
+    "stored_changed_task_json": "{\"id\":\"tsk_go\",\"projectId\":\"\",\"dependencies\":null,\"title\":\"written-by-rust 世界\",\"instructions\":\"\",\"role\":\"\",\"desired\":\"\",\"state\":\"\",\"generation\":1,\"createdAt\":\"2026-10-26T03:04:05.123456789+00:00\",\"updatedAt\":\"0001-01-01T00:00:00Z\",\"extension\":{\"decimal\":1.0000000000000000001,\"escaped\":\"<\",\"large\":9007199254740993,\"null\":null}}",
+    "untouched_receipt_body": "{\"id\":\"rust-operation\",\"fingerprint\":\"synthetic-rust-fingerprint\",\"outcome\":{\"value\":9007199254740993,\"answer\":null,\"text\":\"\\u003c\"},\"createdAt\":\"0001-01-01T00:00:00Z\"}",
+    "noop_all_rows_byte_identical": true,
+    "history_delta_for_single_update": 1
+  },
+  {
+    "scenario": "live_owner_rejected",
+    "error": {
+      "code": "store_owned",
+      "message": "state store already has an active scheduler owner; connect as a client instead"
+    }
+  },
+  {
+    "scenario": "live_owner_rejected_alias",
+    "error": {
+      "code": "store_owned",
+      "message": "state store already has an active scheduler owner; connect as a client instead"
+    }
+  },
+  {
+    "scenario": "graceful_lease_release",
+    "reopen_succeeded": true,
+    "child_exit": 0
+  },
+  {
+    "scenario": "malformed_record_refused",
+    "error": {
+      "code": "corrupt_state",
+      "message": "stored state is invalid; explicit recovery is required"
+    }
+  },
+  {
+    "scenario": "future_schema_refused",
+    "error": {
+      "code": "newer_schema",
+      "message": "database schema is newer than this executable"
+    }
+  },
+  {
+    "scenario": "nonprivate_directory_not_repaired",
+    "error": {
+      "code": "invalid_request",
+      "message": "state directory must be owner-only; refusing to change existing permissions automatically"
+    },
+    "mode_unchanged": "0755",
+    "database_created": false
+  },
+  {
+    "scenario": "nonregular_file_refused",
+    "name": "scheduler.lock",
+    "error": {
+      "code": "invalid_request",
+      "message": "refusing nonregular state file"
+    },
+    "target_unchanged": true
+  },
+  {
+    "scenario": "nonregular_file_refused",
+    "name": "tandem.db",
+    "error": {
+      "code": "invalid_request",
+      "message": "refusing nonregular state file"
+    },
+    "target_unchanged": true
+  },
+  {
+    "scenario": "nonregular_file_refused",
+    "name": "tandem.db-wal",
+    "error": {
+      "code": "invalid_request",
+      "message": "refusing nonregular state file"
+    },
+    "target_unchanged": true
+  },
+  {
+    "scenario": "nonregular_file_refused",
+    "name": "tandem.db-shm",
+    "error": {
+      "code": "invalid_request",
+      "message": "refusing nonregular state file"
+    },
+    "target_unchanged": true
+  }
+]

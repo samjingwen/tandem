@@ -1,0 +1,12 @@
+[package]
+name = "foundation-live-consumer"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+tandem-core = { path = "../../crates/tandem-core" }
+tandem-store = { path = "../../crates/tandem-store" }
+rusqlite = { version = "=0.41.0", features = ["bundled"] }
+serde_json = { version = "=1.0.154", features = ["raw_value", "arbitrary_precision"] }
