@@ -288,3 +288,64 @@ func TestRustStoreCrossLanguageOwnershipAndCrash(t *testing.T) {
 		t.Fatal("committed Rust state was lost after owned process crash", err)
 	}
 }
+
+func TestRustStoreMalformedTimestampMatchesGoRefusal(t *testing.T) {
+	_ = requireRustFixture(t)
+	dir := filepath.Join(t.TempDir(), "state")
+	db, err := store.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	fixture, err := sql.Open("sqlite", filepath.Join(dir, "tandem.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = fixture.Exec(`INSERT INTO tasks VALUES('tsk_time','{"id":"tsk_time","createdAt":"not-a-timestamp"}')`); err != nil {
+		t.Fatal(err)
+	}
+	_ = fixture.Close()
+	if _, err = db.Snapshot(context.Background()); err == nil {
+		t.Fatal("Go reference accepted malformed persisted RFC3339 timestamp")
+	}
+	if err = db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	output, err := rustFixture(t, ctx, "snapshot", dir).CombinedOutput()
+	if err == nil || !strings.Contains(string(output), `"code":"corrupt_state"`) {
+		t.Fatal("Rust accepted persisted timestamp corruption rejected by Go", err)
+	}
+}
+
+func TestRustStoreTimestampCorpusMatchesGo(t *testing.T) {
+	_ = requireRustFixture(t)
+	for _, raw := range []string{`null`, `"0001-01-01T00:00:00Z"`, `"2026-10-26T03:04:05.123456789012Z"`, `"2026-10-26T03:04:05,123Z"`, `"2026-10-26T03:04:60Z"`, `"2026-10-26T03:04:05+24:00"`, `"2026-10-26T03:04:05+00:60"`, `"2026-10-26T3:04:05Z"`, `"2026-10-26t03:04:05z"`, `"2026-02-30T03:04:05Z"`} {
+		t.Run(raw, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "state")
+			db, err := store.Open(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fixture, err := sql.Open("sqlite", filepath.Join(dir, "tandem.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = fixture.Exec(`INSERT INTO tasks VALUES('time',?)`, `{"id":"time","createdAt":`+raw+`}`); err != nil {
+				t.Fatal(err)
+			}
+			_ = fixture.Close()
+			_, goError := db.Snapshot(context.Background())
+			if err = db.Close(); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			output, rustError := rustFixture(t, ctx, "snapshot", dir).CombinedOutput()
+			if (goError == nil) != (rustError == nil) {
+				t.Fatalf("timestamp %s: Go=%v, Rust=%v: %s", raw, goError, rustError, output)
+			}
+		})
+	}
+}

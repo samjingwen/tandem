@@ -64,8 +64,12 @@ This package lifetime does not extend individual fixture, request, runtime, or r
 CI invokes these same Makefile targets; targeted regression and opt-in native commands retain their separate deadlines.
 No live model or shared native service is required by normal CI.
 An absent opt-in fixture is reported skipped, never described as a live pass.
-`make test` also runs the Rust workspace tests and `make rust-parity`; the latter invokes a separate Go storage test run with Go's default package timeout and an explicit Rust fixture executable.
-These checks cover the [Rust domain/SQLite foundation](RUST_MIGRATION.md#verification-commands), not Rust engine, adapter, HTTP, or CLI parity.
+`make test` also runs the Rust workspace tests and `make rust-parity`; the latter invokes a separate Go storage/engine-oracle test run with Go's default package timeout and explicit Rust fixture executables.
+These checks cover [Rust domain/SQLite and abstract-port coordination libraries](RUST_MIGRATION.md#verification-commands), not concrete Rust adapter, HTTP, or CLI parity.
+`crates/tandem-engine/tests/coordination.rs` executes real Rust admission/reconciliation against SQLite and controlled runtime/workspace ports, including abandoned-client, shutdown, uncertainty, generation, capacity, notification and cleanup barriers.
+The five-second bookkeeping fixture blocks only its owned storage callback, verifies that controls cannot cross the effects barrier, then releases it and rejects the expired bookkeeping change without fabricating an admission receipt.
+`TestRustEngineGoFingerprintOracle`, `TestRustEngineReplaysActualGoOperationsAndGoReplaysRustCreate`, and `TestRustEngineGoDecisionAndCoordinatorSignalOracle` use actual Go serialization/service behavior as an independent oracle, not Rust-generated expected values.
+Timestamp parity includes malformed-date refusal and accepted legacy Go spellings while retaining their original text and comparing actual instants.
 
 ## Isolated native contract
 

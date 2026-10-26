@@ -49,7 +49,8 @@ rust-test:
 
 rust-parity:
 	cargo build --locked --example store-compat
-	TANDEM_RUST_STORE_HELPER="$(CURDIR)/target/debug/examples/store-compat" go test ./internal/store -run '^TestRustStore' -count=1
+	cargo build --locked --example engine-compat
+	TANDEM_RUST_STORE_HELPER="$(CURDIR)/target/debug/examples/store-compat" TANDEM_RUST_ENGINE_HELPER="$(CURDIR)/target/debug/examples/engine-compat" go test ./internal/store -run '^TestRust(Store|Engine)' -count=1
 
 test-race:
 	go test -race -timeout=$(GO_TEST_TIMEOUT) $(GO_PACKAGES)

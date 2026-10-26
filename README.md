@@ -41,9 +41,10 @@ make build
 The race detector is a development check and needs its supported native C toolchain.
 Go dependencies and tools are pinned in `go.mod`/`go.sum`; plugin dependencies use their own npm lockfile.
 The native engine, service, and CLI are [migrating to Rust](docs/RUST_MIGRATION.md), preserving SQLite, the v1 HTTP API, and the TypeScript plugin.
-The current executable is still Go; the initial Rust crates implement the domain/storage boundary, not a replacement scheduler or CLI yet.
+The current executable is still Go; Rust libraries implement domain/storage and coordination over abstract runtime/workspace ports, not a replacement daemon or CLI yet.
 Rust dependencies use `Cargo.toml`/`Cargo.lock`; `rust-toolchain.toml` pins the toolchain.
 `make check` includes Rust tests and real Go/Rust/Go and Rust/Go/Rust persistence/ownership tests against fresh disposable stores.
+It also checks Go-compatible operation fingerprints, exact receipt replay, coordinator signals, and controlled-runtime coordination behavior.
 No retained database, native service, or provider is needed for those checks.
 
 ## Connect a runtime and start an instance

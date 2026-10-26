@@ -54,3 +54,56 @@ fn persisted_extensibility_and_original_time_are_not_discarded() {
         Value::Null
     );
 }
+
+#[test]
+fn timestamp_validation_keeps_spelling_and_go_null_semantics() {
+    for text in [
+        "0001-01-01T00:00:00Z",
+        "2026-10-26T03:04:05.123456789+00:00",
+        "2026-10-26T12:00:00+08:00",
+    ] {
+        let encoded = serde_json::to_string(text).unwrap();
+        let timestamp: Timestamp = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(timestamp.0, text);
+    }
+    assert!(serde_json::from_str::<Timestamp>(r#""not-a-timestamp""#).is_err());
+    assert_eq!(
+        serde_json::from_str::<Timestamp>("null").unwrap(),
+        Timestamp::default()
+    );
+    let earlier = Timestamp("2026-10-26T08:00:00+08:00".into());
+    let later = Timestamp("2026-10-26T01:00:00Z".into());
+    assert!(earlier.instant().unwrap() < later.instant().unwrap());
+}
+
+#[test]
+fn input_answers_distinguish_missing_from_explicit_null_and_evidence_is_strict() {
+    let missing: tandem_core::ReplyDecision = serde_json::from_str("{}").unwrap();
+    let null: tandem_core::ReplyDecision = serde_json::from_str(r#"{"answer":null}"#).unwrap();
+    assert!(missing.answer.is_none());
+    assert_eq!(null.answer.unwrap().as_str(), "null");
+    assert!(serde_json::from_str::<tandem_core::SubmitResult>(r#"{"evidence":[{"name":"test","reference":"fixture://test","passed":true,"unexpected":true}]}"#).is_err());
+}
+
+#[test]
+fn legacy_go_time_spellings_retain_text_and_order_by_the_same_instant() {
+    for (source, canonical) in [
+        ("2026-10-26T3:04:05,123Z", "2026-10-26T03:04:05.123Z"),
+        ("2026-10-26T03:04:05+24:00", "2026-10-25T03:04:05Z"),
+        ("2026-10-26T03:04:05+00:60", "2026-10-26T02:04:05Z"),
+        (
+            "2026-10-26T03:04:05.123456789012Z",
+            "2026-10-26T03:04:05.123456789Z",
+        ),
+    ] {
+        let timestamp: Timestamp =
+            serde_json::from_str(&serde_json::to_string(source).unwrap()).unwrap();
+        assert_eq!(timestamp.0, source);
+        assert_eq!(
+            timestamp.instant().unwrap(),
+            Timestamp(canonical.into()).instant().unwrap()
+        );
+    }
+    assert!(serde_json::from_str::<Timestamp>(r#""2026-10-26t03:04:05z""#).is_err());
+    assert!(serde_json::from_str::<Timestamp>(r#""2026-10-26T03:04:60Z""#).is_err());
+}

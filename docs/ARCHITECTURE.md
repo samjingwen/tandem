@@ -34,6 +34,7 @@ The service uses the standard HTTP/JSON libraries and database/sql with modernc 
 Dependency versions and tools are pinned in go.mod, with integrity checksums in go.sum.
 The subsequent user decision is to migrate the native engine, service, and CLI to Rust, not to replace SQLite or the HTTP/plugin contracts.
 The Rust core stays independent of concrete storage/runtime packages; the storage crate uses rusqlite with bundled SQLite and the original version-1 SQL migration.
+The Rust coordination engine is a separate crate over core ports, with Tokio-owned effect tasks and cancellation-independent bookkeeping rather than request-future ownership of admitted work.
 Its compiler/tooling and Cargo dependency graph are separately pinned, with runtime cutover blocked on behavioral and cross-language persistence evidence.
 Tenaxe retains Angular and Java/Spring.
 SQLite is local-host storage, not a distributed coordination mechanism.
