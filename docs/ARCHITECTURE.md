@@ -16,6 +16,8 @@ Tenaxe Spring -+                            |
 ```
 
 The initial deployment is one Go executable, one single-user daemon, and one local SQLite store.
+The selected replacement is one Rust executable with the same daemon/store ownership and client contracts; see the [staged migration](RUST_MIGRATION.md).
+Go remains the current executable and differential reference until the Rust engine, adapters, API, and CLI satisfy the cutover gates.
 The public HTTP API is the initial integration contract; the Go package is not yet a separately versioned stable embedding SDK.
 The core depends on narrow Store, Runtime, and Workspaces interfaces, not OpenCode SDK objects.
 The standalone CLI, thin OpenCode plugin, and Tenaxe backend issue the same operations.
@@ -23,13 +25,16 @@ Only the daemon owns the scheduler.
 OpenCode remains responsible for its native sessions, configured providers/models, permissions, and tool loop.
 Tandem does not implement a competing model loop.
 
-## Why Go and SQLite
+## Language migration and SQLite
 
 The project began empty.
 After discussing TypeScript and Java/Spring/GraalVM, the user selected the Go setup for the standalone engine.
 Go 1.27.3 matches the verified installed toolchain.
 The service uses the standard HTTP/JSON libraries and database/sql with modernc SQLite for CGO-free release builds.
 Dependency versions and tools are pinned in go.mod, with integrity checksums in go.sum.
+The subsequent user decision is to migrate the native engine, service, and CLI to Rust, not to replace SQLite or the HTTP/plugin contracts.
+The Rust core stays independent of concrete storage/runtime packages; the storage crate uses rusqlite with bundled SQLite and the original version-1 SQL migration.
+Its compiler/tooling and Cargo dependency graph are separately pinned, with runtime cutover blocked on behavioral and cross-language persistence evidence.
 Tenaxe retains Angular and Java/Spring.
 SQLite is local-host storage, not a distributed coordination mechanism.
 No Redis, external workflow engine, distributed queue, or cross-machine state replication is introduced.

@@ -14,6 +14,7 @@ Separate local/server instances have separate state; installation does not synch
 ## Requirements
 
 - Go **1.27.3** for building.
+- Rust **1.95.0** with rustfmt/Clippy and a C compiler for the bundled SQLite migration adapter.
 - Git and OpenCode **2.1.0**, with a configured usable model.
 - Worktrunk **0.80.0** for the default checkout allocator, or explicitly select `--allocator git` where project policy permits it.
 - Node 24+ and npm only for building/checking the optional TypeScript plugin.
@@ -35,10 +36,15 @@ make build
 ./bin/tandem --version
 ```
 
-Release builds use `CGO_ENABLED=0`; SQLite is embedded through a pure-Go driver.
-`make build` builds both the Go executable and optional plugin; `make build-core` needs only Go.
+`make build` builds the current Go executable, optional plugin, and Rust migration libraries.
+`make build-core` needs only Go and uses `CGO_ENABLED=0`, embedding SQLite through a pure-Go driver.
 The race detector is a development check and needs its supported native C toolchain.
 Go dependencies and tools are pinned in `go.mod`/`go.sum`; plugin dependencies use their own npm lockfile.
+The native engine, service, and CLI are [migrating to Rust](docs/RUST_MIGRATION.md), preserving SQLite, the v1 HTTP API, and the TypeScript plugin.
+The current executable is still Go; the initial Rust crates implement the domain/storage boundary, not a replacement scheduler or CLI yet.
+Rust dependencies use `Cargo.toml`/`Cargo.lock`; `rust-toolchain.toml` pins the toolchain.
+`make check` includes Rust tests and real Go/Rust/Go and Rust/Go/Rust persistence/ownership tests against fresh disposable stores.
+No retained database, native service, or provider is needed for those checks.
 
 ## Connect a runtime and start an instance
 
