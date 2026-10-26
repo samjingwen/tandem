@@ -67,14 +67,7 @@ Until that change is delivered, the canonical [runtime compatibility document](O
 
 ## Verification commands
 
-```sh
-make prepare
-make check
-make test-race
-make prove-quality
-make security
-make build
-```
+Run the [routine deterministic checks](VERIFICATION.md#routine-deterministic-checks) for this milestone.
 
 Focused Rust checks are `make rust-test rust-parity rust-lint rust-security rust-build`.
 `make prepare` installs pinned cargo-audit into task-local `.tmp/rust-tools`, not a global executable directory.

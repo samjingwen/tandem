@@ -36,8 +36,8 @@ make build
 ./bin/tandem --version
 ```
 
-Release builds use `CGO_ENABLED=0`; SQLite is embedded through a pure-Go driver.
-`make build` builds both the Go executable and optional plugin; `make build-core` needs only Go.
+`make build` builds the current Go executable, optional plugin, and Rust migration libraries.
+`make build-core` needs only Go and uses `CGO_ENABLED=0`, embedding SQLite through a pure-Go driver.
 The race detector is a development check and needs its supported native C toolchain.
 Go dependencies and tools are pinned in `go.mod`/`go.sum`; plugin dependencies use their own npm lockfile.
 The native engine, service, and CLI are [migrating to Rust](docs/RUST_MIGRATION.md), preserving SQLite, the v1 HTTP API, and the TypeScript plugin.
