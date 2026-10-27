@@ -3,7 +3,10 @@
 use std::{
     collections::BTreeMap,
     io::{self, Read},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use async_trait::async_trait;
@@ -57,6 +60,13 @@ fn parse<T: serde::de::DeserializeOwned>(input: &str) -> Result<T> {
 #[derive(Default)]
 struct Disabled {
     observations: Option<BTreeMap<String, Observation>>,
+    effect_attempted: AtomicBool,
+}
+impl Disabled {
+    fn forbid_effect(&self) -> Error {
+        self.effect_attempted.store(true, Ordering::Release);
+        disabled()
+    }
 }
 fn disabled() -> Error {
     Error::new(
@@ -81,7 +91,7 @@ impl Runtime for Disabled {
         }
     }
     async fn ensure(&self, _context: &Context, _spec: &SessionSpec) -> Result<()> {
-        Err(disabled())
+        Err(self.forbid_effect())
     }
     async fn inspect(&self, _context: &Context, spec: &SessionSpec) -> Result<Observation> {
         self.observations
@@ -97,10 +107,13 @@ impl Runtime for Disabled {
         _id: &str,
         _text: &str,
     ) -> Result<()> {
-        Err(disabled())
+        Err(self.forbid_effect())
     }
     async fn interrupt(&self, _context: &Context, _spec: &SessionSpec) -> Result<()> {
-        Err(disabled())
+        Err(self.forbid_effect())
+    }
+    async fn cancel_pending(&self, _context: &Context, _spec: &SessionSpec) -> Result<()> {
+        Err(self.forbid_effect())
     }
     async fn reply(
         &self,
@@ -109,7 +122,7 @@ impl Runtime for Disabled {
         _decision: &Decision,
         _answer: &RawJson,
     ) -> Result<()> {
-        Err(disabled())
+        Err(self.forbid_effect())
     }
 }
 
@@ -127,7 +140,7 @@ impl Workspaces for Disabled {
         _project: &Project,
         _workspace: &Workspace,
     ) -> Result<Workspace> {
-        Err(disabled())
+        Err(self.forbid_effect())
     }
     async fn inspect(
         &self,
@@ -147,7 +160,7 @@ impl Workspaces for Disabled {
         _project: &Project,
         _workspace: &Workspace,
     ) -> Result<()> {
-        Err(disabled())
+        Err(self.forbid_effect())
     }
 }
 
@@ -216,11 +229,12 @@ async fn run() -> Result<String> {
                 } else {
                     None
                 },
+                ..Default::default()
             });
             let engine = Engine::new(
                 store,
                 fixture.clone(),
-                fixture,
+                fixture.clone(),
                 Options {
                     runtime_id: "fake".into(),
                     ..Default::default()
@@ -235,7 +249,11 @@ async fn run() -> Result<String> {
                 call(&engine, request).await
             };
             engine.shutdown().await;
-            result
+            if fixture.effect_attempted.load(Ordering::Acquire) {
+                Err(disabled())
+            } else {
+                result
+            }
         }
         _ => Err(Error::invalid(
             "expected fixture mode and optional owned directory",

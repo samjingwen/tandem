@@ -93,6 +93,63 @@ func TestRustEngineGoFingerprintOracle(t *testing.T) {
 	}
 }
 
+func TestRustEngineObserveRejectsForbiddenEffects(t *testing.T) {
+	_ = requireRustEngine(t)
+	for _, phase := range []string{"queued", "session_pending", "session_bound"} {
+		t.Run(phase, func(t *testing.T) {
+			ctx := context.Background()
+			dir := filepath.Join(t.TempDir(), "state")
+			db, err := store.Open(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = db.Close() }()
+			stamp := time.Date(2026, 10, 26, 1, 2, 3, 0, time.UTC)
+			if err = db.Update(ctx, func(s *core.State) error {
+				s.Projects["project"] = core.Project{ID: "project", Name: "fixture", Path: "/synthetic/project", BaseRef: "master", CreatedAt: stamp}
+				task := core.Task{ID: "task", ProjectID: "project", Title: "task", Instructions: "fixture", Role: "worker", Desired: "active", State: "queued", Generation: 1, CreatedAt: stamp, UpdatedAt: stamp}
+				if phase != "queued" {
+					task.State, task.AttemptID = "dispatching", "attempt"
+					s.Attempts["attempt"] = core.Attempt{ID: "attempt", TaskID: "task", RuntimeID: "fake", SessionRef: "session", Phase: phase, Observed: "idle", Generation: 1, Workspace: core.Workspace{Owner: "attempt", Path: "/synthetic/attempt", Allocated: true}, CreatedAt: stamp, UpdatedAt: stamp}
+				}
+				if phase == "session_bound" {
+					s.Commands["prompt"] = core.Command{ID: "prompt", TaskID: "task", AttemptID: "attempt", Kind: "prompt", Text: "fixture", Status: "pending", Generation: 1, Sequence: 1}
+				}
+				s.Tasks["task"] = task
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if err = db.Close(); err != nil {
+				t.Fatal(err)
+			}
+			observations := map[string]any{"session": map[string]any{"exists": true, "owned": true, "state": "idle"}}
+			output, err := rustEngine(t, engineRequest{Kind: "observe", Input: observations}, "observe", dir)
+			var failure struct {
+				Code string `json:"code"`
+			}
+			if err == nil || json.Unmarshal(output, &failure) != nil || failure.Code != "fixture_effect_forbidden" {
+				t.Fatalf("observe must fail attempted native effects: %v: %s", err, output)
+			}
+			db, err = store.Open(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, err := db.Snapshot(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			attempt := state.Attempts[state.Tasks["task"].AttemptID]
+			if attempt.Error != "compatibility consumer forbids native effects" || attempt.FailureCount != 1 {
+				t.Fatalf("fixture did not reach the forbidden effect: %#v", attempt)
+			}
+			if phase == "session_bound" && state.Commands["prompt"].Status != "sending" {
+				t.Fatal("fixture did not attempt pending prompt delivery")
+			}
+		})
+	}
+}
+
 type oracleWorkspaces struct{}
 
 func (oracleWorkspaces) Plan(p core.Project, attempt string) core.Workspace {

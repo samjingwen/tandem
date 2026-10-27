@@ -21,20 +21,6 @@ use tandem_core::{
 use tokio::sync::Mutex;
 use tokio_util::task::TaskTracker;
 
-pub trait Clock: Send + Sync {
-    fn now(&self) -> Result<Timestamp>;
-}
-
-struct SystemClock;
-impl Clock for SystemClock {
-    fn now(&self) -> Result<Timestamp> {
-        time::OffsetDateTime::now_utc()
-            .format(&time::format_description::well_known::Rfc3339)
-            .map(Timestamp)
-            .map_err(|_| Error::new("internal", "clock is outside the supported timestamp range"))
-    }
-}
-
 #[derive(Clone)]
 pub struct Options {
     pub runtime_id: String,
@@ -42,7 +28,6 @@ pub struct Options {
     pub max_tasks: usize,
     pub max_depth: usize,
     pub max_coordinator_notifications: usize,
-    pub clock: Arc<dyn Clock>,
 }
 
 impl Default for Options {
@@ -53,7 +38,6 @@ impl Default for Options {
             max_tasks: 128,
             max_depth: 3,
             max_coordinator_notifications: 32,
-            clock: Arc::new(SystemClock),
         }
     }
 }
@@ -183,7 +167,10 @@ impl Engine {
     }
 
     fn now(&self) -> Result<Timestamp> {
-        self.inner.options.clock.now()
+        time::OffsetDateTime::now_utc()
+            .format(&time::format_description::well_known::Rfc3339)
+            .map(Timestamp)
+            .map_err(|_| Error::new("internal", "clock is outside the supported timestamp range"))
     }
 
     pub async fn snapshot(&self, context: &Context) -> Result<State> {

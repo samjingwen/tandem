@@ -614,7 +614,8 @@ async fn rejected_reply_returns_to_pending_without_losing_the_old_receipt() {
         .reply(&f.context, "answer", &decision.id, answer.clone())
         .await
         .unwrap();
-    f.runtime.state.lock().unwrap().reply_error = Some(Error::invalid("invalid choice"));
+    f.runtime.state.lock().unwrap().reply_error =
+        Some(Error::not_delivered(Error::invalid("invalid choice")));
     f.tick().await;
     assert_eq!(f.state().decisions[&decision.id].status, "pending");
     assert!(f.state().decisions[&decision.id].reply.is_none());
@@ -633,6 +634,63 @@ async fn rejected_reply_returns_to_pending_without_losing_the_old_receipt() {
     f.tick().await;
     assert_eq!(f.state().decisions[&decision.id].status, "answered");
     assert_eq!(f.runtime.calls("reply"), 2);
+    f.engine.shutdown().await;
+}
+
+#[tokio::test]
+async fn unmarked_invalid_reply_preserves_uncertainty_and_blocks_resend() {
+    let f = Fixture::new(Options {
+        concurrency: 1,
+        ..Default::default()
+    })
+    .await;
+    let task = f.create("task").await;
+    f.tick().await;
+    let attempt = f.attempt(&task);
+    f.runtime.decision(&attempt.session_ref, "question");
+    f.tick().await;
+    let decision = f.state().decisions.values().next().unwrap().clone();
+    let answer = ReplyDecision {
+        answer: Some(RawJson::parse("null".into()).unwrap()),
+    };
+    let receipt = f
+        .engine
+        .reply(&f.context, "answer", &decision.id, answer.clone())
+        .await
+        .unwrap();
+    f.runtime.state.lock().unwrap().reply_error = Some(Error::invalid("invalid choice"));
+    f.tick().await;
+    assert_eq!(f.state().decisions[&decision.id].status, "uncertain");
+    assert_eq!(f.state().decisions[&decision.id].reply, answer.answer);
+    assert_eq!(
+        f.engine
+            .reply(&f.context, "answer", &decision.id, answer.clone())
+            .await
+            .unwrap(),
+        receipt
+    );
+    assert!(
+        f.engine
+            .reply(&f.context, "corrected-answer", &decision.id, answer)
+            .await
+            .is_err()
+    );
+    f.runtime.state.lock().unwrap().reply_error = None;
+    f.runtime.observe(&attempt.session_ref, "idle");
+    let queued = f.create("queued").await;
+    for _ in 0..3 {
+        f.tick().await;
+    }
+    assert_eq!(f.state().decisions[&decision.id].status, "uncertain");
+    assert_eq!(f.runtime.calls("reply"), 1);
+    assert!(f.state().tasks[&queued.id].attempt_id.is_empty());
+    assert!(f.control(&task, "retry", false).await.is_err());
+    assert!(
+        f.engine
+            .cleanup(&f.context, "cleanup", &attempt.id)
+            .await
+            .is_err()
+    );
     f.engine.shutdown().await;
 }
 

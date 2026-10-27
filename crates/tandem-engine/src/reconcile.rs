@@ -696,7 +696,7 @@ impl Engine {
             })
             .await
             {
-                if error.code == "invalid_request" {
+                if error.code == "invalid_request" && error.is_not_delivered() {
                     return self.reject_reply(decision, error).await;
                 }
                 if error.is_not_delivered() {
