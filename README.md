@@ -44,7 +44,7 @@ The native engine, service, and CLI are [migrating to Rust](docs/RUST_MIGRATION.
 The current executable is still Go; Rust libraries implement domain/storage and coordination over abstract runtime/workspace ports, not a replacement daemon or CLI yet.
 Rust dependencies use `Cargo.toml`/`Cargo.lock`; `rust-toolchain.toml` pins the toolchain.
 `make check` includes Rust tests and real Go/Rust/Go and Rust/Go/Rust persistence/ownership tests against fresh disposable stores.
-It also checks Go-compatible operation fingerprints, exact receipt replay, coordinator signals, and controlled-runtime coordination behavior.
+See the [verification contract](docs/VERIFICATION.md#routine-deterministic-checks) for coordination/oracle coverage and its acceptance limits.
 No retained database, native service, or provider is needed for those checks.
 
 ## Connect a runtime and start an instance

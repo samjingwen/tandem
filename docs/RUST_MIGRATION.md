@@ -61,16 +61,15 @@ Automatic dispatch failures stop at eight, while explicit resume preserves the a
 Coordinators have a separate single-slot limit and a default 32-notification budget; unchanged evidence is quiet and current signal storage coalesces by child.
 
 Dropping an API/client future abandons only that wait, not the owned operation.
-Explicit cancellation or shutdown signals its cooperative context, while the tracked operation retains the store and effects barrier through independent five-second outcome bookkeeping.
+Explicit cancellation, deadline expiry or shutdown signals its cooperative context, while the tracked operation retains the store and effects barrier through independent five-second outcome bookkeeping.
 Shutdown closes admission atomically with task registration, stops scheduler reads/event listening, and waits for owned tasks without stopping external workers.
+The event listener shares the owned run's cancellation and deadline, so event reads and reconnection stop even while outcome bookkeeping is blocked.
 A storage lock may delay return beyond the bookkeeping deadline; its callback must then refuse the expired change, and ownership remains retained until the blocking storage task actually returns.
-Runtime ports must honor cancellation and classify proven non-delivery separately from uncertainty.
+Runtime ports must honor cancellation; only an explicit `Error::not_delivered` classification proves a failed write can safely return to pending delivery.
+An `invalid_request` reply error without that proof retains uncertainty, rather than clearing the answer for another reply.
 Cleanup requires terminal intent, settled dispatch, current owned foreground quiescence and the runtime's separate background-resource quiescence capability.
 
-The executable Go oracle verifies request field order/omission, HTML and U+2028/U+2029 escaping, raw-answer compaction/order/number spelling, all eight command kinds' old receipts, operation conflicts, decision identifiers and coordinator signal bodies.
-An actual Rust-created task/receipt is reopened and replayed by the Go service.
-The Rust suite separately exercises lifetime/cancellation barriers, admission-before-effects, same-reference recovery, generations, role/dependency bounds, finite budgets, quiet polls, explicit decisions and cleanup barriers.
-These are library/SQLite contracts with simulated external execution, not native adapter behavior or HTTP/CLI parity.
+See the [verification contract](VERIFICATION.md#routine-deterministic-checks) for executable oracle and controlled-consumer coverage and its acceptance limits.
 
 ## Delivery sequence and cutover gates
 
@@ -97,8 +96,8 @@ Focused Rust checks are `make rust-test rust-parity rust-lint rust-security rust
 `make prepare` installs pinned cargo-audit into task-local `.tmp/rust-tools`, not a global executable directory.
 `make rust-parity` builds the test-only `store-compat` and `engine-compat` examples and supplies their explicit absolute paths to the Go tests; ordinary Go-only tests report these cross-language fixtures skipped when not opted in.
 The aggregate check and CI execute the opted-in fixture, so those skips are not substituted for interoperability evidence.
-`make rust-safety` builds a disposable JSON-lines Rust Service/SQLite consumer and drives it with Python 3, independently asserting durable rows, pre-effect ownership, uncertainty, generations, limits, cleanup and blocked-bookkeeping cancellation.
-It also runs under `make rust-parity`; external runtime/workspace execution is simulated, not native acceptance.
+The explicit-directory `engine-compat` consumer disables native effects; its `observe` mode accepts synthetic read-only observations/inspection and fails if any write is attempted, even when reconciliation handles the per-attempt error.
+`make rust-safety` builds the separate `engine-safety` consumer and drives it with Python 3; it also runs under `make rust-parity`.
 All compatibility stores, leases and forced-crash processes belong to newly created disposable fixtures, with no retained application data, runtime session, provider credential, real model, or shared service involved.
 The Rust quality proof runs the formatter, Clippy and compiler against conforming and deliberately violating fixtures and retains non-secret output in `.tmp`.
 `make test-race` remains Go race-detector evidence, not a Rust sanitizer result.
