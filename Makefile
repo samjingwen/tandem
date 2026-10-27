@@ -1,12 +1,14 @@
-.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-runtime-parity rust-safety rust-build rust-security python-prepare python-format python-format-check python-lint
+.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-runtime-parity rust-workspace-parity rust-safety rust-build rust-security python-prepare python-format python-format-check python-lint python-test worktrunk-prepare
 
 RUST_AUDIT_VERSION := 0.22.2
 RUST_AUDIT_ROOT := $(CURDIR)/.tmp/rust-tools
 PYTHON := python3
 PYTHON_TOOLS := $(CURDIR)/.tmp/python-tools
 RUFF := $(PYTHON_TOOLS)/bin/ruff
-# Only this driver is maintained Python; do not scan dependencies or fixtures.
-PYTHON_SOURCES := tools/test-engine-safety.py
+# Explicit maintained tooling ownership; do not scan dependencies or fixtures.
+PYTHON_SOURCES := tools/test-engine-safety.py tools/prepare-worktrunk.py tools/test-prepare-worktrunk.py
+WORKTRUNK_ROOT := $(CURDIR)/.tmp/worktrunk
+export PATH := $(WORKTRUNK_ROOT)/bin:$(PATH)
 
 # Explicit maintained-language ownership. Go's ./... can otherwise discover Go
 # sources shipped inside npm dependencies after plugin installation.
@@ -22,6 +24,10 @@ prepare:
 	npm --prefix plugin ci --ignore-scripts
 	$(MAKE) rust-prepare
 	$(MAKE) python-prepare
+	$(MAKE) worktrunk-prepare
+
+worktrunk-prepare:
+	$(PYTHON) tools/prepare-worktrunk.py "$(WORKTRUNK_ROOT)"
 
 python-prepare:
 	$(PYTHON) -m venv "$(PYTHON_TOOLS)"
@@ -36,6 +42,9 @@ python-format-check:
 
 python-lint: python-format-check
 	"$(RUFF)" check --config ruff.toml $(PYTHON_SOURCES)
+
+python-test:
+	$(PYTHON) tools/test-prepare-worktrunk.py
 
 rust-prepare:
 	cargo fetch --locked
@@ -64,6 +73,7 @@ rust-lint:
 test:
 	go test -timeout=$(GO_TEST_TIMEOUT) $(GO_PACKAGES)
 	$(MAKE) rust-test rust-parity
+	$(MAKE) python-test
 
 rust-test:
 	cargo test --workspace --all-targets --locked
@@ -74,10 +84,15 @@ rust-parity:
 	TANDEM_RUST_STORE_HELPER="$(CURDIR)/target/debug/examples/store-compat" TANDEM_RUST_ENGINE_HELPER="$(CURDIR)/target/debug/examples/engine-compat" go test ./internal/store -run '^TestRust(Store|Engine)' -count=1
 	$(MAKE) rust-safety
 	$(MAKE) rust-runtime-parity
+	$(MAKE) rust-workspace-parity
 
 rust-runtime-parity:
 	cargo build --locked -p tandem-opencode --example runtime-compat
 	TANDEM_RUST_OPENCODE_HELPER="$(CURDIR)/target/debug/examples/runtime-compat" go test -race ./internal/opencode -run '^TestRustOpenCode' -count=1
+
+rust-workspace-parity: worktrunk-prepare
+	cargo build --locked -p tandem-workspace --example workspace-compat
+	TANDEM_RUST_WORKSPACE_HELPER="$(CURDIR)/target/debug/examples/workspace-compat" go test -race ./internal/workspace -run '^TestRustWorkspace' -count=1
 
 rust-safety:
 	cargo build --locked -p tandem-engine --example engine-safety

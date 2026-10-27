@@ -1,5 +1,5 @@
 # Explicit maintained Python ownership, excluding generated/upstream/private data.
-include = ["tools/test-engine-safety.py"]
+include = ["tools/test-engine-safety.py", "tools/prepare-worktrunk.py", "tools/test-prepare-worktrunk.py"]
 force-exclude = true
 extend-exclude = [".tmp", "target", "plugin", "vendor", ".worktrees"]
 target-version = "py311"
