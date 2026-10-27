@@ -1,4 +1,4 @@
-.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-build rust-security
+.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-safety rust-build rust-security
 
 RUST_AUDIT_VERSION := 0.22.2
 RUST_AUDIT_ROOT := $(CURDIR)/.tmp/rust-tools
@@ -51,6 +51,11 @@ rust-parity:
 	cargo build --locked --example store-compat
 	cargo build --locked --example engine-compat
 	TANDEM_RUST_STORE_HELPER="$(CURDIR)/target/debug/examples/store-compat" TANDEM_RUST_ENGINE_HELPER="$(CURDIR)/target/debug/examples/engine-compat" go test ./internal/store -run '^TestRust(Store|Engine)' -count=1
+	$(MAKE) rust-safety
+
+rust-safety:
+	cargo build --locked -p tandem-engine --example engine-safety
+	python3 tools/test-engine-safety.py "$(CURDIR)/target/debug/examples/engine-safety"
 
 test-race:
 	go test -race -timeout=$(GO_TEST_TIMEOUT) $(GO_PACKAGES)

@@ -97,6 +97,8 @@ Focused Rust checks are `make rust-test rust-parity rust-lint rust-security rust
 `make prepare` installs pinned cargo-audit into task-local `.tmp/rust-tools`, not a global executable directory.
 `make rust-parity` builds the test-only `store-compat` and `engine-compat` examples and supplies their explicit absolute paths to the Go tests; ordinary Go-only tests report these cross-language fixtures skipped when not opted in.
 The aggregate check and CI execute the opted-in fixture, so those skips are not substituted for interoperability evidence.
+`make rust-safety` builds a disposable JSON-lines Rust Service/SQLite consumer and drives it with Python 3, independently asserting durable rows, pre-effect ownership, uncertainty, generations, limits, cleanup and blocked-bookkeeping cancellation.
+It also runs under `make rust-parity`; external runtime/workspace execution is simulated, not native acceptance.
 All compatibility stores, leases and forced-crash processes belong to newly created disposable fixtures, with no retained application data, runtime session, provider credential, real model, or shared service involved.
 The Rust quality proof runs the formatter, Clippy and compiler against conforming and deliberately violating fixtures and retains non-secret output in `.tmp`.
 `make test-race` remains Go race-detector evidence, not a Rust sanitizer result.
