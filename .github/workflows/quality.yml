@@ -10,7 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     # Cleanup must inspect every same-user cwd and fail closed on unreadable
     # processes. Keep unrelated hosted-runner processes outside its /proc view.
-    container: buildpack-deps:bookworm
+    # Keep Python built for Bookworm rather than using a host-toolcache binary
+    # whose GLIBC requirement can exceed the container's version.
+    container: python:3.11-bookworm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
@@ -21,9 +23,6 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: plugin/package-lock.json
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: '1.95.0'
