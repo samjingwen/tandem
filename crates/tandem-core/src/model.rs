@@ -53,15 +53,13 @@ impl<'de> Deserialize<'de> for Timestamp {
         if raw.get() == "null" {
             return Ok(Self::default());
         }
-        let value = raw
-            .get()
-            .strip_prefix('"')
-            .and_then(|value| value.strip_suffix('"'))
+        let value = serde_json::from_str::<String>(raw.get())
+            .ok()
             .filter(|value| crate::time_compat::parse(value).is_some())
             .ok_or_else(|| {
                 serde::de::Error::custom("timestamp must match Go RFC3339 JSON semantics")
             })?;
-        Ok(Self(value.into()))
+        Ok(Self(value))
     }
 }
 

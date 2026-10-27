@@ -94,7 +94,12 @@ fn timestamp_validation_keeps_spelling_and_go_null_semantics() {
         r#""\u0032026-10-26T03:04:05Z""#,
         r#""2026-10-26\u005403:04:05Z""#,
     ] {
-        assert!(serde_json::from_str::<Timestamp>(raw).is_err());
+        let timestamp: Timestamp = serde_json::from_str(raw).unwrap();
+        assert_eq!(timestamp.0, "2026-10-26T03:04:05Z");
+        assert_eq!(
+            timestamp.instant().unwrap(),
+            Timestamp("2026-10-26T03:04:05Z".into()).instant().unwrap()
+        );
     }
 }
 

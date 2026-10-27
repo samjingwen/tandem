@@ -367,9 +367,31 @@ func TestRustStoreTimestampCorpusMatchesGo(t *testing.T) {
 				want := raw
 				if raw == "null" {
 					want = `"0001-01-01T00:00:00Z"`
+				} else {
+					var text string
+					if err := json.Unmarshal([]byte(raw), &text); err != nil {
+						t.Fatal(err)
+					}
+					encoded, err := json.Marshal(text)
+					if err != nil {
+						t.Fatal(err)
+					}
+					want = string(encoded)
 				}
 				if got := string(exported.State.Tasks["time"].CreatedAt); got != want {
 					t.Fatalf("timestamp spelling changed: got %s, want %s", got, want)
+				}
+				fixture, err := sql.Open("sqlite", filepath.Join(dir, "tandem.db"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer fixture.Close()
+				var retained string
+				if err := fixture.QueryRow(`SELECT body FROM tasks WHERE id='time'`).Scan(&retained); err != nil {
+					t.Fatal(err)
+				}
+				if want := `{"id":"time","createdAt":` + raw + `}`; retained != want {
+					t.Fatalf("persisted timestamp token changed: got %s, want %s", retained, want)
 				}
 			}
 		})
