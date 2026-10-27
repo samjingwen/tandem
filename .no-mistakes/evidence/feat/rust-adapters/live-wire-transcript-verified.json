@@ -1,0 +1,42 @@
+[
+  {
+    "method": "info",
+    "exit_status": 0,
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/api/info"
+      }
+    ],
+    "consumer_output": {
+      "value": {
+        "compatible": true,
+        "id": "opencode_b9357f4b62c2439d3829f3893b16bdf0",
+        "version": "2.1.0"
+      },
+      "wakes": 0
+    }
+  },
+  {
+    "method": "events",
+    "exit_status": 0,
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/api/info"
+      },
+      {
+        "method": "GET",
+        "path": "/api/event"
+      }
+    ],
+    "consumer_output": {
+      "error": {
+        "code": "runtime_eof",
+        "message": "OpenCode event stream ended",
+        "notDelivered": false
+      },
+      "wakes": 1
+    }
+  }
+]

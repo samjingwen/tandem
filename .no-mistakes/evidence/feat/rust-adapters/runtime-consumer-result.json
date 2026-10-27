@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "tandem-opencode",
+        "--example",
+        "runtime-compat"
+      ],
+      "exit_status": 0
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "./internal/opencode",
+        "-run",
+        "^TestRustOpenCode",
+        "-count=1",
+        "-v"
+      ],
+      "exit_status": 0
+    }
+  ],
+  "binary_sha256": "84ed593b93245276a7464bf2d9c536a77b81ab802c7772e880b9e840839caf1d"
+}

@@ -1,0 +1,9 @@
+{
+  "command": [
+    "make",
+    "rust-test",
+    "rust-parity"
+  ],
+  "exit_status": 0,
+  "elapsed_seconds": 58.11
+}

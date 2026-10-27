@@ -1,0 +1,20 @@
+[
+  {
+    "method": "info",
+    "exit_status": 0,
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/api/info"
+      }
+    ],
+    "consumer_output": {
+      "value": {
+        "compatible": true,
+        "id": "opencode_d8c8529c26bda3b538d3778966b038b4",
+        "version": "2.1.0"
+      },
+      "wakes": 0
+    }
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "command": [
+    "go",
+    "test",
+    "./internal/integration",
+    "-run",
+    "^Test(IndependentClientsDuplicateCreateDisconnectAndRestart|AnotherClientAnswersDecisionAndAcceptsCurrentGeneration|TaskCleanupResolvesOwnedAttempt)$",
+    "-count=1",
+    "-v"
+  ],
+  "exit_status": 0
+}
