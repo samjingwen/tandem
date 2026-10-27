@@ -41,7 +41,7 @@ make build
 The race detector is a development check and needs its supported native C toolchain.
 Go dependencies and tools are pinned in `go.mod`/`go.sum`; plugin dependencies use their own npm lockfile.
 The native engine, service, and CLI are [migrating to Rust](docs/RUST_MIGRATION.md), preserving SQLite, the v1 HTTP API, and the TypeScript plugin.
-The current executable is still Go; Rust libraries implement domain/storage and coordination over abstract runtime/workspace ports, not a replacement daemon or CLI yet.
+The current executable is still Go; Rust libraries implement domain/storage, abstract-port coordination and a pinned HTTP/SSE runtime adapter verified with controlled HTTP fixtures, not a replacement daemon or CLI yet.
 Rust dependencies use `Cargo.toml`/`Cargo.lock`; `rust-toolchain.toml` pins the toolchain.
 Python quality tooling requires Python 3.11+ with `venv` and pip (CI uses 3.11).
 `make prepare` installs pinned Ruff from `tools/python-requirements.txt` into `.tmp/python-tools`, without changing global tools.

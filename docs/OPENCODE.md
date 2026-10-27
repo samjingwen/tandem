@@ -21,6 +21,9 @@ URLs cannot contain embedded credentials, query parameters, or fragments.
 
 Requests use HTTP Basic authentication with username `opencode` and the supplied password.
 `Info` reads the direct `/api/info` response, reports exact compatibility, and derives a stable runtime ID from the normalized endpoint URL, never the password.
+Endpoint identity follows Go URL semantics: lowercase the scheme and decoded authority, re-escape the authority, retain explicit ports, and trim decoded trailing path slashes.
+Retain the original escaped path spelling only while it still represents the unchanged decoded path; otherwise re-escape the trimmed path canonically.
+The Rust adapter preserves this identity rather than hashing the HTTP library's IDNA or path-normalized URL.
 Every runtime operation checks the live version before using the pinned contract.
 The HTTP adapter never retries mutations, and redirects are never followed.
 The engine may retry a prompt or decision reply only when the adapter proves non-delivery, such as a failed preflight read or deterministic rejection, within the existing failure budget.
@@ -143,6 +146,19 @@ The parser supports comments, CRLF, and multiline data, bounds line/frame sizes,
 Callbacks receive only a wake signal, never event payloads, session text, credentials, or foreign-location data.
 The engine must provide a fast coalescing callback, reconnect/backoff after EOF or failure, and reconcile durable state after reconnecting.
 There is no replay cursor or automatic reconnect in this adapter.
+
+## Rust runtime migration
+
+The non-default `crates/tandem-opencode` library implements the same pinned Runtime port using an explicitly configured reqwest client, with redirects and transport retries disabled.
+The core and engine remain independent of that concrete HTTP implementation.
+`OpenCode::new(Options)` accepts `url`, `password` and optional `model`; `Model` contains `id`, `provider_id` and `variant`, and `Model::parse` accepts an explicit `provider/model#variant` reference or an empty string for the native default.
+An empty password uses the same explicit `OPENCODE_PASSWORD` fallback as Go.
+The runtime behavior described above also applies to Rust, with snake_case trait methods and `RawJson` decision bodies instead of Go's `json.RawMessage`.
+Unlike Go's optional extension interfaces, Rust's `tandem_core::Runtime` includes `reconcile_prompt`, `cancel_pending` and `check_quiescence`; this adapter advertises all three capabilities.
+Its ordinary requests use cooperative cancellation, a 30-second deadline and an 8-MiB response ceiling; live-only event subscriptions use the caller's deadline/cancellation rather than that ordinary-request timeout.
+`check_quiescence` requires a current owned idle/failed observation with no pending decisions, location-bound `/api/shell` and `/api/pty` inventories, and session terminal inventory when `/api/info` advertises `persistentPty`.
+Running resources block quiescence; unknown states or mismatched location/session bindings fail closed, without stopping or adopting resources.
+See [verification coverage and commands](VERIFICATION.md#routine-deterministic-checks) for controlled HTTP parity and its native-acceptance limits, and [migration status](RUST_MIGRATION.md) for cutover holds.
 
 ## Thin plugin
 
