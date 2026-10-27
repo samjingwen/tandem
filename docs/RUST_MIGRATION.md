@@ -29,7 +29,7 @@ Do not point them at a retained state directory as a cutover experiment.
 Use a pinned Cargo workspace and Rust 1.95.0, with unsafe Rust forbidden in maintained crates.
 Concrete adapters must never become dependencies of the core or engine (except explicit test dependencies).
 The core's cooperative context uses no executor; Tokio and tracked service-owned tasks belong to the engine crate.
-The service/runtime implementation can use Tokio, Axum and reqwest, and the CLI can use clap when those layers are ported; add exact dependency versions and executable contract tests at that point, not empty crates or placeholder handlers now.
+The runtime adapter uses Tokio and reqwest; the service can use Axum and the CLI can use clap when those layers are ported, with exact dependency versions and executable contract tests rather than empty crates or placeholder handlers.
 Bundled SQLite needs a build-time C compiler but no separately provisioned SQLite service or library at runtime.
 
 ## Compatibility rules
@@ -75,12 +75,7 @@ See the [verification contract](VERIFICATION.md#routine-deterministic-checks) fo
 
 ## Concrete runtime adapter
 
-The HTTP adapter accepts an explicit endpoint/password/model handoff and never discovers, pairs, starts, moves, upgrades or restarts a native service.
-It preserves Go's stable endpoint/session/message identities, exact ordered worker/coordinator policy and immutable assignment metadata.
-Every operation verifies the live 2.1.0 version; redirects and HTTP-client retries are disabled, ordinary requests have a 30-second deadline and bounded JSON reads, and event subscriptions are caller-cancelled with bounded SSE parsing.
-Known prompt admission is never posted again to wake a parked session; uncertain recovery performs only reads across projected messages, pending admissions and the projection race.
-Pending cancellation removes only deterministic owned user admissions after interruption, while quiescence checks location-scoped shell/PTY inventories and supported session terminals rather than equating foreground idle with safe cleanup.
-The unchanged plugin still supplies the additional native path/tool guards; the adapter is not a security sandbox or a provider/model client.
+See the [OpenCode integration contract](OPENCODE.md#rust-runtime-migration) for Rust configuration, stable identities, permission isolation, uncertain recovery, cancellation and quiescence behavior.
 Neither the Go binary nor a retained state directory is switched to these libraries by compiling or testing them.
 
 ## Delivery sequence and cutover gates
@@ -110,8 +105,7 @@ Focused Rust checks are `make rust-test rust-parity rust-lint rust-security rust
 The aggregate check and CI execute the opted-in fixture, so those skips are not substituted for interoperability evidence.
 The explicit-directory `engine-compat` consumer disables native effects; its `observe` mode accepts synthetic read-only observations/inspection and fails if any write is attempted, even when reconciliation handles the per-attempt error.
 `make rust-safety` builds the separate `engine-safety` consumer and drives it with Python 3; it also runs under `make rust-parity`.
-`make rust-runtime-parity` builds the separate `runtime-compat` consumer and runs opted-in Go/Rust HTTP-fixture parity with the Go race detector; it also runs under `make rust-parity`.
-Those fixtures independently assert actual HTTP requests, effect counts, exact policy/answers, uncertainty, ownership, scoped background-resource checks, read limits and SSE cancellation against the documented pinned contract and executable Go oracle.
+Runtime-adapter commands and executable oracle coverage are documented in the [verification contract](VERIFICATION.md#routine-deterministic-checks).
 All compatibility stores, leases and forced-crash processes belong to newly created disposable fixtures, with no retained application data, runtime session, provider credential, real model, or shared service involved.
 The Rust quality proof runs the formatter, Clippy and compiler against conforming and deliberately violating fixtures and retains non-secret output in `.tmp`.
 `make test-race` remains Go race-detector evidence, not a Rust sanitizer result.

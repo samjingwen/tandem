@@ -77,10 +77,13 @@ The separate `tools/test-engine-safety.py` driver exercises the actual Rust Serv
 It independently asserts durable rows, pre-effect ownership, uncertainty without resend or premature cleanup, generations, task/depth/role limits, finite delivery/notification budgets and blocked-bookkeeping cancellation.
 Only runtime/workspace execution is simulated; this is not concrete native adapter, model/provider, external consumer or HTTP/CLI acceptance.
 The driver can retain requests/responses, SQLite operation rows, effect/event observations and source/binary hashes with `--evidence PATH`; fixture data remains disposable.
-`make rust-runtime-parity` independently drives both concrete HTTP adapters against the same controlled request/response cases, including exact create policy/assignment and configured native model, lost-response recovery across fresh adapter instances, no speculative prompt resend, reply rejection proof and stale decision refusal, selective inbox cancellation, foreground/background quiescence, redirects, read limits and live-only SSE cancellation/bounds.
+`make rust-runtime-parity` builds the separate `runtime-compat` executable and independently drives both concrete HTTP adapters against the same controlled request/response cases, including exact create policy/assignment and configured native model, lost-response recovery across fresh adapter instances, no speculative prompt resend, reply rejection proof and stale decision refusal, selective inbox cancellation, foreground/background quiescence, redirects, read limits and live-only SSE cancellation/bounds.
 `TestRustOpenCodeGoEndpointIdentityOracle` obtains the expected persisted runtime identity from the executable Go adapter, including escaped and Unicode endpoint paths; it does not substitute a second Rust implementation for the oracle.
+`TestRustOpenCodeGoAuthorityIdentityOracle` checks the shared authority cases against actual Go constructor/Info behavior; Rust's `go_authority_identity_oracle` checks its constructor/Info against those same cases, including Unicode and percent-escaped hosts and explicit ports.
+The authority tests redirect only their test-local transport to loopback fixtures after construction, preserving the configured identity without contacting public hostnames.
 The separate Rust executable receives only explicitly supplied fixture configuration, runs with a fresh HOME and no inherited control/provider credentials, and never starts a native runtime.
 Ordinary Go-only test invocations report this consumer skipped when not supplied; `make rust-parity` and CI supply it explicitly, and the opt-in runtime parity invocation enables the Go race detector.
+These fixtures do not start native OpenCode or establish plugin/provider compatibility or retained-state cutover acceptance.
 
 ## Isolated native contract
 
