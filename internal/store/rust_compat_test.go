@@ -321,7 +321,14 @@ func TestRustStoreMalformedTimestampMatchesGoRefusal(t *testing.T) {
 
 func TestRustStoreTimestampCorpusMatchesGo(t *testing.T) {
 	_ = requireRustFixture(t)
-	for _, raw := range []string{`null`, `"0001-01-01T00:00:00Z"`, `"2026-10-26T03:04:05.123456789012Z"`, `"2026-10-26T03:04:05,123Z"`, `"2026-10-26T03:04:60Z"`, `"2026-10-26T03:04:05+24:00"`, `"2026-10-26T03:04:05+00:60"`, `"2026-10-26T3:04:05Z"`, `"2026-10-26t03:04:05z"`, `"2026-02-30T03:04:05Z"`} {
+	for _, raw := range []string{
+		`null`, `"0001-01-01T00:00:00Z"`, `"2026-10-26T03:04:05.123456789012Z"`,
+		`"2026-10-26T03:04:05,123Z"`, `"2026-10-26T03:04:60Z"`, `"2026-10-26T03:04:05+24:00"`,
+		`"2026-10-26T03:04:05+00:60"`, `"2026-10-26T3:04:05Z"`, `"2026-10-26t03:04:05z"`,
+		`"2026-02-30T03:04:05Z"`, `"2026-10-26T03:04:05\u005a"`, `"\u0032026-10-26T03:04:05Z"`,
+		`"2026-10-26\u005403:04:05Z"`, `"9999-12-31T23:59:59-00:01"`, `"9999-12-31T23:59:59-24:60"`,
+		`"0000-01-01T00:00:00+00:01"`, `"0000-01-01T00:00:00+24:60"`,
+	} {
 		t.Run(raw, func(t *testing.T) {
 			dir := filepath.Join(t.TempDir(), "state")
 			db, err := store.Open(dir)
@@ -345,6 +352,25 @@ func TestRustStoreTimestampCorpusMatchesGo(t *testing.T) {
 			output, rustError := rustFixture(t, ctx, "snapshot", dir).CombinedOutput()
 			if (goError == nil) != (rustError == nil) {
 				t.Fatalf("timestamp %s: Go=%v, Rust=%v: %s", raw, goError, rustError, output)
+			}
+			if rustError == nil {
+				var exported struct {
+					State struct {
+						Tasks map[string]struct {
+							CreatedAt json.RawMessage `json:"createdAt"`
+						} `json:"tasks"`
+					} `json:"state"`
+				}
+				if err := json.Unmarshal(output, &exported); err != nil {
+					t.Fatal(err)
+				}
+				want := raw
+				if raw == "null" {
+					want = `"0001-01-01T00:00:00Z"`
+				}
+				if got := string(exported.State.Tasks["time"].CreatedAt); got != want {
+					t.Fatalf("timestamp spelling changed: got %s, want %s", got, want)
+				}
 			}
 		})
 	}

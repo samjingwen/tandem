@@ -35,7 +35,7 @@ impl Engine {
             interval
         };
         let wake = Arc::new(Notify::new());
-        let events_context = Context::background();
+        let events_context = context.clone();
         let events_stop = events_context.clone();
         let events_engine = self.clone();
         let events_wake = wake.clone();

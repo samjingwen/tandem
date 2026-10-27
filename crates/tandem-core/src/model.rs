@@ -49,15 +49,19 @@ pub struct Timestamp(pub String);
 
 impl<'de> Deserialize<'de> for Timestamp {
     fn deserialize<D: Deserializer<'de>>(decoder: D) -> std::result::Result<Self, D::Error> {
-        match Option::<String>::deserialize(decoder)? {
-            None => Ok(Self::default()), // time.Time also treats JSON null as its zero value.
-            Some(value) => {
-                crate::time_compat::parse(&value).ok_or_else(|| {
-                    serde::de::Error::custom("timestamp must match Go RFC3339 JSON semantics")
-                })?;
-                Ok(Self(value))
-            }
+        let raw = Box::<RawValue>::deserialize(decoder)?;
+        if raw.get() == "null" {
+            return Ok(Self::default());
         }
+        let value = raw
+            .get()
+            .strip_prefix('"')
+            .and_then(|value| value.strip_suffix('"'))
+            .filter(|value| crate::time_compat::parse(value).is_some())
+            .ok_or_else(|| {
+                serde::de::Error::custom("timestamp must match Go RFC3339 JSON semantics")
+            })?;
+        Ok(Self(value.into()))
     }
 }
 

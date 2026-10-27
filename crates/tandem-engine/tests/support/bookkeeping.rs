@@ -108,3 +108,109 @@ async fn bookkeeping_deadline_expires_without_releasing_effect_ownership_early()
     );
     assert_eq!(f.runtime.calls("prompt"), 1);
 }
+
+#[tokio::test]
+async fn run_cancellation_stops_events_before_blocked_bookkeeping_settles() {
+    for mode in ["shutdown", "cancel", "deadline"] {
+        for reconnecting in [false, true] {
+            let f = support::Fixture::new(Options::default()).await;
+            let task = f.create("task").await;
+            f.engine.shutdown().await;
+            let store = Arc::new(DelayedStore {
+                store: f.store.clone(),
+                once: AtomicBool::new(true),
+                entered: Semaphore::new(0),
+                release: (Mutex::new(false), Condvar::new()),
+            });
+            let engine = Engine::new(
+                store.clone(),
+                f.runtime.clone(),
+                f.workspaces.clone(),
+                Options {
+                    runtime_id: "fake".into(),
+                    ..Default::default()
+                },
+            );
+            let context = if mode == "deadline" {
+                Context::background().with_timeout(Duration::from_secs(2))
+            } else {
+                Context::background()
+            };
+            let owner = engine.clone();
+            let run_context = context.clone();
+            let runner =
+                tokio::spawn(async move { owner.run(&run_context, Duration::from_secs(60)).await });
+            tokio::time::timeout(Duration::from_secs(2), store.entered.acquire())
+                .await
+                .unwrap()
+                .unwrap()
+                .forget();
+            tokio::time::timeout(Duration::from_secs(2), f.runtime.events_entered.acquire())
+                .await
+                .unwrap()
+                .unwrap()
+                .forget();
+            if reconnecting {
+                if mode == "deadline" {
+                    tokio::time::sleep_until(
+                        (context.deadline().unwrap() - Duration::from_millis(500)).into(),
+                    )
+                    .await;
+                }
+                f.runtime.events_release.add_permits(1);
+                tokio::time::timeout(Duration::from_secs(2), f.runtime.events_stopped.acquire())
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .forget();
+            }
+            let mut shutdown = if mode == "shutdown" {
+                let owner = engine.clone();
+                Some(tokio::spawn(async move { owner.shutdown().await }))
+            } else {
+                if mode == "cancel" {
+                    context.cancel();
+                }
+                None
+            };
+            let stopped = if reconnecting {
+                if mode == "deadline" {
+                    tokio::time::sleep_until(context.deadline().unwrap().into()).await;
+                }
+                true
+            } else {
+                tokio::time::timeout(Duration::from_secs(3), f.runtime.events_stopped.acquire())
+                    .await
+                    .map(|permit| permit.unwrap().forget())
+                    .is_ok()
+            };
+            tokio::time::sleep(Duration::from_millis(1100)).await;
+            let subscriptions = f.runtime.calls("events");
+            if shutdown.is_none() {
+                let owner = engine.clone();
+                shutdown = Some(tokio::spawn(async move { owner.shutdown().await }));
+            }
+            let mut shutdown = shutdown.unwrap();
+            let held = tokio::time::timeout(Duration::from_millis(50), &mut shutdown)
+                .await
+                .is_err();
+            let state = f.state();
+            *store.release.0.lock().unwrap() = true;
+            store.release.1.notify_all();
+            shutdown.await.unwrap();
+            let _ = runner.await.unwrap();
+            assert!(stopped, "{mode}: subscription survived cancellation");
+            assert_eq!(subscriptions, 1, "{mode}: event listener reconnected");
+            assert!(held, "{mode}: shutdown released bookkeeping ownership");
+            assert_eq!(state.tasks[&task.id].desired, "active");
+            assert!(
+                state
+                    .commands
+                    .values()
+                    .any(|command| command.status == "sending")
+            );
+            assert_eq!(f.runtime.calls("prompt"), 1);
+            assert_eq!(f.runtime.calls("interrupt"), 0);
+        }
+    }
+}

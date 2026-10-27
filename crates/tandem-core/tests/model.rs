@@ -61,6 +61,10 @@ fn timestamp_validation_keeps_spelling_and_go_null_semantics() {
         "0001-01-01T00:00:00Z",
         "2026-10-26T03:04:05.123456789+00:00",
         "2026-10-26T12:00:00+08:00",
+        "9999-12-31T23:59:59-00:01",
+        "9999-12-31T23:59:59-24:60",
+        "0000-01-01T00:00:00+00:01",
+        "0000-01-01T00:00:00+24:60",
     ] {
         let encoded = serde_json::to_string(text).unwrap();
         let timestamp: Timestamp = serde_json::from_str(&encoded).unwrap();
@@ -74,6 +78,24 @@ fn timestamp_validation_keeps_spelling_and_go_null_semantics() {
     let earlier = Timestamp("2026-10-26T08:00:00+08:00".into());
     let later = Timestamp("2026-10-26T01:00:00Z".into());
     assert!(earlier.instant().unwrap() < later.instant().unwrap());
+    for (earlier, later) in [
+        ("9999-12-31T23:59:59Z", "9999-12-31T23:59:59-00:01"),
+        ("0000-01-01T00:00:00+00:01", "0000-01-01T00:00:00Z"),
+        ("0000-01-01T00:00:00+24:60", "0000-01-01T00:00:00+00:01"),
+        ("9999-12-31T23:59:59-00:01", "9999-12-31T23:59:59-24:60"),
+    ] {
+        assert!(
+            Timestamp(earlier.into()).instant().unwrap()
+                < Timestamp(later.into()).instant().unwrap()
+        );
+    }
+    for raw in [
+        r#""2026-10-26T03:04:05\u005a""#,
+        r#""\u0032026-10-26T03:04:05Z""#,
+        r#""2026-10-26\u005403:04:05Z""#,
+    ] {
+        assert!(serde_json::from_str::<Timestamp>(raw).is_err());
+    }
 }
 
 #[test]

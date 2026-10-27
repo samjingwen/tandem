@@ -34,6 +34,9 @@ pub struct FakeRuntime {
     pub block_info: std::sync::atomic::AtomicBool,
     pub info_entered: Semaphore,
     pub info_release: Semaphore,
+    pub events_entered: Semaphore,
+    pub events_release: Semaphore,
+    pub events_stopped: Semaphore,
 }
 
 impl FakeRuntime {
@@ -101,6 +104,24 @@ impl Runtime for FakeRuntime {
             compatible: !self.state.lock().unwrap().incompatible,
             ..Default::default()
         })
+    }
+    async fn events(&self, context: &Context, _notify: Arc<dyn Fn() + Send + Sync>) -> Result<()> {
+        struct Stopped<'a>(&'a Semaphore);
+        impl Drop for Stopped<'_> {
+            fn drop(&mut self) {
+                self.0.add_permits(1);
+            }
+        }
+        let _stopped = Stopped(&self.events_stopped);
+        context.check()?;
+        self.state
+            .lock()
+            .unwrap()
+            .calls
+            .push(("events".into(), String::new()));
+        self.events_entered.add_permits(1);
+        self.events_release.acquire().await.unwrap().forget();
+        Ok(())
     }
     async fn ensure(&self, context: &Context, spec: &SessionSpec) -> Result<()> {
         context.check()?;
@@ -327,6 +348,9 @@ impl Fixture {
             block_info: std::sync::atomic::AtomicBool::new(false),
             info_entered: Semaphore::new(0),
             info_release: Semaphore::new(0),
+            events_entered: Semaphore::new(0),
+            events_release: Semaphore::new(0),
+            events_stopped: Semaphore::new(0),
         });
         let workspaces = Arc::new(FakeWorkspaces {
             store: store.clone(),
