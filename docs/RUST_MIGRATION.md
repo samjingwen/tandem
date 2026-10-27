@@ -6,25 +6,27 @@ The native coordination engine, HTTP service, and CLI will move from Go to Rust.
 SQLite, the v1 HTTP API and its OpenAPI contract, the TypeScript OpenCode plugin, and OpenCode's ownership of model/tool execution remain unchanged.
 This is a compatibility migration, not a new product, parallel scheduler, or permission to start/adopt existing native services.
 
-**Current milestone: domain and SQLite foundation.**
+**Current milestone: domain, SQLite, and abstract-port coordination libraries.**
 The production executable and scheduler are still Go.
-The Rust crates are not a replacement daemon and do not expose command admission, runtime dispatch, HTTP endpoints, or a production CLI yet.
+`tandem-engine` implements command admission and reconciliation over runtime/workspace interfaces, exercised with controlled fixtures.
+No concrete Rust OpenCode adapter, checkout allocator, HTTP service, or production CLI is delivered by these libraries.
 Do not point them at a retained state directory as a cutover experiment.
 
 ## Boundaries
 
 | Layer | Rust boundary | Status |
 | --- | --- | --- |
-| Domain/storage contract | `crates/tandem-core` | Typed retained records, raw JSON outcomes, errors, Store/Revision interface |
+| Domain/storage contract | `crates/tandem-core` | Typed retained records, strict command inputs, cancellation context, runtime/workspace/service ports, raw JSON outcomes, Store/Revision interface |
 | SQLite adapter | `crates/tandem-store` | Transactional schema-1 store, lifetime OS lock, append-only history and immutable accepted receipts |
-| Scheduling and recovery | Runtime-independent core state transitions and explicit effects boundary | Not migrated |
+| Scheduling and recovery | `crates/tandem-engine` | Admission, controls, reconciliation, bounded coordinator signals and cleanup over abstract ports; controlled-runtime verification, not native acceptance |
 | OpenCode and worktrees | Concrete runtime/filesystem adapters behind core interfaces | Not migrated |
 | HTTP service | Same `/v1` contract, auth, bounded reads/receipts, cursors, live-only SSE | Not migrated |
 | CLI and composition root | Same client receipts/options; daemon alone owns scheduling | Not migrated |
 | Plugin | Existing TypeScript package | Remains TypeScript and API-only |
 
 Use a pinned Cargo workspace and Rust 1.95.0, with unsafe Rust forbidden in maintained crates.
-Concrete adapters must never become dependencies of the core.
+Concrete adapters must never become dependencies of the core or engine (except explicit test dependencies).
+The core's cooperative context uses no executor; Tokio and tracked service-owned tasks belong to the engine crate.
 The service/runtime implementation can use Tokio, Axum and reqwest, and the CLI can use clap when those layers are ported; add exact dependency versions and executable contract tests at that point, not empty crates or placeholder handlers now.
 Bundled SQLite needs a build-time C compiler but no separately provisioned SQLite service or library at runtime.
 
@@ -35,7 +37,7 @@ Bundled SQLite needs a build-time C compiler but no separately provisioned SQLit
 - Session idleness is not completion evidence or permission for destructive cleanup.
 - Every accepted mutation must retain the same caller operation identity, normalized fingerprint and exact immutable outcome, committed with its state change.
 - Go's request serialization is part of existing fingerprint compatibility: ordinary Rust JSON serialization is not automatically byte-identical, especially for field order, omitted/zero fields, HTML characters, numbers and raw answers.
-- Do not admit real Rust commands until cross-language replay/conflict tests cover those fingerprint rules.
+- Cross-language replay/conflict tests cover those fingerprint rules before any production Rust command surface is introduced.
 - Preserve complete content and exact receipts, including arbitrary JSON and integer/decimal precision, rather than silently truncating or replacing an old receipt with current task state.
 - Preserve all legacy HTTP shapes, strict request budgets, typed failures, authentication/browser boundaries, no mutation redirect/retry, bounded read filters and byte caps, process-scoped cursors, and live-only SSE semantics.
 - One canonical state directory has one lifetime OS lock and one scheduling owner, including across Go and Rust processes and symlink aliases.
@@ -45,8 +47,29 @@ The Rust store serializes snapshots/transactions behind one mutex and reads each
 An unchanged transaction does not change revision or append history.
 Unchanged persisted rows retain their exact stored JSON, including accepted operation bodies; only changed records append history at the new atomic revision.
 Unknown record fields and original timestamp spellings survive unrelated Rust updates.
+Timestamp loading matches Go's RFC3339 JSON behavior, including legacy single-digit hours, comma fractions, long fractions and boundary offsets; sorting compares instants rather than the retained strings.
 An existing operation receipt cannot be changed or removed, retained records cannot be deleted through the generic update boundary, and caller attempts to change the instance/revision are rejected.
 These fail-closed restrictions protect persistence; the full engine must still enforce graph, dispatch, generation, control and acceptance invariants.
+
+## Coordination library
+
+The engine persists attempt/workspace/session ownership before allocating or invoking execution, and journals accepted commands atomically with their original immutable outcomes.
+Its tick lock serializes reconciliation; a separate effects lock serializes external mutation admission and control/cleanup barriers.
+An ambiguous prompt is reconciled read-only by its existing command/session reference, never retried as a new mutation.
+Uncertainty retains capacity even when the runtime is foreground-idle.
+Automatic dispatch failures stop at eight, while explicit resume preserves the attempt and resets its delivery budget.
+Coordinators have a separate single-slot limit and a default 32-notification budget; unchanged evidence is quiet and current signal storage coalesces by child.
+
+Dropping an API/client future abandons only that wait, not the owned operation.
+Explicit cancellation, deadline expiry or shutdown signals its cooperative context, while the tracked operation retains the store and effects barrier through independent five-second outcome bookkeeping.
+Shutdown closes admission atomically with task registration, stops scheduler reads/event listening, and waits for owned tasks without stopping external workers.
+The event listener shares the owned run's cancellation and deadline, so event reads and reconnection stop even while outcome bookkeeping is blocked.
+A storage lock may delay return beyond the bookkeeping deadline; its callback must then refuse the expired change, and ownership remains retained until the blocking storage task actually returns.
+Runtime ports must honor cancellation; only an explicit `Error::not_delivered` classification proves a failed write can safely return to pending delivery.
+An `invalid_request` reply error without that proof retains uncertainty, rather than clearing the answer for another reply.
+Cleanup requires terminal intent, settled dispatch, current owned foreground quiescence and the runtime's separate background-resource quiescence capability.
+
+See the [verification contract](VERIFICATION.md#routine-deterministic-checks) for executable oracle and controlled-consumer coverage and its acceptance limits.
 
 ## Delivery sequence and cutover gates
 
@@ -71,10 +94,12 @@ Run the [routine deterministic checks](VERIFICATION.md#routine-deterministic-che
 
 Focused Rust checks are `make rust-test rust-parity rust-lint rust-security rust-build`.
 `make prepare` installs pinned cargo-audit into task-local `.tmp/rust-tools`, not a global executable directory.
-`make rust-parity` builds the test-only `store-compat` example and supplies its explicit absolute path to the Go tests; ordinary Go-only tests report this cross-language fixture skipped when not opted in.
+`make rust-parity` builds the test-only `store-compat` and `engine-compat` examples and supplies their explicit absolute paths to the Go tests; ordinary Go-only tests report these cross-language fixtures skipped when not opted in.
 The aggregate check and CI execute the opted-in fixture, so those skips are not substituted for interoperability evidence.
+The explicit-directory `engine-compat` consumer disables native effects; its `observe` mode accepts synthetic read-only observations/inspection and fails if any write is attempted, even when reconciliation handles the per-attempt error.
+`make rust-safety` builds the separate `engine-safety` consumer and drives it with Python 3; it also runs under `make rust-parity`.
 All compatibility stores, leases and forced-crash processes belong to newly created disposable fixtures, with no retained application data, runtime session, provider credential, real model, or shared service involved.
 The Rust quality proof runs the formatter, Clippy and compiler against conforming and deliberately violating fixtures and retains non-secret output in `.tmp`.
 `make test-race` remains Go race-detector evidence, not a Rust sanitizer result.
 
-The first milestone proves storage/model behavior only, not migration completion, live OpenCode compatibility, production cutover, external consumer acceptance or permission to publish/deploy an executable.
+The current milestone proves storage/model and abstract-port coordination behavior only, not migration completion, live OpenCode compatibility, production cutover, external consumer acceptance or permission to publish/deploy an executable.

@@ -35,17 +35,44 @@ impl Eq for RawJson {}
 
 // Unlike Option's usual JSON handling, an explicitly supplied null is a retained
 // value, not the absence of this optional json.RawMessage field.
-fn optional_raw<'de, D: Deserializer<'de>>(
+pub(crate) fn optional_raw<'de, D: Deserializer<'de>>(
     decoder: D,
 ) -> std::result::Result<Option<RawJson>, D::Error> {
     RawJson::deserialize(decoder).map(Some)
 }
 
 /// Preserves the original RFC3339 spelling and subsecond precision on reopen.
-/// Parsing and clock access belong to command admission, not storage rewrites.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+/// Validate RFC3339 without normalizing unchanged persisted strings.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct Timestamp(pub String);
+
+impl<'de> Deserialize<'de> for Timestamp {
+    fn deserialize<D: Deserializer<'de>>(decoder: D) -> std::result::Result<Self, D::Error> {
+        let raw = Box::<RawValue>::deserialize(decoder)?;
+        if raw.get() == "null" {
+            return Ok(Self::default());
+        }
+        let value = serde_json::from_str::<String>(raw.get())
+            .ok()
+            .filter(|value| crate::time_compat::parse(value).is_some())
+            .ok_or_else(|| {
+                serde::de::Error::custom("timestamp must match Go RFC3339 JSON semantics")
+            })?;
+        Ok(Self(value))
+    }
+}
+
+impl Timestamp {
+    pub fn instant(&self) -> crate::Result<time::OffsetDateTime> {
+        crate::time_compat::parse(&self.0).ok_or_else(|| {
+            crate::Error::new(
+                "corrupt_state",
+                "stored timestamp is invalid; explicit recovery is required",
+            )
+        })
+    }
+}
 
 impl Default for Timestamp {
     fn default() -> Self {

@@ -64,8 +64,19 @@ This package lifetime does not extend individual fixture, request, runtime, or r
 CI invokes these same Makefile targets; targeted regression and opt-in native commands retain their separate deadlines.
 No live model or shared native service is required by normal CI.
 An absent opt-in fixture is reported skipped, never described as a live pass.
-`make test` also runs the Rust workspace tests and `make rust-parity`; the latter invokes a separate Go storage test run with Go's default package timeout and an explicit Rust fixture executable.
-These checks cover the [Rust domain/SQLite foundation](RUST_MIGRATION.md#verification-commands), not Rust engine, adapter, HTTP, or CLI parity.
+`make test` also runs the Rust workspace tests and `make rust-parity`; the latter invokes a separate Go storage/engine-oracle test run with Go's default package timeout and explicit Rust fixture executables.
+These checks cover [Rust domain/SQLite and abstract-port coordination libraries](RUST_MIGRATION.md#verification-commands), not concrete Rust adapter, HTTP, or CLI parity.
+`crates/tandem-engine/tests/coordination.rs` executes real Rust admission/reconciliation against SQLite and controlled runtime/workspace ports, including abandoned-client, shutdown, uncertainty, same-reference recovery, generation, role/dependency bounds, capacity, finite notifications, quiet polls, explicit decisions and cleanup barriers.
+Reply regressions distinguish explicitly proven rejection from an unmarked `invalid_request`, which must retain uncertainty and prevent resend.
+The five-second bookkeeping fixture blocks only its owned storage callback, verifies that controls cannot cross the effects barrier, then releases it and rejects the expired bookkeeping change without fabricating an admission receipt.
+`crates/tandem-engine/tests/support/bookkeeping.rs` also checks that shutdown, explicit cancellation and deadlines stop event subscriptions and reconnection before blocked bookkeeping releases ownership.
+`TestRustEngineGoFingerprintOracle`, `TestRustEngineReplaysActualGoOperationsAndGoReplaysRustCreate`, and `TestRustEngineGoDecisionAndCoordinatorSignalOracle` use actual Go serialization/service behavior as an independent oracle, not Rust-generated expected values.
+They cover request field order/omission, HTML and U+2028/U+2029 escaping, raw-answer compaction/order/number spelling, all eight command kinds' old receipts, operation conflicts, decision identifiers and coordinator signal bodies, including Go replay of an actual Rust-created task/receipt.
+Timestamp parity includes malformed-date refusal and accepted legacy Go spellings while retaining their original text and comparing actual instants.
+The separate `tools/test-engine-safety.py` driver exercises the actual Rust Service, scheduler, lifecycle and SQLite through the disposable JSON-lines `engine-safety` consumer.
+It independently asserts durable rows, pre-effect ownership, uncertainty without resend or premature cleanup, generations, task/depth/role limits, finite delivery/notification budgets and blocked-bookkeeping cancellation.
+Only runtime/workspace execution is simulated; this is not concrete native adapter, model/provider, external consumer or HTTP/CLI acceptance.
+The driver can retain requests/responses, SQLite operation rows, effect/event observations and source/binary hashes with `--evidence PATH`; fixture data remains disposable.
 
 ## Isolated native contract
 

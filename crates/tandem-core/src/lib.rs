@@ -5,9 +5,16 @@
 //! JSON representation. The Go engine remains the executable until parity is
 //! established for scheduling, adapters, HTTP, and CLI as well as persistence.
 
+mod context;
+mod input;
 mod model;
+mod ports;
+mod time_compat;
 
+pub use context::Context;
+pub use input::*;
 pub use model::*;
+pub use ports::*;
 
 pub const VERSION: &str = "0.1.0";
 
@@ -17,6 +24,8 @@ pub const VERSION: &str = "0.1.0";
 pub struct Error {
     pub code: String,
     pub message: String,
+    #[serde(skip)]
+    not_delivered: bool,
 }
 
 impl Error {
@@ -24,11 +33,32 @@ impl Error {
         Self {
             code: code.into(),
             message: message.into(),
+            not_delivered: false,
         }
     }
 
     pub fn invalid(message: impl Into<String>) -> Self {
         Self::new("invalid_request", message)
+    }
+
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::new("not_found", message)
+    }
+
+    pub fn uncertain() -> Self {
+        Self::new(
+            "uncertain",
+            "external outcome cannot be established; reconciliation required",
+        )
+    }
+
+    pub fn not_delivered(mut error: Self) -> Self {
+        error.not_delivered = true;
+        error
+    }
+
+    pub fn is_not_delivered(&self) -> bool {
+        self.not_delivered
     }
 }
 

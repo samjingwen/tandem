@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/tandem-core", "crates/tandem-store"]
+members = ["crates/tandem-core", "crates/tandem-engine", "crates/tandem-store"]
 resolver = "3"
 
 [workspace.package]
@@ -11,12 +11,17 @@ repository = "https://github.com/samjingwen/tandem"
 publish = false
 
 [workspace.dependencies]
+async-trait = "=0.1.92"
+event-listener = "=5.4.2"
 getrandom = "=0.4.3"
 rusqlite = { version = "=0.41.0", features = ["bundled"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.154", features = ["raw_value", "arbitrary_precision"] }
+sha2 = "=0.11.1"
 tempfile = "=3.27.0"
-time = { version = "=0.3.55", features = ["formatting", "parsing"] }
+time = { version = "=0.3.55", features = ["formatting", "parsing", "large-dates"] }
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio-util = { version = "=0.7.20", features = ["rt"] }
 tandem-core = { path = "crates/tandem-core" }
 
 [workspace.lints.rust]
