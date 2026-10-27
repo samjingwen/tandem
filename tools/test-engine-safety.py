@@ -481,7 +481,10 @@ def main():
     report = {
         "scope": "Real Rust Service/scheduler/SQLite; simulated execution only; no native acceptance",
         "head": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], text=True
+            # Container checkouts can be owned by the runner rather than its user.
+            # Trust only this checkout for this read, without global config writes.
+            ["git", "-c", f"safe.directory={Path.cwd()}", "rev-parse", "HEAD"],
+            text=True,
         ).strip(),
         "binarySha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
         "sourceSha256": {},
