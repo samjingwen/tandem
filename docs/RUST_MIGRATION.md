@@ -6,10 +6,11 @@ The native coordination engine, HTTP service, and CLI will move from Go to Rust.
 SQLite, the v1 HTTP API and its OpenAPI contract, the TypeScript OpenCode plugin, and OpenCode's ownership of model/tool execution remain unchanged.
 This is a compatibility migration, not a new product, parallel scheduler, or permission to start/adopt existing native services.
 
-**Current milestone: domain, SQLite, and abstract-port coordination libraries.**
+**Current milestone: domain, SQLite, abstract-port coordination and controlled HTTP runtime-adapter libraries.**
 The production executable and scheduler are still Go.
 `tandem-engine` implements command admission and reconciliation over runtime/workspace interfaces, exercised with controlled fixtures.
-No concrete Rust OpenCode adapter, checkout allocator, HTTP service, or production CLI is delivered by these libraries.
+`tandem-opencode` implements the pinned OpenCode 2.1.0 HTTP/SSE Runtime port, verified against disposable HTTP fixtures and the executable Go adapter, not a native OpenCode process.
+No Rust checkout allocator, HTTP service or production CLI is delivered by these libraries.
 Do not point them at a retained state directory as a cutover experiment.
 
 ## Boundaries
@@ -19,7 +20,8 @@ Do not point them at a retained state directory as a cutover experiment.
 | Domain/storage contract | `crates/tandem-core` | Typed retained records, strict command inputs, cancellation context, runtime/workspace/service ports, raw JSON outcomes, Store/Revision interface |
 | SQLite adapter | `crates/tandem-store` | Transactional schema-1 store, lifetime OS lock, append-only history and immutable accepted receipts |
 | Scheduling and recovery | `crates/tandem-engine` | Admission, controls, reconciliation, bounded coordinator signals and cleanup over abstract ports; controlled-runtime verification, not native acceptance |
-| OpenCode and worktrees | Concrete runtime/filesystem adapters behind core interfaces | Not migrated |
+| OpenCode HTTP/SSE | `crates/tandem-opencode` behind the Runtime port | Pinned wire/ownership/recovery adapter with controlled HTTP verification only; no native acceptance |
+| Worktrees | Concrete filesystem adapter behind Workspaces | Not migrated |
 | HTTP service | Same `/v1` contract, auth, bounded reads/receipts, cursors, live-only SSE | Not migrated |
 | CLI and composition root | Same client receipts/options; daemon alone owns scheduling | Not migrated |
 | Plugin | Existing TypeScript package | Remains TypeScript and API-only |
@@ -71,6 +73,16 @@ Cleanup requires terminal intent, settled dispatch, current owned foreground qui
 
 See the [verification contract](VERIFICATION.md#routine-deterministic-checks) for executable oracle and controlled-consumer coverage and its acceptance limits.
 
+## Concrete runtime adapter
+
+The HTTP adapter accepts an explicit endpoint/password/model handoff and never discovers, pairs, starts, moves, upgrades or restarts a native service.
+It preserves Go's stable endpoint/session/message identities, exact ordered worker/coordinator policy and immutable assignment metadata.
+Every operation verifies the live 2.1.0 version; redirects and HTTP-client retries are disabled, ordinary requests have a 30-second deadline and bounded JSON reads, and event subscriptions are caller-cancelled with bounded SSE parsing.
+Known prompt admission is never posted again to wake a parked session; uncertain recovery performs only reads across projected messages, pending admissions and the projection race.
+Pending cancellation removes only deterministic owned user admissions after interruption, while quiescence checks location-scoped shell/PTY inventories and supported session terminals rather than equating foreground idle with safe cleanup.
+The unchanged plugin still supplies the additional native path/tool guards; the adapter is not a security sandbox or a provider/model client.
+Neither the Go binary nor a retained state directory is switched to these libraries by compiling or testing them.
+
 ## Delivery sequence and cutover gates
 
 1. **Persistence foundation:** typed domain, schema-1 storage, Go/Rust bidirectional reopen, cross-process/alias ownership, rollback, crash recovery, exact raw receipts, complete content, and deterministic quality/security checks.
@@ -98,8 +110,10 @@ Focused Rust checks are `make rust-test rust-parity rust-lint rust-security rust
 The aggregate check and CI execute the opted-in fixture, so those skips are not substituted for interoperability evidence.
 The explicit-directory `engine-compat` consumer disables native effects; its `observe` mode accepts synthetic read-only observations/inspection and fails if any write is attempted, even when reconciliation handles the per-attempt error.
 `make rust-safety` builds the separate `engine-safety` consumer and drives it with Python 3; it also runs under `make rust-parity`.
+`make rust-runtime-parity` builds the separate `runtime-compat` consumer and runs opted-in Go/Rust HTTP-fixture parity with the Go race detector; it also runs under `make rust-parity`.
+Those fixtures independently assert actual HTTP requests, effect counts, exact policy/answers, uncertainty, ownership, scoped background-resource checks, read limits and SSE cancellation against the documented pinned contract and executable Go oracle.
 All compatibility stores, leases and forced-crash processes belong to newly created disposable fixtures, with no retained application data, runtime session, provider credential, real model, or shared service involved.
 The Rust quality proof runs the formatter, Clippy and compiler against conforming and deliberately violating fixtures and retains non-secret output in `.tmp`.
 `make test-race` remains Go race-detector evidence, not a Rust sanitizer result.
 
-The current milestone proves storage/model and abstract-port coordination behavior only, not migration completion, live OpenCode compatibility, production cutover, external consumer acceptance or permission to publish/deploy an executable.
+The current milestone proves storage/model, abstract-port coordination and controlled HTTP runtime-adapter behavior only, not migration completion, live OpenCode compatibility, production cutover, external consumer acceptance or permission to publish/deploy an executable.

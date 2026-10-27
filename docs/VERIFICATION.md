@@ -65,7 +65,7 @@ CI invokes these same Makefile targets; targeted regression and opt-in native co
 No live model or shared native service is required by normal CI.
 An absent opt-in fixture is reported skipped, never described as a live pass.
 `make test` also runs the Rust workspace tests and `make rust-parity`; the latter invokes a separate Go storage/engine-oracle test run with Go's default package timeout and explicit Rust fixture executables.
-These checks cover [Rust domain/SQLite and abstract-port coordination libraries](RUST_MIGRATION.md#verification-commands), not concrete Rust adapter, HTTP, or CLI parity.
+These checks cover [Rust domain/SQLite, abstract-port coordination and controlled runtime-adapter libraries](RUST_MIGRATION.md#verification-commands), not native OpenCode, workspace allocator, HTTP-service or CLI acceptance.
 `crates/tandem-engine/tests/coordination.rs` executes real Rust admission/reconciliation against SQLite and controlled runtime/workspace ports, including abandoned-client, shutdown, uncertainty, same-reference recovery, generation, role/dependency bounds, capacity, finite notifications, quiet polls, explicit decisions and cleanup barriers.
 Reply regressions distinguish explicitly proven rejection from an unmarked `invalid_request`, which must retain uncertainty and prevent resend.
 The five-second bookkeeping fixture blocks only its owned storage callback, verifies that controls cannot cross the effects barrier, then releases it and rejects the expired bookkeeping change without fabricating an admission receipt.
@@ -77,6 +77,10 @@ The separate `tools/test-engine-safety.py` driver exercises the actual Rust Serv
 It independently asserts durable rows, pre-effect ownership, uncertainty without resend or premature cleanup, generations, task/depth/role limits, finite delivery/notification budgets and blocked-bookkeeping cancellation.
 Only runtime/workspace execution is simulated; this is not concrete native adapter, model/provider, external consumer or HTTP/CLI acceptance.
 The driver can retain requests/responses, SQLite operation rows, effect/event observations and source/binary hashes with `--evidence PATH`; fixture data remains disposable.
+`make rust-runtime-parity` independently drives both concrete HTTP adapters against the same controlled request/response cases, including exact create policy/assignment and configured native model, lost-response recovery across fresh adapter instances, no speculative prompt resend, reply rejection proof and stale decision refusal, selective inbox cancellation, foreground/background quiescence, redirects, read limits and live-only SSE cancellation/bounds.
+`TestRustOpenCodeGoEndpointIdentityOracle` obtains the expected persisted runtime identity from the executable Go adapter, including escaped and Unicode endpoint paths; it does not substitute a second Rust implementation for the oracle.
+The separate Rust executable receives only explicitly supplied fixture configuration, runs with a fresh HOME and no inherited control/provider credentials, and never starts a native runtime.
+Ordinary Go-only test invocations report this consumer skipped when not supplied; `make rust-parity` and CI supply it explicitly, and the opt-in runtime parity invocation enables the Go race detector.
 
 ## Isolated native contract
 

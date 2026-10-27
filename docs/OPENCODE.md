@@ -144,6 +144,16 @@ Callbacks receive only a wake signal, never event payloads, session text, creden
 The engine must provide a fast coalescing callback, reconnect/backoff after EOF or failure, and reconcile durable state after reconnecting.
 There is no replay cursor or automatic reconnect in this adapter.
 
+## Rust runtime migration
+
+The non-default `crates/tandem-opencode` library implements the same pinned Runtime port using an explicitly configured reqwest client, with redirects and transport retries disabled.
+The core and engine remain independent of that concrete HTTP implementation.
+Its ordinary requests use cooperative cancellation, a 30-second deadline and an 8-MiB response ceiling; live-only event subscriptions use the caller's deadline/cancellation rather than that ordinary-request timeout.
+`make rust-runtime-parity` drives the actual Rust library through a separate executable against disposable HTTP fixtures shared with the executable Go oracle.
+It verifies wire ownership/policy, stable identities, lost-create/prompt recovery without resending, deterministic rejection classification, scoped cancellation/quiescence, bounded reads and SSE parsing/cancellation.
+This controlled verification does not start native OpenCode, prove plugin/provider compatibility, replace the Go executable or authorize retained-state cutover.
+The supported version remains exactly 2.1.0; a separate runtime-version upgrade cannot be inferred from a newer client library or from the development harness's version.
+
 ## Thin plugin
 
 The package lives in `plugin/`, deliberately outside automatic `.opencode/plugins/` discovery.

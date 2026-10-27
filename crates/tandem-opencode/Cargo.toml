@@ -1,0 +1,22 @@
+[package]
+name = "tandem-opencode"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Explicit-endpoint OpenCode 2.1.0 runtime adapter for Tandem"
+
+[dependencies]
+async-trait.workspace = true
+mime.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tandem-core.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

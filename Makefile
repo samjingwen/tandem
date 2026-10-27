@@ -1,4 +1,4 @@
-.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-safety rust-build rust-security python-prepare python-format python-format-check python-lint
+.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-runtime-parity rust-safety rust-build rust-security python-prepare python-format python-format-check python-lint
 
 RUST_AUDIT_VERSION := 0.22.2
 RUST_AUDIT_ROOT := $(CURDIR)/.tmp/rust-tools
@@ -73,6 +73,11 @@ rust-parity:
 	cargo build --locked --example engine-compat
 	TANDEM_RUST_STORE_HELPER="$(CURDIR)/target/debug/examples/store-compat" TANDEM_RUST_ENGINE_HELPER="$(CURDIR)/target/debug/examples/engine-compat" go test ./internal/store -run '^TestRust(Store|Engine)' -count=1
 	$(MAKE) rust-safety
+	$(MAKE) rust-runtime-parity
+
+rust-runtime-parity:
+	cargo build --locked -p tandem-opencode --example runtime-compat
+	TANDEM_RUST_OPENCODE_HELPER="$(CURDIR)/target/debug/examples/runtime-compat" go test -race ./internal/opencode -run '^TestRustOpenCode' -count=1
 
 rust-safety:
 	cargo build --locked -p tandem-engine --example engine-safety
