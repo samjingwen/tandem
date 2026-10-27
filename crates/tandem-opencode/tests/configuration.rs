@@ -10,6 +10,7 @@ fn explicit_configuration_rejects_unsafe_endpoints_and_incomplete_models() {
         "http://localhost?secret=value",
         "http://localhost#secret",
         "http://localhost/\n",
+        "http://%65xample.test",
     ] {
         let result = OpenCode::new(Options {
             url: url.into(),

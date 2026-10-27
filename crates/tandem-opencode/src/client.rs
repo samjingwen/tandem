@@ -84,12 +84,9 @@ impl OpenCode {
         {
             return Err(invalid());
         }
+        let host = go_endpoint_host(host).ok_or_else(invalid)?;
         let path = go_endpoint_path(&path).ok_or_else(invalid)?;
-        let base = format!(
-            "{}://{}{path}",
-            scheme.to_ascii_lowercase(),
-            host.to_lowercase()
-        );
+        let base = format!("{}://{host}{path}", scheme.to_ascii_lowercase());
         if options
             .model
             .as_ref()
@@ -269,19 +266,53 @@ impl OpenCode {
     }
 }
 
+fn hex(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn go_endpoint_host(raw: &str) -> Option<String> {
+    let input = raw.as_bytes();
+    let mut decoded = Vec::new();
+    let mut index = 0;
+    while index < input.len() {
+        if input[index] == b'%' {
+            let byte = hex(*input.get(index + 1)?)? * 16 + hex(*input.get(index + 2)?)?;
+            if byte < 0x80 && byte != b'%' {
+                return None;
+            }
+            decoded.push(byte);
+            index += 3;
+        } else {
+            decoded.push(input[index]);
+            index += 1;
+        }
+    }
+    let lower: String = std::str::from_utf8(&decoded)
+        .ok()?
+        .chars()
+        .map(|character| character.to_lowercase().next().unwrap_or(character))
+        .collect();
+    let mut escaped = String::new();
+    for byte in lower.bytes() {
+        if byte >= 0x80 || byte == b'%' {
+            escaped.push_str(&format!("%{byte:02X}"));
+        } else {
+            escaped.push(char::from(byte));
+        }
+    }
+    Some(escaped)
+}
+
 /// Go's URL stores a decoded Path and an optional original RawPath. Trimming
 /// decoded trailing slashes invalidates RawPath, so the remaining bytes must be
 /// escaped canonically. Preserve a valid original spelling only when it still
 /// denotes the unchanged path, including percent-escaped unreserved characters.
 fn go_endpoint_path(raw: &str) -> Option<String> {
-    fn hex(byte: u8) -> Option<u8> {
-        match byte {
-            b'0'..=b'9' => Some(byte - b'0'),
-            b'a'..=b'f' => Some(byte - b'a' + 10),
-            b'A'..=b'F' => Some(byte - b'A' + 10),
-            _ => None,
-        }
-    }
     let input = raw.as_bytes();
     let mut decoded = Vec::new();
     let mut index = 0;
@@ -335,5 +366,82 @@ pub(crate) async fn within<T>(
         () = context.cancellation_requested() => Err(Error::new("canceled", "operation canceled").into()),
         () = deadline => Err(Error::new("timeout", "operation deadline exceeded").into()),
         result = work => result,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        io::{Read, Write},
+        net::TcpListener,
+    };
+    use tandem_core::Runtime;
+
+    #[tokio::test]
+    async fn go_authority_identity_oracle() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            url: String,
+            base: String,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../tests/endpoint-authorities.json")).unwrap();
+        for case in cases {
+            let mut runtime = OpenCode::new(Options {
+                url: case.url.clone(),
+                password: "fixture-only".into(),
+                model: None,
+            })
+            .unwrap();
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let address = listener.local_addr().unwrap();
+            let fixture = std::thread::spawn(move || {
+                let deadline = std::time::Instant::now() + Duration::from_secs(5);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(std::time::Instant::now() < deadline);
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("{error}"),
+                    }
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut request = Vec::new();
+                while !request.ends_with(b"\r\n\r\n") {
+                    let mut byte = [0];
+                    stream.read_exact(&mut byte).unwrap();
+                    request.push(byte[0]);
+                    assert!(request.len() < 8192);
+                }
+                assert!(request.starts_with(b"GET /api/info HTTP/1.1\r\n"));
+                stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 19\r\nConnection: close\r\n\r\n{\"version\":\"2.1.0\"}").unwrap();
+            });
+            let base = runtime.base.clone();
+            runtime.base = format!("http://{address}");
+            runtime.client = Client::builder().no_proxy().build().unwrap();
+            let info = runtime
+                .info(&Context::background().with_timeout(Duration::from_secs(5)))
+                .await
+                .unwrap();
+            fixture.join().unwrap();
+            assert_eq!(
+                info.id,
+                format!("opencode_{}", digest(&case.base)),
+                "{}",
+                case.url
+            );
+            assert_eq!(base, case.base, "{}", case.url);
+            assert!(info.compatible);
+            assert_eq!(info.version, VERSION);
+        }
     }
 }

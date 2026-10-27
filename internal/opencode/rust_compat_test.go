@@ -912,3 +912,39 @@ func TestRustOpenCodeGoEndpointIdentityOracle(t *testing.T) {
 		})
 	}
 }
+
+func TestRustOpenCodeGoAuthorityIdentityOracle(t *testing.T) {
+	data, err := os.ReadFile("../../crates/tandem-opencode/tests/endpoint-authorities.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		URL  string
+		Base string
+	}
+	if err := json.Unmarshal(data, &cases); err != nil {
+		t.Fatal(err)
+	}
+	server := authenticatedFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/info" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL)
+		}
+		writeJSON(w, map[string]any{"version": Version})
+	})
+	for _, test := range cases {
+		t.Run(test.URL, func(t *testing.T) {
+			runtime, err := New(Options{URL: test.URL, Password: "test-password"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if runtime.base != test.Base {
+				t.Fatalf("Go normalized %q to %q, want %q", test.URL, runtime.base, test.Base)
+			}
+			runtime.base = server.URL
+			info, err := runtime.Info(t.Context())
+			if err != nil || info.ID != "opencode_"+digest(test.Base) || !info.Compatible || info.Version != Version {
+				t.Fatalf("Go Info: %+v, err=%v", info, err)
+			}
+		})
+	}
+}

@@ -1,0 +1,13 @@
+[
+  {"url":"https://bücher.example","base":"https://b%C3%BCcher.example"},
+  {"url":"https://b%c3%bccher.example","base":"https://b%C3%BCcher.example"},
+  {"url":"https://B%C3%9CCHER.example","base":"https://b%C3%BCcher.example"},
+  {"url":"https://xn--bcher-kva.example","base":"https://xn--bcher-kva.example"},
+  {"url":"https://BÜCHER.example:443/prefix/","base":"https://b%C3%BCcher.example:443/prefix"},
+  {"url":"http://%C4%B0.example:80/a%2fb","base":"http://i.example:80/a%2fb"},
+  {"url":"http://İ.example:80/a%2fb","base":"http://i.example:80/a%2fb"},
+  {"url":"http://ΟΣ.example/","base":"http://%CE%BF%CF%83.example"},
+  {"url":"http://EXAMPLE.test:80/","base":"http://example.test:80"},
+  {"url":"https://[2001:DB8::A]:443/","base":"https://[2001:db8::a]:443"},
+  {"url":"http://127.0.0.1:80/","base":"http://127.0.0.1:80"}
+]
