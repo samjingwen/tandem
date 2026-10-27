@@ -1,0 +1,66 @@
+{
+  "scope": "Assigned Test fix only; separately driven real Rust Service, scheduler, lifecycle and SQLite; simulated runtime/workspace execution; no native acceptance",
+  "finding": "Missing executable consumer evidence for uncertainty, blocked-bookkeeping cancellation, admission/generations/limits/cleanup",
+  "productChanges": false,
+  "consumerScenariosPassed": [
+    "uncertainty",
+    "generations-cleanup",
+    "limits",
+    "delivery-budget",
+    "role-limits",
+    "notification-budget",
+    "expired-bookkeeping-dropped-wait",
+    "shutdown-reconnecting-False",
+    "shutdown-reconnecting-True",
+    "cancel-reconnecting-False",
+    "cancel-reconnecting-True",
+    "deadline-reconnecting-False",
+    "deadline-reconnecting-True"
+  ],
+  "checks": [
+    {
+      "command": "cargo test --locked -p tandem-engine --test coordination bookkeeping::run_cancellation_stops_events_before_blocked_bookkeeping_settles -- --exact --nocapture",
+      "exitStatus": 0
+    },
+    {
+      "command": "make rust-test",
+      "exitStatus": 0,
+      "tests": 36,
+      "log": "rust-tests-parity-safety-round3.log"
+    },
+    {
+      "command": "Go Rust store/engine oracles with explicit freshly built helpers, -count=1 -v",
+      "exitStatus": 0,
+      "skips": 0,
+      "log": "go-rust-oracles-verbose-round3.log"
+    },
+    {
+      "command": "Three named Go integration baseline tests, -count=1 -v",
+      "exitStatus": 0,
+      "log": "go-integration-baseline-round3.log"
+    },
+    {
+      "command": "python3 tools/test-engine-safety.py target/debug/examples/engine-safety --evidence <named evidence directory>/engine-safety-consumer-round3-final.json",
+      "exitStatus": 0,
+      "scenarios": 13
+    },
+    {
+      "command": "make rust-parity",
+      "exitStatus": 0,
+      "log": "rust-parity-safety-round3-final.log"
+    }
+  ],
+  "recordedFailures": [
+    "New driver initially created a non-private fixture directory; fixed to owner-only permissions without changing the store refusal.",
+    "New resume assertion incorrectly expected one prompt; explicit resume delivers the proven-undelivered initial command and a new resume instruction, now independently asserted per command.",
+    "New runtime boundary failed to transition a successfully prompted session to running; quiet-poll assertion exposed the inconsistent simulation. Fixed the boundary, kept the revision assertion; focused notification regression and all consumer scenarios passed afterward.",
+    "Initial make rust-test rust-parity exited 2 on that notification fixture assertion; Rust tests and Go oracles had passed. Reverified the failing consumer and all invalidated consumer scenarios after the fixture fix."
+  ],
+  "evidence": "engine-safety-consumer-round3-final.json records exact source/binary hashes, requests/responses, persisted SQLite rows and effect/event observations",
+  "notPerformed": [
+    "native runtime/model/provider acceptance",
+    "other gate phases",
+    "full repository suite",
+    "linters/formatters/static analysis"
+  ]
+}

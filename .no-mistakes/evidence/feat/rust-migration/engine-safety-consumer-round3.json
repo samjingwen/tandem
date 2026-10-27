@@ -1,0 +1,32 @@
+{
+  "scope": "Real Rust Service/scheduler/SQLite; simulated execution only; no native acceptance",
+  "head": "bb78a87862ad7c002d5b7b7e7bdbefb27c513e30",
+  "binarySha256": "84356329a7908fce51779fd5f9d49ce0118b8e6a58c33d888655aad48f046982",
+  "sourceSha256": {
+    "crates/tandem-core/tests/model.rs": "86666c7d1c774049bb717c30922c3793d8acaaff3fd93ea9c1753164ca276ce9",
+    "crates/tandem-core/src/ports.rs": "c525ac76ac3dd923e90a5a532c7922dee9161d9b765e5fb73f0136be8e835d61",
+    "crates/tandem-core/src/time_compat.rs": "d5d27caf8c0d2d83758a9fc92f6bffa2205396bf95a8b002fd8978a6ba88bc78",
+    "crates/tandem-core/src/lib.rs": "887491a1060c13b995e30bb97bd0a53cbe2d1d0745280ed3899526a15676ad52",
+    "crates/tandem-core/src/input.rs": "99af95f426cfe62b97f05e383443ad39a208f81249fde5700ab012b65cc7bab0",
+    "crates/tandem-core/src/model.rs": "f30355f42334515d5ee9dbedf8b57812c1ed7cafc51b0935cb4cce5ae92f21d1",
+    "crates/tandem-core/src/context.rs": "5dab28702079a5e3b00e07ec9945c665d9489f406df6f8b378b0acb4d8abce3e",
+    "crates/tandem-store/tests/persistence.rs": "681ea03d4a46ab51596aeb82c3dae664c9ef22c8fabd238b3ba155f56bcb2591",
+    "crates/tandem-store/examples/store-compat.rs": "cadda42e6872e3501c6436b87988d668c57fbb1b40cdbd9e5a035ed3e648bb6f",
+    "crates/tandem-store/src/lib.rs": "8f356f80ddcb3c531028594578b07c8b0abf39cf4ae133a5a3f60c30aca1ad24",
+    "crates/tandem-engine/tests/coordination.rs": "3bfbadeaf6790f701e4404f042c63297d6a72008571fcfaf45b3d947625bc8e6",
+    "crates/tandem-engine/examples/engine-compat.rs": "22f202e47365d5e9c1001a6cc09047a276f609529ac6354e7c5b640b252f53fd",
+    "crates/tandem-engine/examples/engine-safety.rs": "33d660d2898b065eefacf3f1149c59633d492cf0fcae3484b967070981da648c",
+    "crates/tandem-engine/src/journal.rs": "bd5f5c4ecc72813116946cda34df3d283886f2f3f14de8444330f644365b2e69",
+    "crates/tandem-engine/src/lib.rs": "651cf2344ac83e9b0c97b0d672fcb726a062a952dcddd9a06edc68bb1c9a8a69",
+    "crates/tandem-engine/src/commands.rs": "5ef93004b53824ad13d12a980b3f2b04659be218ec1c6980ff9f20d9e8ac5e55",
+    "crates/tandem-engine/src/reconcile.rs": "2b9cd439f40e42ac9e60d5d2ebdc0832bc6e6ae60ef9027447e846de928d1449",
+    "crates/tandem-engine/src/state.rs": "149341ed67104d887f6128c91ad55f76c5b4b04d5ae82788a4bfc1cc53c87d5c",
+    "crates/tandem-engine/src/notifications.rs": "2a216db0a6bb946ec7f85bfe5c5cd36aaf1afaa3804d3a7a044e39515d6785a4",
+    "crates/tandem-engine/tests/support/bookkeeping.rs": "a7d09fb3b2c8d75f2313be4b45b6d4edf193d34ec57b0cbe52878ecec99ab50f",
+    "crates/tandem-engine/tests/support/mod.rs": "955cd82b95294ef425da208f4022cbf78a19fe6dd789195c1982929fd46df826",
+    "Cargo.lock": "e99dc55b03bf978b1c05667371162a802c79c567922758c7ae5bdec83d7e7d2d",
+    "tools/test-engine-safety.py": "a84533141711261aa2f67ce7a60d74344b033c4eccd70220231ea8ef9b93b2ab"
+  },
+  "passed": [],
+  "records": []
+}

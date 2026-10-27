@@ -1,0 +1,8 @@
+=== RUN   TestTaskCleanupResolvesOwnedAttempt
+--- PASS: TestTaskCleanupResolvesOwnedAttempt (0.91s)
+=== RUN   TestIndependentClientsDuplicateCreateDisconnectAndRestart
+--- PASS: TestIndependentClientsDuplicateCreateDisconnectAndRestart (0.42s)
+=== RUN   TestAnotherClientAnswersDecisionAndAcceptsCurrentGeneration
+--- PASS: TestAnotherClientAnswersDecisionAndAcceptsCurrentGeneration (0.55s)
+PASS
+ok  	github.com/samjingwen/tandem/internal/integration	2.207s

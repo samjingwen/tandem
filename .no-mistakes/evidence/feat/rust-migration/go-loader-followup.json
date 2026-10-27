@@ -1,0 +1,47 @@
+{
+  "note": "The initial manual driver conflated successful snapshot loading with Go JSON reserialization, which rejects +24:60 offsets. This followup reports snapshot loading independently via time.Format; the original evidence is retained unchanged.",
+  "responses": [
+    {
+      "token": "\"2026-10-26T03:04:05Z\"",
+      "go_snapshot_exit": 0,
+      "stdout": "{\"createdAt\":\"2026-10-26T03:04:05Z\",\"loaded\":true}",
+      "stderr": ""
+    },
+    {
+      "token": "\"2026-10-26T03:04:05\\u005a\"",
+      "go_snapshot_exit": 0,
+      "stdout": "{\"createdAt\":\"2026-10-26T03:04:05Z\",\"loaded\":true}",
+      "stderr": ""
+    },
+    {
+      "token": "\"\\u0032026-10-26T03:04:05Z\"",
+      "go_snapshot_exit": 0,
+      "stdout": "{\"createdAt\":\"2026-10-26T03:04:05Z\",\"loaded\":true}",
+      "stderr": ""
+    },
+    {
+      "token": "\"2026-10-26\\u005403:04:05Z\"",
+      "go_snapshot_exit": 0,
+      "stdout": "{\"createdAt\":\"2026-10-26T03:04:05Z\",\"loaded\":true}",
+      "stderr": ""
+    },
+    {
+      "token": "\"9999-12-31T23:59:59-00:01\"",
+      "go_snapshot_exit": 0,
+      "stdout": "{\"createdAt\":\"9999-12-31T23:59:59-00:01\",\"loaded\":true}",
+      "stderr": ""
+    },
+    {
+      "token": "\"0000-01-01T00:00:00+24:60\"",
+      "go_snapshot_exit": 0,
+      "stdout": "{\"createdAt\":\"0000-01-01T00:00:00+25:00\",\"loaded\":true}",
+      "stderr": ""
+    },
+    {
+      "token": "\"not-a-timestamp\"",
+      "go_snapshot_exit": 1,
+      "stdout": "corrupt tasks record: parsing time \"not-a-timestamp\" as \"2006-01-02T15:04:05Z07:00\": cannot parse \"not-a-timestamp\" as \"2006\"",
+      "stderr": ""
+    }
+  ]
+}

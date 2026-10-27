@@ -1,0 +1,25 @@
+cargo build --locked --example store-compat
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
+cargo build --locked --example engine-compat
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.04s
+TANDEM_RUST_STORE_HELPER="<managed-checkout>/target/debug/examples/store-compat" TANDEM_RUST_ENGINE_HELPER="<managed-checkout>/target/debug/examples/engine-compat" go test ./internal/store -run '^TestRust(Store|Engine)' -count=1
+ok  	github.com/samjingwen/tandem/internal/store	3.679s
+make rust-safety
+cargo build --locked -p tandem-engine --example engine-safety
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.04s
+python3 tools/test-engine-safety.py "<managed-checkout>/target/debug/examples/engine-safety"
+PASS uncertainty
+PASS generations-cleanup
+PASS limits
+PASS delivery-budget
+PASS role-limits
+PASS notification-budget
+PASS expired-bookkeeping-dropped-wait
+PASS shutdown-reconnecting-False
+PASS shutdown-reconnecting-True
+PASS cancel-reconnecting-False
+PASS cancel-reconnecting-True
+PASS deadline-reconnecting-False
+PASS deadline-reconnecting-True
+
+Exit status: 0

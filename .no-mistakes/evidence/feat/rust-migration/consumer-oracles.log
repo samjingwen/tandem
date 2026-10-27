@@ -1,0 +1,28 @@
+=== RUN   TestRustStoreGoRustGoPersistence
+--- PASS: TestRustStoreGoRustGoPersistence (2.14s)
+=== RUN   TestRustStoreRustGoRustPersistence
+--- PASS: TestRustStoreRustGoRustPersistence (0.02s)
+=== RUN   TestRustStoreCrossLanguageOwnershipAndCrash
+--- PASS: TestRustStoreCrossLanguageOwnershipAndCrash (0.02s)
+=== RUN   TestRustStoreMalformedTimestampMatchesGoRefusal
+--- PASS: TestRustStoreMalformedTimestampMatchesGoRefusal (0.01s)
+=== RUN   TestRustEngineGoFingerprintOracle
+--- PASS: TestRustEngineGoFingerprintOracle (0.09s)
+=== RUN   TestRustEngineObserveRejectsForbiddenEffects
+=== RUN   TestRustEngineObserveRejectsForbiddenEffects/queued
+=== RUN   TestRustEngineObserveRejectsForbiddenEffects/session_pending
+=== RUN   TestRustEngineObserveRejectsForbiddenEffects/session_bound
+--- PASS: TestRustEngineObserveRejectsForbiddenEffects (0.05s)
+    --- PASS: TestRustEngineObserveRejectsForbiddenEffects/queued (0.02s)
+    --- PASS: TestRustEngineObserveRejectsForbiddenEffects/session_pending (0.01s)
+    --- PASS: TestRustEngineObserveRejectsForbiddenEffects/session_bound (0.01s)
+=== RUN   TestRustEngineReplaysActualGoOperationsAndGoReplaysRustCreate
+--- PASS: TestRustEngineReplaysActualGoOperationsAndGoReplaysRustCreate (0.10s)
+=== RUN   TestRustEngineGoDecisionAndCoordinatorSignalOracle
+=== RUN   TestRustEngineGoDecisionAndCoordinatorSignalOracle/ready_for_review
+=== RUN   TestRustEngineGoDecisionAndCoordinatorSignalOracle/waiting_for_input
+--- PASS: TestRustEngineGoDecisionAndCoordinatorSignalOracle (0.04s)
+    --- PASS: TestRustEngineGoDecisionAndCoordinatorSignalOracle/ready_for_review (0.02s)
+    --- PASS: TestRustEngineGoDecisionAndCoordinatorSignalOracle/waiting_for_input (0.02s)
+PASS
+ok  	github.com/samjingwen/tandem/internal/store	2.707s

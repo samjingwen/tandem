@@ -1,0 +1,96 @@
+[
+  {
+    "consumer": "store-compat",
+    "mode": "snapshot",
+    "request": null,
+    "exit": 0,
+    "stdout": "{\"state\":{\"instanceId\":\"6a487139560b9681d8b741c37fc045a0\",\"revision\":0,\"projects\":{},\"tasks\":{},\"attempts\":{},\"commands\":{},\"decisions\":{},\"results\":{}},\"operations\":{}}\n",
+    "stderr": ""
+  },
+  {
+    "consumer": "engine-compat",
+    "mode": "call",
+    "request": {
+      "kind": "task.create",
+      "operation": "create-manual",
+      "input": {
+        "projectId": "project",
+        "title": "Unicode 世界 <&>",
+        "instructions": "Keep complete content"
+      }
+    },
+    "exit": 0,
+    "stdout": "{\"id\":\"tsk_bf68ae0e9ce7f2ddf4cfcfd88486e7f8\",\"projectId\":\"project\",\"dependencies\":[],\"title\":\"Unicode 世界 \\u003c\\u0026\\u003e\",\"instructions\":\"Keep complete content\",\"role\":\"worker\",\"desired\":\"active\",\"state\":\"queued\",\"generation\":1,\"createdAt\":\"2026-10-27T12:34:48.159828Z\",\"updatedAt\":\"2026-10-27T12:34:48.15985Z\"}\n",
+    "stderr": ""
+  },
+  {
+    "consumer": "engine-compat",
+    "mode": "call",
+    "request": {
+      "kind": "task.followup",
+      "operation": "follow-manual",
+      "target": "tsk_bf68ae0e9ce7f2ddf4cfcfd88486e7f8",
+      "input": {
+        "text": "next generation"
+      }
+    },
+    "exit": 0,
+    "stdout": "{\"id\":\"tsk_bf68ae0e9ce7f2ddf4cfcfd88486e7f8\",\"projectId\":\"project\",\"dependencies\":[],\"title\":\"Unicode 世界 \\u003c\\u0026\\u003e\",\"instructions\":\"Keep complete content\\n\\nFollow-up:\\nnext generation\",\"role\":\"worker\",\"desired\":\"active\",\"state\":\"queued\",\"generation\":2,\"createdAt\":\"2026-10-27T12:34:48.159828Z\",\"updatedAt\":\"2026-10-27T12:34:48.168928Z\"}\n",
+    "stderr": ""
+  },
+  {
+    "consumer": "engine-compat",
+    "mode": "call",
+    "request": {
+      "kind": "task.create",
+      "operation": "create-manual",
+      "input": {
+        "projectId": "project",
+        "title": "Unicode 世界 <&>",
+        "instructions": "Keep complete content"
+      }
+    },
+    "exit": 0,
+    "stdout": "{\"id\":\"tsk_bf68ae0e9ce7f2ddf4cfcfd88486e7f8\",\"projectId\":\"project\",\"dependencies\":[],\"title\":\"Unicode 世界 \\u003c\\u0026\\u003e\",\"instructions\":\"Keep complete content\",\"role\":\"worker\",\"desired\":\"active\",\"state\":\"queued\",\"generation\":1,\"createdAt\":\"2026-10-27T12:34:48.159828Z\",\"updatedAt\":\"2026-10-27T12:34:48.15985Z\"}\n",
+    "stderr": ""
+  },
+  {
+    "consumer": "engine-compat",
+    "mode": "call",
+    "request": {
+      "kind": "task.create",
+      "operation": "create-manual",
+      "input": {
+        "projectId": "project",
+        "title": "Changed body",
+        "instructions": "Keep complete content"
+      }
+    },
+    "exit": 1,
+    "stdout": "",
+    "stderr": "{\"code\":\"operation_conflict\",\"message\":\"operation ID was already used for a different request\"}\n"
+  },
+  {
+    "consumer": "engine-compat",
+    "mode": "observe",
+    "request": {
+      "kind": "observe",
+      "input": {}
+    },
+    "exit": 1,
+    "stdout": "",
+    "stderr": "{\"code\":\"fixture_effect_forbidden\",\"message\":\"compatibility consumer forbids native effects\"}\n"
+  },
+  {
+    "consumer": "store-compat",
+    "mode": "snapshot",
+    "request": null,
+    "exit": 0,
+    "stdout": "{\"state\":{\"instanceId\":\"6a487139560b9681d8b741c37fc045a0\",\"revision\":4,\"projects\":{\"project\":{\"id\":\"project\",\"name\":\"Disposable project\",\"path\":\"/synthetic/project\",\"baseRef\":\"master\",\"instructions\":\"\",\"createdAt\":\"2026-10-26T01:02:03Z\"}},\"tasks\":{\"tsk_bf68ae0e9ce7f2ddf4cfcfd88486e7f8\":{\"id\":\"tsk_bf68ae0e9ce7f2ddf4cfcfd88486e7f8\",\"projectId\":\"project\",\"dependencies\":[],\"title\":\"Unicode 世界 <&>\",\"instructions\":\"Keep complete content\\n\\nFollow-up:\\nnext generation\",\"role\":\"worker\",\"desired\":\"active\",\"state\":\"recovering\",\"generation\":2,\"attemptId\":\"run_2612994e7a8acb99da02b46e05df3228\",\"error\":\"compatibility consumer forbids native effects\",\"createdAt\":\"2026-10-27T12:34:48.159828Z\",\"updatedAt\":\"2026-10-27T12:34:48.189938Z\"}},\"attempts\":{\"run_2612994e7a8acb99da02b46e05df3228\":{\"id\":\"run_2612994e7a8acb99da02b46e05df3228\",\"taskId\":\"tsk_bf68ae0e9ce7f2ddf4cfcfd88486e7f8\",\"runtimeId\":\"fake\",\"sessionRef\":\"forbidden\",\"workspace\":{\"allocator\":\"\",\"owner\":\"\",\"path\":\"\",\"branch\":\"\",\"baseRef\":\"\",\"baseSha\":\"\",\"allocated\":false},\"phase\":\"workspace_pending\",\"observed\":\"unknown\",\"generation\":2,\"failureCount\":1,\"error\":\"compatibility consumer forbids native effects\",\"createdAt\":\"2026-10-27T12:34:48.189068Z\",\"updatedAt\":\"2026-10-27T12:34:48.189932Z\"}},\"commands\":{},\"decisions\":{},\"results\":{}},\"operations\":{\"create-manual\":{\"id\":\"create-manual\",\"fingerprint\":\"39a94834247bdea37f7135cdaefa4b59eb44359c9aba6cf063c35ee0314020aa\",\"outcome\":{\"id\":\"tsk_bf68ae0e9ce7f2ddf4cfcfd88486e7f8\",\"projectId\":\"project\",\"dependencies\":[],\"title\":\"Unicode 世界 \\u003c\\u0026\\u003e\",\"instructions\":\"Keep complete content\",\"role\":\"worker\",\"desired\":\"active\",\"state\":\"queued\",\"generation\":1,\"createdAt\":\"2026-10-27T12:34:48.159828Z\",\"updatedAt\":\"2026-10-27T12:34:48.15985Z\"},\"createdAt\":\"2026-10-27T12:34:48.159994Z\"},\"follow-manual\":{\"id\":\"follow-manual\",\"fingerprint\":\"e6174d9ae13f159ba70b6295ae0abce111dcbc28233ad838a52fe13dadd8aea7\",\"outcome\":{\"id\":\"tsk_bf68ae0e9ce7f2ddf4cfcfd88486e7f8\",\"projectId\":\"project\",\"dependencies\":[],\"title\":\"Unicode 世界 \\u003c\\u0026\\u003e\",\"instructions\":\"Keep complete content\\n\\nFollow-up:\\nnext generation\",\"role\":\"worker\",\"desired\":\"active\",\"state\":\"queued\",\"generation\":2,\"createdAt\":\"2026-10-27T12:34:48.159828Z\",\"updatedAt\":\"2026-10-27T12:34:48.168928Z\"},\"createdAt\":\"2026-10-27T12:34:48.168976Z\"}}}\n",
+    "stderr": ""
+  },
+  {
+    "assertion": "Original generation-1 receipt replayed after generation-2 followup; conflicting reuse refused; queued observe fails forbidden allocation; current state retains generation 2",
+    "result": "pass"
+  }
+]

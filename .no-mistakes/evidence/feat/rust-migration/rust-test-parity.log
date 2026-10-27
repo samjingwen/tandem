@@ -1,0 +1,107 @@
+cargo test --workspace --all-targets --locked
+   Compiling tandem-core v0.1.0 (<managed-checkout>/crates/tandem-core)
+   Compiling tandem-store v0.1.0 (<managed-checkout>/crates/tandem-store)
+   Compiling tandem-engine v0.1.0 (<managed-checkout>/crates/tandem-engine)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.43s
+     Running unittests src/lib.rs (target/debug/deps/tandem_core-dcec9ac71b01b7e4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/model.rs (target/debug/deps/model-abab460ac4dd394f)
+
+running 7 tests
+test retained_json_keeps_numbers_escapes_null_and_precision ... ok
+test legacy_go_time_spellings_retain_text_and_order_by_the_same_instant ... ok
+test journal_is_not_part_of_public_state ... ok
+test input_answers_distinguish_missing_from_explicit_null_and_evidence_is_strict ... ok
+test timestamp_validation_keeps_spelling_and_go_null_semantics ... ok
+test absent_and_explicit_null_decision_payloads_are_distinct ... ok
+test persisted_extensibility_and_original_time_are_not_discarded ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/tandem_engine-1c8b27bf0941a5dc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/coordination.rs (target/debug/deps/coordination-2e97e172a7bbd579)
+
+running 20 tests
+test cancellation_books_uncertainty_and_shutdown_waits_for_owned_operations ... ok
+test allocation_orders_actual_instants_not_timestamp_strings ... ok
+test cleanup_barrier_cannot_be_crossed_by_controls_or_new_results ... ok
+test lifecycle_run_stops_without_interrupting_workers ... ok
+test decisions_require_explicit_valid_answers_and_uncertainty_blocks_cleanup ... ok
+test admission_replay_generation_acceptance_and_cleanup_are_durable ... ok
+test failed_attempt_retry_and_cleanup_require_background_quiescence ... ok
+test dropping_the_client_wait_does_not_drop_owned_effect_or_control_barrier ... ok
+test lost_session_creation_response_recovers_same_reference_after_restart ... ok
+test registration_and_input_limits_are_transactional_and_graphs_stay_acyclic ... ok
+test coordinator_evidence_is_coalesced_bounded_and_unchanged_polls_are_quiet ... ok
+test shutdown_cancels_scheduler_reads_in_flight_without_a_client_cancel ... ok
+test ambiguous_prompt_holds_capacity_and_never_speculatively_resends ... ok
+test paused_ancestor_blocks_new_children_but_does_not_pause_existing_child ... ok
+test rejected_reply_returns_to_pending_without_losing_the_old_receipt ... ok
+test unmarked_invalid_reply_preserves_uncertainty_and_blocks_resend ... ok
+test proven_non_delivery_has_a_finite_budget_and_explicit_resume ... ok
+test independent_worker_and_coordinator_limits_and_dependency_release ... ok
+test bookkeeping::bookkeeping_deadline_expires_without_releasing_effect_ownership_early ... ok
+test bookkeeping::run_cancellation_stops_events_before_blocked_bookkeeping_settles ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.77s
+
+     Running unittests examples/engine-compat.rs (target/debug/examples/engine_compat-cf9203d9ca9b1662)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/tandem_store-e4b0d1ac16cb71fb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/persistence.rs (target/debug/deps/persistence-4217cf4222ff3934)
+
+running 9 tests
+test permissive_or_nonregular_state_is_refused_without_repair ... ok
+test all_failed_mutations_leave_durable_state_unchanged ... ok
+test invalid_record_encoding_cannot_be_committed ... ok
+test unrelated_updates_retain_unknown_fields ... ok
+test same_process_and_canonical_alias_cannot_bypass_ownership ... ok
+test no_op_is_quiet_and_only_changed_rows_append_history ... ok
+test newer_schema_and_corrupt_records_fail_closed ... ok
+test commit_rollback_and_reopen_preserve_identity_and_receipt ... ok
+test concurrent_changes_are_serialized_and_large_content_is_complete ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s
+
+     Running unittests examples/store-compat.rs (target/debug/examples/store_compat-1c1cc007623ae62b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+cargo build --locked --example store-compat
+   Compiling tandem-store v0.1.0 (<managed-checkout>/crates/tandem-store)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.34s
+cargo build --locked --example engine-compat
+   Compiling tandem-engine v0.1.0 (<managed-checkout>/crates/tandem-engine)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.12s
+TANDEM_RUST_STORE_HELPER="<managed-checkout>/target/debug/examples/store-compat" TANDEM_RUST_ENGINE_HELPER="<managed-checkout>/target/debug/examples/engine-compat" go test ./internal/store -run '^TestRust(Store|Engine)' -count=1
+--- FAIL: TestRustStoreTimestampCorpusMatchesGo (0.18s)
+    --- FAIL: TestRustStoreTimestampCorpusMatchesGo/"2026-10-26T03:04:05\u005a" (0.01s)
+        rust_compat_test.go:354: timestamp "2026-10-26T03:04:05\u005a": Go=<nil>, Rust=exit status 1: {"error":{"code":"corrupt_state","message":"stored state is invalid; explicit recovery is required"}}
+    --- FAIL: TestRustStoreTimestampCorpusMatchesGo/"\u0032026-10-26T03:04:05Z" (0.01s)
+        rust_compat_test.go:354: timestamp "\u0032026-10-26T03:04:05Z": Go=<nil>, Rust=exit status 1: {"error":{"code":"corrupt_state","message":"stored state is invalid; explicit recovery is required"}}
+    --- FAIL: TestRustStoreTimestampCorpusMatchesGo/"2026-10-26\u005403:04:05Z" (0.01s)
+        rust_compat_test.go:354: timestamp "2026-10-26\u005403:04:05Z": Go=<nil>, Rust=exit status 1: {"error":{"code":"corrupt_state","message":"stored state is invalid; explicit recovery is required"}}
+FAIL
+FAIL	github.com/samjingwen/tandem/internal/store	4.101s
+FAIL
+make: *** [rust-parity] Error 1

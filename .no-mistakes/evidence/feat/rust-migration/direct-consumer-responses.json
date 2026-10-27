@@ -1,0 +1,316 @@
+[
+  {
+    "scenario": "Go and Rust reopen the same timestamp",
+    "token": "\"2026-10-26T03:04:05Z\"",
+    "go": {
+      "exit": 0,
+      "stdout": "{\"time\":{\"id\":\"time\",\"projectId\":\"\",\"dependencies\":null,\"title\":\"\",\"instructions\":\"\",\"role\":\"\",\"desired\":\"\",\"state\":\"\",\"generation\":0,\"createdAt\":\"2026-10-26T03:04:05Z\",\"updatedAt\":\"0001-01-01T00:00:00Z\"}}",
+      "stderr": ""
+    },
+    "rust": {
+      "exit": 0,
+      "stdout": "{\"state\":{\"instanceId\":\"f96fe4afce3dd1c8265ad0610094a1c9\",\"revision\":0,\"projects\":{},\"tasks\":{\"time\":{\"id\":\"time\",\"projectId\":\"\",\"dependencies\":null,\"title\":\"\",\"instructions\":\"\",\"role\":\"\",\"desired\":\"\",\"state\":\"\",\"generation\":0,\"createdAt\":\"2026-10-26T03:04:05Z\",\"updatedAt\":\"0001-01-01T00:00:00Z\"}},\"attempts\":{},\"commands\":{},\"decisions\":{},\"results\":{}},\"operations\":{}}",
+      "stderr": ""
+    }
+  },
+  {
+    "scenario": "Go and Rust reopen the same timestamp",
+    "token": "\"2026-10-26T03:04:05\\u005a\"",
+    "go": {
+      "exit": 0,
+      "stdout": "{\"time\":{\"id\":\"time\",\"projectId\":\"\",\"dependencies\":null,\"title\":\"\",\"instructions\":\"\",\"role\":\"\",\"desired\":\"\",\"state\":\"\",\"generation\":0,\"createdAt\":\"2026-10-26T03:04:05Z\",\"updatedAt\":\"0001-01-01T00:00:00Z\"}}",
+      "stderr": ""
+    },
+    "rust": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "{\"error\":{\"code\":\"corrupt_state\",\"message\":\"stored state is invalid; explicit recovery is required\"}}"
+    }
+  },
+  {
+    "scenario": "Go and Rust reopen the same timestamp",
+    "token": "\"\\u0032026-10-26T03:04:05Z\"",
+    "go": {
+      "exit": 0,
+      "stdout": "{\"time\":{\"id\":\"time\",\"projectId\":\"\",\"dependencies\":null,\"title\":\"\",\"instructions\":\"\",\"role\":\"\",\"desired\":\"\",\"state\":\"\",\"generation\":0,\"createdAt\":\"2026-10-26T03:04:05Z\",\"updatedAt\":\"0001-01-01T00:00:00Z\"}}",
+      "stderr": ""
+    },
+    "rust": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "{\"error\":{\"code\":\"corrupt_state\",\"message\":\"stored state is invalid; explicit recovery is required\"}}"
+    }
+  },
+  {
+    "scenario": "Go and Rust reopen the same timestamp",
+    "token": "\"2026-10-26\\u005403:04:05Z\"",
+    "go": {
+      "exit": 0,
+      "stdout": "{\"time\":{\"id\":\"time\",\"projectId\":\"\",\"dependencies\":null,\"title\":\"\",\"instructions\":\"\",\"role\":\"\",\"desired\":\"\",\"state\":\"\",\"generation\":0,\"createdAt\":\"2026-10-26T03:04:05Z\",\"updatedAt\":\"0001-01-01T00:00:00Z\"}}",
+      "stderr": ""
+    },
+    "rust": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "{\"error\":{\"code\":\"corrupt_state\",\"message\":\"stored state is invalid; explicit recovery is required\"}}"
+    }
+  },
+  {
+    "scenario": "Go and Rust reopen the same timestamp",
+    "token": "\"9999-12-31T23:59:59-00:01\"",
+    "go": {
+      "exit": 0,
+      "stdout": "{\"time\":{\"id\":\"time\",\"projectId\":\"\",\"dependencies\":null,\"title\":\"\",\"instructions\":\"\",\"role\":\"\",\"desired\":\"\",\"state\":\"\",\"generation\":0,\"createdAt\":\"9999-12-31T23:59:59-00:01\",\"updatedAt\":\"0001-01-01T00:00:00Z\"}}",
+      "stderr": ""
+    },
+    "rust": {
+      "exit": 0,
+      "stdout": "{\"state\":{\"instanceId\":\"7a3d5dadd090709cd6001d9f2e403cc6\",\"revision\":0,\"projects\":{},\"tasks\":{\"time\":{\"id\":\"time\",\"projectId\":\"\",\"dependencies\":null,\"title\":\"\",\"instructions\":\"\",\"role\":\"\",\"desired\":\"\",\"state\":\"\",\"generation\":0,\"createdAt\":\"9999-12-31T23:59:59-00:01\",\"updatedAt\":\"0001-01-01T00:00:00Z\"}},\"attempts\":{},\"commands\":{},\"decisions\":{},\"results\":{}},\"operations\":{}}",
+      "stderr": ""
+    }
+  },
+  {
+    "scenario": "Go and Rust reopen the same timestamp",
+    "token": "\"0000-01-01T00:00:00+24:60\"",
+    "go": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "panic: json: error calling MarshalJSON for type *time.Time: timezone hour outside of range [0,23]\n\ngoroutine 1 [running]:\nmain.main()\n\t<managed-checkout>/.tmp/test-phase/main.go:25 +0x188"
+    },
+    "rust": {
+      "exit": 0,
+      "stdout": "{\"state\":{\"instanceId\":\"9554dd2d77ada2fec5e49582f1b0d5a7\",\"revision\":0,\"projects\":{},\"tasks\":{\"time\":{\"id\":\"time\",\"projectId\":\"\",\"dependencies\":null,\"title\":\"\",\"instructions\":\"\",\"role\":\"\",\"desired\":\"\",\"state\":\"\",\"generation\":0,\"createdAt\":\"0000-01-01T00:00:00+24:60\",\"updatedAt\":\"0001-01-01T00:00:00Z\"}},\"attempts\":{},\"commands\":{},\"decisions\":{},\"results\":{}},\"operations\":{}}",
+      "stderr": ""
+    }
+  },
+  {
+    "scenario": "Go and Rust reopen the same timestamp",
+    "token": "\"not-a-timestamp\"",
+    "go": {
+      "exit": 1,
+      "stdout": "corrupt tasks record: parsing time \"not-a-timestamp\" as \"2006-01-02T15:04:05Z07:00\": cannot parse \"not-a-timestamp\" as \"2006\"",
+      "stderr": ""
+    },
+    "rust": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "{\"error\":{\"code\":\"corrupt_state\",\"message\":\"stored state is invalid; explicit recovery is required\"}}"
+    }
+  },
+  {
+    "scenario": "Observe permits read-only inspection and rejects writes",
+    "phase": "read-only",
+    "response": {
+      "exit": 0,
+      "stdout": "{\"instanceId\":\"415dea071a1f4e16f836da1995816a82\",\"revision\":1,\"projects\":{\"project\":{\"id\":\"project\",\"name\":\"fixture\",\"path\":\"/synthetic/project\",\"baseRef\":\"master\",\"instructions\":\"\",\"createdAt\":\"2026-10-26T01:02:03Z\"}},\"tasks\":{\"task\":{\"id\":\"task\",\"projectId\":\"project\",\"dependencies\":null,\"title\":\"task\",\"instructions\":\"fixture\",\"role\":\"worker\",\"desired\":\"active\",\"state\":\"running\",\"generation\":1,\"attemptId\":\"attempt\",\"createdAt\":\"2026-10-26T01:02:03Z\",\"updatedAt\":\"2026-10-27T12:29:14.779108Z\"}},\"attempts\":{\"attempt\":{\"id\":\"attempt\",\"taskId\":\"task\",\"runtimeId\":\"fake\",\"sessionRef\":\"session\",\"workspace\":{\"allocator\":\"\",\"owner\":\"attempt\",\"path\":\"/synthetic/attempt\",\"branch\":\"\",\"baseRef\":\"\",\"baseSha\":\"\",\"allocated\":true},\"phase\":\"running\",\"observed\":\"idle\",\"generation\":1,\"failureCount\":0,\"createdAt\":\"2026-10-26T01:02:03Z\",\"updatedAt\":\"2026-10-26T01:02:03Z\"}},\"commands\":{},\"decisions\":{},\"results\":{}}",
+      "stderr": ""
+    },
+    "persisted": {
+      "tasks": [
+        {
+          "id": "task",
+          "projectId": "project",
+          "dependencies": null,
+          "title": "task",
+          "instructions": "fixture",
+          "role": "worker",
+          "desired": "active",
+          "state": "running",
+          "generation": 1,
+          "attemptId": "attempt",
+          "createdAt": "2026-10-26T01:02:03Z",
+          "updatedAt": "2026-10-27T12:29:14.779108Z"
+        }
+      ],
+      "attempts": [
+        {
+          "id": "attempt",
+          "taskId": "task",
+          "runtimeId": "fake",
+          "sessionRef": "session",
+          "phase": "running",
+          "observed": "idle",
+          "generation": 1,
+          "workspace": {
+            "owner": "attempt",
+            "path": "/synthetic/attempt",
+            "allocated": true
+          },
+          "createdAt": "2026-10-26T01:02:03Z",
+          "updatedAt": "2026-10-26T01:02:03Z"
+        }
+      ],
+      "commands": []
+    }
+  },
+  {
+    "scenario": "Observe permits read-only inspection and rejects writes",
+    "phase": "queued",
+    "response": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "{\"code\":\"fixture_effect_forbidden\",\"message\":\"compatibility consumer forbids native effects\"}"
+    },
+    "persisted": {
+      "tasks": [
+        {
+          "id": "task",
+          "projectId": "project",
+          "dependencies": null,
+          "title": "task",
+          "instructions": "fixture",
+          "role": "worker",
+          "desired": "active",
+          "state": "recovering",
+          "generation": 1,
+          "attemptId": "run_44fec3f89729b615ca4b71862aec89d4",
+          "error": "compatibility consumer forbids native effects",
+          "createdAt": "2026-10-26T01:02:03Z",
+          "updatedAt": "2026-10-27T12:29:14.79863Z"
+        }
+      ],
+      "attempts": [
+        {
+          "id": "run_44fec3f89729b615ca4b71862aec89d4",
+          "taskId": "task",
+          "runtimeId": "fake",
+          "sessionRef": "forbidden",
+          "workspace": {
+            "allocator": "",
+            "owner": "",
+            "path": "",
+            "branch": "",
+            "baseRef": "",
+            "baseSha": "",
+            "allocated": false
+          },
+          "phase": "workspace_pending",
+          "observed": "unknown",
+          "generation": 1,
+          "failureCount": 1,
+          "error": "compatibility consumer forbids native effects",
+          "createdAt": "2026-10-27T12:29:14.79771Z",
+          "updatedAt": "2026-10-27T12:29:14.798619Z"
+        }
+      ],
+      "commands": []
+    }
+  },
+  {
+    "scenario": "Observe permits read-only inspection and rejects writes",
+    "phase": "session_pending",
+    "response": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "{\"code\":\"fixture_effect_forbidden\",\"message\":\"compatibility consumer forbids native effects\"}"
+    },
+    "persisted": {
+      "tasks": [
+        {
+          "id": "task",
+          "projectId": "project",
+          "dependencies": null,
+          "title": "task",
+          "instructions": "fixture",
+          "role": "worker",
+          "desired": "active",
+          "state": "recovering",
+          "generation": 1,
+          "attemptId": "attempt",
+          "error": "compatibility consumer forbids native effects",
+          "createdAt": "2026-10-26T01:02:03Z",
+          "updatedAt": "2026-10-27T12:29:14.816067Z"
+        }
+      ],
+      "attempts": [
+        {
+          "id": "attempt",
+          "taskId": "task",
+          "runtimeId": "fake",
+          "sessionRef": "session",
+          "workspace": {
+            "allocator": "",
+            "owner": "attempt",
+            "path": "/synthetic/attempt",
+            "branch": "",
+            "baseRef": "",
+            "baseSha": "",
+            "allocated": true
+          },
+          "phase": "session_pending",
+          "observed": "unknown",
+          "generation": 1,
+          "failureCount": 1,
+          "error": "compatibility consumer forbids native effects",
+          "createdAt": "2026-10-26T01:02:03Z",
+          "updatedAt": "2026-10-27T12:29:14.816054Z"
+        }
+      ],
+      "commands": []
+    }
+  },
+  {
+    "scenario": "Observe permits read-only inspection and rejects writes",
+    "phase": "session_bound",
+    "response": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "{\"code\":\"fixture_effect_forbidden\",\"message\":\"compatibility consumer forbids native effects\"}"
+    },
+    "persisted": {
+      "tasks": [
+        {
+          "id": "task",
+          "projectId": "project",
+          "dependencies": null,
+          "title": "task",
+          "instructions": "fixture",
+          "role": "worker",
+          "desired": "active",
+          "state": "recovering",
+          "generation": 1,
+          "attemptId": "attempt",
+          "error": "compatibility consumer forbids native effects",
+          "createdAt": "2026-10-26T01:02:03Z",
+          "updatedAt": "2026-10-27T12:29:14.837961Z"
+        }
+      ],
+      "attempts": [
+        {
+          "id": "attempt",
+          "taskId": "task",
+          "runtimeId": "fake",
+          "sessionRef": "session",
+          "workspace": {
+            "allocator": "",
+            "owner": "attempt",
+            "path": "/synthetic/attempt",
+            "branch": "",
+            "baseRef": "",
+            "baseSha": "",
+            "allocated": true
+          },
+          "phase": "session_bound",
+          "observed": "unknown",
+          "generation": 1,
+          "failureCount": 1,
+          "error": "compatibility consumer forbids native effects",
+          "createdAt": "2026-10-26T01:02:03Z",
+          "updatedAt": "2026-10-27T12:29:14.837956Z"
+        }
+      ],
+      "commands": [
+        {
+          "id": "prompt",
+          "taskId": "task",
+          "attemptId": "attempt",
+          "kind": "prompt",
+          "text": "fixture",
+          "status": "sending",
+          "generation": 1,
+          "sequence": 1
+        }
+      ]
+    }
+  }
+]
