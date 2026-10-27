@@ -364,7 +364,7 @@ func TestRustStoreTimestampCorpusMatchesGo(t *testing.T) {
 				if err := json.Unmarshal(output, &exported); err != nil {
 					t.Fatal(err)
 				}
-				want := raw
+				var want string
 				if raw == "null" {
 					want = `"0001-01-01T00:00:00Z"`
 				} else {

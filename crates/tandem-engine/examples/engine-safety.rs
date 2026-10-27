@@ -306,7 +306,11 @@ impl Consumer {
             "register" => encode(service.register(&context, op, input(&v)?).await),
             "create" => encode(service.create(&context, op, input(&v)?).await),
             "followup" => encode(service.followup(&context, op, target, input(&v)?).await),
-            "result" => encode(service.submit_result(&context, op, target, input(&v)?).await),
+            "result" => encode(
+                service
+                    .submit_result(&context, op, target, input(&v)?)
+                    .await,
+            ),
             "accept" => encode(service.accept(&context, op, target).await),
             "control" => encode(service.control(&context, op, target, input(&v)?).await),
             "cleanup" => encode(service.cleanup(&context, op, target).await),

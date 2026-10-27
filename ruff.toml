@@ -1,0 +1,8 @@
+# Explicit maintained Python ownership, excluding generated/upstream/private data.
+include = ["tools/test-engine-safety.py"]
+force-exclude = true
+extend-exclude = [".tmp", "target", "plugin", "vendor", ".worktrees"]
+target-version = "py311"
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I"]

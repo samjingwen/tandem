@@ -9,12 +9,12 @@ rows are retained when --evidence is supplied. No native acceptance is claimed.
 import argparse
 import hashlib
 import json
-from pathlib import Path
 import select
 import sqlite3
 import subprocess
 import tempfile
 import time
+from pathlib import Path
 
 
 class Consumer:
@@ -32,8 +32,13 @@ class Consumer:
         )
         try:
             self.project = self.call(
-                "register", operation="register",
-                input={"name": "Disposable", "path": "/synthetic/project", "baseRef": "master"},
+                "register",
+                operation="register",
+                input={
+                    "name": "Disposable",
+                    "path": "/synthetic/project",
+                    "baseRef": "master",
+                },
             )["id"]
         except BaseException:
             self.close()
@@ -47,7 +52,9 @@ class Consumer:
         line = self.process.stdout.readline()
         assert line, f"consumer exited during {request}"
         response = json.loads(line)
-        self.records.append({"scenario": self.name, "request": request, "response": response})
+        self.records.append(
+            {"scenario": self.name, "request": request, "response": response}
+        )
         if error:
             assert "error" in response, response
             return response["error"]
@@ -55,19 +62,33 @@ class Consumer:
         return response["ok"]
 
     def create(self, operation, **fields):
-        return self.call("create", operation=operation, input={
-            "projectId": self.project, "title": operation,
-            "instructions": "Exercise library ownership", **fields,
-        })
+        return self.call(
+            "create",
+            operation=operation,
+            input={
+                "projectId": self.project,
+                "title": operation,
+                "instructions": "Exercise library ownership",
+                **fields,
+            },
+        )
 
     def state(self):
         state = self.call("snapshot")
         # A second consumer reads real committed SQLite rows, not engine expectations.
-        with sqlite3.connect(f"file:{self.directory / 'tandem.db'}?mode=ro", uri=True) as db:
+        with sqlite3.connect(
+            f"file:{self.directory / 'tandem.db'}?mode=ro", uri=True
+        ) as db:
             for table in ("tasks", "attempts", "commands", "results"):
-                rows = {key: json.loads(body) for key, body in db.execute(f"SELECT id, body FROM {table}")}
+                rows = {
+                    key: json.loads(body)
+                    for key, body in db.execute(f"SELECT id, body FROM {table}")
+                }
                 assert rows == state[table], (table, rows, state[table])
-            operations = {key: json.loads(body) for key, body in db.execute("SELECT id, body FROM operations")}
+            operations = {
+                key: json.loads(body)
+                for key, body in db.execute("SELECT id, body FROM operations")
+            }
         self.records.append({"scenario": self.name, "sqliteOperations": operations})
         return state, operations
 
@@ -86,21 +107,43 @@ class Consumer:
         raise AssertionError(f"{self.name}: observation deadline exceeded")
 
     def control(self, task, action, error=False):
-        return self.call("control", target=task["id"], operation=action, error=error,
-                         input={"action": action, "cascade": False})
+        return self.call(
+            "control",
+            target=task["id"],
+            operation=action,
+            error=error,
+            input={"action": action, "cascade": False},
+        )
 
     def result(self, task, operation, generation):
         state, _ = self.state()
-        return self.call("result", target=task["id"], operation=operation, input={
-            "attemptId": state["tasks"][task["id"]]["attemptId"],
-            "generation": generation, "summary": "Independently checked",
-            "evidence": [{"name": "assertion", "reference": "fixture://driver", "passed": True}],
-        })
+        return self.call(
+            "result",
+            target=task["id"],
+            operation=operation,
+            input={
+                "attemptId": state["tasks"][task["id"]]["attemptId"],
+                "generation": generation,
+                "summary": "Independently checked",
+                "evidence": [
+                    {
+                        "name": "assertion",
+                        "reference": "fixture://driver",
+                        "passed": True,
+                    }
+                ],
+            },
+        )
 
     def ownership(self):
         for event in self.audit()["events"]:
             kind = event["kind"]
-            if kind not in ("workspace.ensure", "session.ensure", "prompt", "workspace.remove"):
+            if kind not in (
+                "workspace.ensure",
+                "session.ensure",
+                "prompt",
+                "workspace.remove",
+            ):
                 continue
             state = event["durable"]
             if kind == "prompt":
@@ -148,7 +191,11 @@ def uncertainty(c):
     assert state["tasks"][first["id"]]["state"] == "recovering"
     assert not state["tasks"][second["id"]].get("attemptId")
     assert c.count("prompt") == c.count("session.ensure") == 1
-    assert {event["target"] for event in c.audit()["events"] if event["kind"] == "prompt.inspect"} == set(state["commands"])
+    assert {
+        event["target"]
+        for event in c.audit()["events"]
+        if event["kind"] == "prompt.inspect"
+    } == set(state["commands"])
     c.control(first, "retry", error=True)
     c.control(first, "cancel")
     c.call("tick")
@@ -172,7 +219,12 @@ def generations(c):
     state, _ = c.state()
     attempt = state["attempts"][state["tasks"][task["id"]]["attemptId"]]
     c.call("accept", target=task["id"], operation="idle-is-not-completion", error=True)
-    receipt = c.call("followup", target=task["id"], operation="follow", input={"text": "Second generation"})
+    receipt = c.call(
+        "followup",
+        target=task["id"],
+        operation="follow",
+        input={"text": "Second generation"},
+    )
     assert receipt["generation"] == 2
     c.call("tick")
     assert c.result(task, "stale", 1)["late"]
@@ -180,7 +232,9 @@ def generations(c):
     assert not c.result(task, "current", 2)["late"]
     c.call("observe", target=task["id"], state="idle")
     c.call("tick")
-    assert c.call("accept", target=task["id"], operation="accept")["state"] == "completed"
+    assert (
+        c.call("accept", target=task["id"], operation="accept")["state"] == "completed"
+    )
     c.call("configure", background_busy=True)
     c.call("cleanup", target=attempt["id"], operation="busy-cleanup", error=True)
     assert c.count("workspace.remove") == 0
@@ -192,7 +246,15 @@ def generations(c):
     assert c.count("workspace.remove") == 1
     assert "busy-cleanup" not in operations
     revision = state["revision"]
-    assert c.call("followup", target=task["id"], operation="follow", input={"text": "Second generation"}) == receipt
+    assert (
+        c.call(
+            "followup",
+            target=task["id"],
+            operation="follow",
+            input={"text": "Second generation"},
+        )
+        == receipt
+    )
     assert c.state()[0]["revision"] == revision
     c.ownership()
 
@@ -205,15 +267,30 @@ def limits(c):
         ("depth", {"parentId": child["id"]}),
         ("cycle", {"parentId": first["id"], "dependencies": [first["id"]]}),
     ]:
-        c.call("create", operation=operation, error=True, input={
-            "projectId": c.project, "title": operation, "instructions": "invalid graph", **fields,
-        })
+        c.call(
+            "create",
+            operation=operation,
+            error=True,
+            input={
+                "projectId": c.project,
+                "title": operation,
+                "instructions": "invalid graph",
+                **fields,
+            },
+        )
     assert c.state()[0]["revision"] == before["revision"]
     dependent = c.create("dependent", dependencies=[first["id"]])
     c.create("coordinator", role="coordinator")
-    c.call("create", operation="overflow", error=True, input={
-        "projectId": c.project, "title": "overflow", "instructions": "too many",
-    })
+    c.call(
+        "create",
+        operation="overflow",
+        error=True,
+        input={
+            "projectId": c.project,
+            "title": "overflow",
+            "instructions": "too many",
+        },
+    )
     c.call("tick")
     state, operations = c.state()
     assert len(state["tasks"]) == 4
@@ -243,7 +320,9 @@ def budget(c):
     assert state["attempts"][attempt_id]["phase"] == "executing"
     # Explicit resume queues its own instruction as well as resetting delivery
     # of the proven-undelivered initial instruction. Both must be delivered.
-    prompts = [event["target"] for event in c.audit()["events"] if event["kind"] == "prompt"]
+    prompts = [
+        event["target"] for event in c.audit()["events"] if event["kind"] == "prompt"
+    ]
     initial = f"initial_{attempt_id}"
     assert prompts.count(initial) == 9
     assert len(prompts) == 10
@@ -275,8 +354,11 @@ def notifications(c):
     c.call("observe", target=child["id"], state="idle")
     c.call("tick")
     state, _ = c.state()
-    notifications = [command for command in state["commands"].values()
-                     if command["id"].startswith("coordination_")]
+    notifications = [
+        command
+        for command in state["commands"].values()
+        if command["id"].startswith("coordination_")
+    ]
     assert len(notifications) == 1
     assert child["id"] in notifications[0]["text"]
     c.call("tick")
@@ -286,9 +368,20 @@ def notifications(c):
     c.call("accept", target=child["id"], operation="accept-child")
     c.call("tick")
     state, _ = c.state()
-    assert sum(command["id"].startswith("coordination_") for command in state["commands"].values()) == 1
-    assert sum(command["kind"] == "signal" and command["status"] == "suppressed"
-               for command in state["commands"].values()) == 1
+    assert (
+        sum(
+            command["id"].startswith("coordination_")
+            for command in state["commands"].values()
+        )
+        == 1
+    )
+    assert (
+        sum(
+            command["kind"] == "signal" and command["status"] == "suppressed"
+            for command in state["commands"].values()
+        )
+        == 1
+    )
     assert "notification budget exhausted" in state["tasks"][parent["id"]]["error"]
     c.ownership()
 
@@ -297,7 +390,12 @@ def lifecycle(c, mode, reconnecting):
     c.call("configure", delay_bookkeeping=True)
     task = c.create("task")
     start = time.monotonic()
-    c.call("start", name="run", action="run", **({"deadline_ms": 2000} if mode == "deadline" else {}))
+    c.call(
+        "start",
+        name="run",
+        action="run",
+        **({"deadline_ms": 2000} if mode == "deadline" else {}),
+    )
     c.wait(lambda: c.audit()["blocked"])
     c.wait(lambda: c.count("events.started") == 1)
     if reconnecting:
@@ -324,9 +422,16 @@ def lifecycle(c, mode, reconnecting):
     assert any(command["status"] == "sending" for command in state["commands"].values())
     assert c.count("prompt") == 1
     assert c.count("interrupt") == 0
-    c.call("create", operation="after-shutdown", input={
-        "projectId": c.project, "title": "rejected", "instructions": "no admission",
-    }, error=True)
+    c.call(
+        "create",
+        operation="after-shutdown",
+        input={
+            "projectId": c.project,
+            "title": "rejected",
+            "instructions": "no admission",
+        },
+        error=True,
+    )
     c.call("release")
     c.wait(lambda: c.call("job", target="shutdown")["finished"])
     c.call("join", target="shutdown")
@@ -342,8 +447,14 @@ def expired_bookkeeping(c):
     c.call("start", name="tick", action="tick")
     c.wait(lambda: c.audit()["blocked"])
     c.call("drop_wait", target="tick")
-    c.call("start", name="control", action="control", target=task["id"],
-           operation="pause", input={"action": "pause", "cascade": False})
+    c.call(
+        "start",
+        name="control",
+        action="control",
+        target=task["id"],
+        operation="pause",
+        input={"action": "pause", "cascade": False},
+    )
     time.sleep(5.1)  # The unchanged five-second bookkeeping contract must expire.
     assert not c.call("job", target="control")["finished"]
     state, operations = c.state()
@@ -367,28 +478,54 @@ def main():
     args = parser.parse_args()
     binary = args.binary.absolute()
     records = []
-    report = {"scope": "Real Rust Service/scheduler/SQLite; simulated execution only; no native acceptance",
-              "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-              "binarySha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
-              "sourceSha256": {}, "passed": [], "records": records}
-    for path in [*Path("crates").rglob("*.rs"), *Path("crates").rglob("Cargo.toml"),
-                 Path("Cargo.toml"), Path("Cargo.lock"), Path("Makefile"),
-                 Path("tools/test-engine-safety.py")]:
-        report["sourceSha256"][str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
-    scenarios = [("uncertainty", uncertainty), ("generations-cleanup", generations),
-                 ("limits", limits), ("delivery-budget", budget),
-                 ("role-limits", role_limits), ("notification-budget", notifications),
-                 ("expired-bookkeeping-dropped-wait", expired_bookkeeping)]
+    report = {
+        "scope": "Real Rust Service/scheduler/SQLite; simulated execution only; no native acceptance",
+        "head": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True
+        ).strip(),
+        "binarySha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+        "sourceSha256": {},
+        "passed": [],
+        "records": records,
+    }
+    for path in [
+        *Path("crates").rglob("*.rs"),
+        *Path("crates").rglob("Cargo.toml"),
+        Path("Cargo.toml"),
+        Path("Cargo.lock"),
+        Path("Makefile"),
+        Path("tools/test-engine-safety.py"),
+    ]:
+        report["sourceSha256"][str(path)] = hashlib.sha256(
+            path.read_bytes()
+        ).hexdigest()
+    scenarios = [
+        ("uncertainty", uncertainty),
+        ("generations-cleanup", generations),
+        ("limits", limits),
+        ("delivery-budget", budget),
+        ("role-limits", role_limits),
+        ("notification-budget", notifications),
+        ("expired-bookkeeping-dropped-wait", expired_bookkeeping),
+    ]
     for mode in ("shutdown", "cancel", "deadline"):
         for reconnecting in (False, True):
-            scenarios.append((f"{mode}-reconnecting-{reconnecting}",
-                              lambda c, m=mode, r=reconnecting: lifecycle(c, m, r)))
+            scenarios.append(
+                (
+                    f"{mode}-reconnecting-{reconnecting}",
+                    lambda c, m=mode, r=reconnecting: lifecycle(c, m, r),
+                )
+            )
     if args.scenario:
-        scenarios = [(name, scenario) for name, scenario in scenarios if name == args.scenario]
+        scenarios = [
+            (name, scenario) for name, scenario in scenarios if name == args.scenario
+        ]
         assert scenarios, f"Unknown scenario: {args.scenario}"
     try:
         Path(".tmp").mkdir(exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="engine-safety-", dir=".tmp") as directory:
+        with tempfile.TemporaryDirectory(
+            prefix="engine-safety-", dir=".tmp"
+        ) as directory:
             for name, scenario in scenarios:
                 consumer = Consumer(binary, Path(directory).absolute(), records, name)
                 try:
@@ -402,7 +539,9 @@ def main():
         raise
     finally:
         if args.evidence:
-            args.evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+            args.evidence.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2) + "\n"
+            )
 
 
 if __name__ == "__main__":

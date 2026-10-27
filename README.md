@@ -43,6 +43,10 @@ Go dependencies and tools are pinned in `go.mod`/`go.sum`; plugin dependencies u
 The native engine, service, and CLI are [migrating to Rust](docs/RUST_MIGRATION.md), preserving SQLite, the v1 HTTP API, and the TypeScript plugin.
 The current executable is still Go; Rust libraries implement domain/storage and coordination over abstract runtime/workspace ports, not a replacement daemon or CLI yet.
 Rust dependencies use `Cargo.toml`/`Cargo.lock`; `rust-toolchain.toml` pins the toolchain.
+Python quality tooling requires Python 3.11+ with `venv` and pip (CI uses 3.11).
+`make prepare` installs pinned Ruff from `tools/python-requirements.txt` into `.tmp/python-tools`, without changing global tools.
+`make lint` checks formatting and focused Python lint for the maintained `tools/test-engine-safety.py` driver only; dependencies, generated files and private data are excluded.
+`make format` applies safe Ruff fixes and formatting; `make prove-quality` also exercises disposable Python analyzer consumers.
 `make check` includes Rust tests and real Go/Rust/Go and Rust/Go/Rust persistence/ownership tests against fresh disposable stores.
 See the [verification contract](docs/VERIFICATION.md#routine-deterministic-checks) for coordination/oracle coverage and its acceptance limits.
 No retained database, native service, or provider is needed for those checks.
