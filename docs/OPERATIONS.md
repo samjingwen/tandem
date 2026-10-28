@@ -108,10 +108,10 @@ The Rust `tandem-workspace` library follows the same recorded Git/Worktrunk auth
 Registration resolves the canonical repository root, requires an explicit commit-resolving base reference, and leaves the canonical checkout unchanged, including dirty and ignored files.
 Policy text keeps inline instructions, root-to-project `AGENTS.md` order and explicitly requested Markdown files in caller order, including duplicates, within the 256-KiB total and 16-explicit-file limits.
 Environment-file names and Markdown aliases resolving to those names are refused.
-Unix filesystem access rejects symlink directory components and opens policy files as bounded, regular, no-follow descriptors.
+Registration canonicalizes repository and permitted Markdown aliases before access; subsequent Unix descriptor-relative traversal rejects symlink directory components and opens policy files as bounded, regular, no-follow descriptors.
 New allocation parents are private; existing directories and worker commits are not reset or permission-rewritten.
 
-Git and Worktrunk commands receive only the documented basic user/path/locale environment, with Git hooks and fsmonitor disabled and no inherited control/provider credentials.
+Git and Worktrunk commands receive only the basic environment whitelist in [`process::run`](../crates/tandem-workspace/src/process.rs), with Git hooks and fsmonitor disabled and no inherited control/provider credentials.
 Worktrunk also receives `--no-hooks`; registration never authorizes startup hooks or ignored-file copying.
 Each command has a 30-second maximum deadline and independent 1-MiB stdout/stderr bounds; public errors do not contain command diagnostics.
 Cooperative cancellation stops the isolated command group created by this adapter and joins its child before returning, retaining any already-created checkout for read-only reconciliation.
@@ -120,6 +120,8 @@ The engine retains operation ownership when an API caller drops its wait; caller
 
 Cleanup checks tracked, untracked and ignored material, then inventories same-user process cwd ownership through Linux `/proc` metadata or bounded five-second macOS `lsof` output.
 Unreadable or ambiguous ownership fails closed; unsupported platforms refuse cleanup.
+On Linux, a missing cwd alone does not prove process exit, including when the main thread has exited but other threads remain alive.
+On macOS, ambiguous `lsof` caret encodings, including literal caret text indistinguishable from encoded controls, refuse cleanup even when the reported cwd appears unrelated to the workspace.
 No process is stopped to make removal succeed, and no branch is deleted.
 These checks complement runtime quiescence, not a security sandbox or protection against a concurrent same-user process changing cwd or filesystem bindings after inspection.
 

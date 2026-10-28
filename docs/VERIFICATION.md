@@ -99,6 +99,8 @@ Allocator tests disable actual Git/Worktrunk hooks and include a deliberate disp
 The ambiguity fixture executes the real allocator, injects only a failed post-execution command result, then verifies that read-only recovery performs no second allocation.
 Credential tests use synthetic control/provider values and a Git wrapper that rejects inherited settings.
 Rust command-consumer tests exercise cancellation/deadlines, bounded stdout/stderr, private diagnostic suppression, joined command groups and retained partial effects.
+`crates/tandem-workspace/src/settlement_tests.rs` composes the engine with real command and blocking-filesystem work across registration, allocation, inspection, acceptance and removal, checking retained ownership under cancellation, deadlines and abandoned waits, plus shutdown during acceptance.
+Platform-specific executable regressions in `crates/tandem-workspace/src/holders.rs` cover macOS `lsof` Unicode/backslash and ambiguous caret renderings, and Linux live threads after main-thread exit; each runs only on its matching platform.
 `crates/tandem-workspace/tests/coordination.rs` composes the real Rust engine, SQLite and Git adapter, asserting durable ownership before allocation/runtime effects and cleanup, exact cleanup receipt replay and retained branches; only runtime execution is simulated.
 Go-only test invocations without the explicit Rust consumer report these parity tests skipped; the focused/aggregate opted-in run supplies it and requires actual Worktrunk rather than skipping a missing allocator.
 No retained checkout, native OpenCode/provider session or default-binary cutover is part of this evidence.

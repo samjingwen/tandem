@@ -65,6 +65,7 @@ Coordinators have a separate single-slot limit and a default 32-notification bud
 
 Dropping an API/client future abandons only that wait, not the owned operation.
 Explicit cancellation, deadline expiry or shutdown signals its cooperative context, while the tracked operation retains the store and effects barrier through independent five-second outcome bookkeeping.
+Workspace calls await actual subprocess or blocking-filesystem settlement before outcome bookkeeping, including registration and acceptance inspection; cancellation does not release ownership by dropping the adapter future.
 Shutdown closes admission atomically with task registration, stops scheduler reads/event listening, and waits for owned tasks without stopping external workers.
 The event listener shares the owned run's cancellation and deadline, so event reads and reconnection stop even while outcome bookkeeping is blocked.
 A storage lock may delay return beyond the bookkeeping deadline; its callback must then refuse the expired change, and ownership remains retained until the blocking storage task actually returns.
