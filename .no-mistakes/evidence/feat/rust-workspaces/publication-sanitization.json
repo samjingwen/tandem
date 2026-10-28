@@ -1,0 +1,64 @@
+{
+  "purpose": "Regenerated path-free public rendering of the original Test artifacts",
+  "testedSourceCommit": "e62d740725dbbaa8d30a593821e349985c3a621c",
+  "publishedSourceCommit": "4f1c328432de80219b29505565be5bbcc12309ab",
+  "originalTestScope": "11 of 13 live macOS scenarios; the command-only scenario and Linux scenario were untested in that record, not waived or rewritten as passes",
+  "normalization": "Machine-local home, managed checkout, evidence and temporary directory prefixes are replaced with explicit location labels. No verdict, error, receipt, executable hash or test status is changed.",
+  "history": "Original evidence history is preserved by this append-only rendering commit. Historical-path cleanup is a separately authorized post-merge operation, not claimed complete here.",
+  "artifacts": [
+    {
+      "path": ".no-mistakes/evidence/feat/rust-workspaces/consumers-build.log",
+      "originalBlob": "d7d3a5cd0fc607f2dba9cc05047f4c6beafc4504",
+      "originalSha256": "c2d5aeb5fa9a8e46ab4768dddbf2b8d7936b3f00edf19406a0096436ca2883a7",
+      "regeneratedSha256": "d09ee77d938c3ecc5d40841cce0cafe72f68a747e1a8f14a2533b2dd4a1bf464"
+    },
+    {
+      "path": ".no-mistakes/evidence/feat/rust-workspaces/dependency-tests.log",
+      "originalBlob": "21390ec56a22500e178f58c135aa57f052256b97",
+      "originalSha256": "5769e8efd2200fe45331e34264a22e2c525b2549187155931760efd14a5555ae",
+      "regeneratedSha256": "820369661541fc0651b29ad7e7e149d6cf8afc1b0292dde1ac229c1a1e8add36"
+    },
+    {
+      "path": ".no-mistakes/evidence/feat/rust-workspaces/engine-safety.log",
+      "originalBlob": "19c4091dd74fc49daaa4e25b39713648ada16086",
+      "originalSha256": "d03b204cc489661cdce73dd0a74b74dc86518bac3e324aeabf6581286dd8b12a",
+      "regeneratedSha256": "cba5d2d39fffd259aaed0f5efaccfe1faea99d6904c09646ac1f95dad6374b72"
+    },
+    {
+      "path": ".no-mistakes/evidence/feat/rust-workspaces/installer.log",
+      "originalBlob": "a2ddeec3db05c7c009e0b84c5ef02f4e120ae3e4",
+      "originalSha256": "c28c68765fc26f1d126ce4dc8fac015a88302ee0a48d06bc2b30e1826d271b27",
+      "regeneratedSha256": "feb53e8df24b79a1e8bbc4a390367509c8eff78c339ea8208dc69d8657786688"
+    },
+    {
+      "path": ".no-mistakes/evidence/feat/rust-workspaces/local-product-probe.py",
+      "originalBlob": "3fca9764048e1406b8b2b5c1d6179e3b2764d1ec",
+      "originalSha256": "2f49a74576f7b8431c78807738667349133834d422c4bcf06c8a771b990b1206",
+      "regeneratedSha256": "27ccec40c96a3d99632ed26385e39891b46cdf531537f77e07c47223edabeffe"
+    },
+    {
+      "path": ".no-mistakes/evidence/feat/rust-workspaces/local-test-phase.py",
+      "originalBlob": "91945d9411e621c75127e0d80e549d67ef3af12a",
+      "originalSha256": "9f445298f20528d30a548e42c77c518986faff8804d30e4e5f76fe37c91c3ae8",
+      "regeneratedSha256": "a8b1bb95bdca51c346aa30aa67e76de622cb69812ab82cbd4d11064de9347740"
+    },
+    {
+      "path": ".no-mistakes/evidence/feat/rust-workspaces/prepare.log",
+      "originalBlob": "bb2755c92b05a9e8a0794c00dc8a0d24728cdeee",
+      "originalSha256": "7315d99d4b33d51e2b5842c817038072ec645e6349bc8fc99629ce98a9d97a84",
+      "regeneratedSha256": "a89771bc8eba60708426040396ac2da82591459aea1faf764c2daf662f78d6bf"
+    },
+    {
+      "path": ".no-mistakes/evidence/feat/rust-workspaces/results.json",
+      "originalBlob": "1cb74ce1bdf180212c8bcc53569cbf7184fee763",
+      "originalSha256": "54fc90bd05260de664f769d46d44496ba2b2ca5ceee835a99b78f2ec27f2d09a",
+      "regeneratedSha256": "c84ef722cf244262fe53839ce3c2b31b1645909c6009f69ba66f6ba79889a22a"
+    },
+    {
+      "path": ".no-mistakes/evidence/feat/rust-workspaces/workspace-rust.log",
+      "originalBlob": "e39b57f635eeecb356ef87e8b07f7c7c6b184860",
+      "originalSha256": "ae79300480bec1a781333ab42ba8bae03fe42bcbb2003b700711bccbb30c255f",
+      "regeneratedSha256": "eb5cc5687f10cda3e0c42f8945541aa4417c58ec78715248c19cd4f7e1e88422"
+    }
+  ]
+}
