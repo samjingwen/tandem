@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO history(revision,entity,id,at,body) VALUES(?,?,?,?,?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "b2fa348080d3d2063e8e2655370042ec6a8f577725bef08aa06824de4e842cc3"
+}

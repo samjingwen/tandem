@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO metadata(key,value) VALUES('instance_id',?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "af53fda490fd534466d74a4c46bf85bdf9ceb3fbfc9d041e485ef1b6de07a3a3"
+}

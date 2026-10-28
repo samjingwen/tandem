@@ -289,3 +289,127 @@ fn unrelated_updates_retain_unknown_fields() {
         extension
     );
 }
+
+#[test]
+fn failed_statement_settles_rollback_before_returning_to_an_independent_writer() {
+    let (_root, store) = open();
+    let connection = Connection::open(store.directory().join("tandem.db")).unwrap();
+    connection.busy_timeout(std::time::Duration::ZERO).unwrap();
+    let before = store.read_revision().unwrap();
+    connection
+        .execute_batch(
+            "CREATE TRIGGER reject_revision BEFORE UPDATE ON metadata WHEN NEW.key='revision'
+         BEGIN SELECT RAISE(ABORT,'fixture revision failure'); END;",
+        )
+        .unwrap();
+    let result = store.update(&mut |state| {
+        state.tasks.insert("tsk_rollback".into(), Task::default());
+        Ok(())
+    });
+    assert!(result.is_err());
+    // Independent SQLite is the oracle: do not enqueue another store query
+    // that could incidentally wait for a background rollback to finish.
+    connection
+        .execute_batch("BEGIN IMMEDIATE; ROLLBACK;")
+        .unwrap();
+    let rows: i64 = connection
+        .query_row("SELECT count(*) FROM tasks", [], |row| row.get(0))
+        .unwrap();
+    let history: i64 = connection
+        .query_row("SELECT count(*) FROM history", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!((rows, history), (0, 0));
+    assert_eq!(store.read_revision().unwrap(), before);
+    connection
+        .execute_batch("DROP TRIGGER reject_revision")
+        .unwrap();
+    store
+        .update(&mut |state| {
+            state.tasks.insert("tsk_after".into(), Task::default());
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(store.read_revision().unwrap().revision, before.revision + 1);
+}
+
+#[test]
+fn failed_commit_is_drained_and_fails_closed_until_reopen() {
+    let (_root, store) = open();
+    let directory = store.directory().to_owned();
+    let connection = Connection::open(directory.join("tandem.db")).unwrap();
+    connection.busy_timeout(std::time::Duration::ZERO).unwrap();
+    connection.execute_batch(
+        "CREATE TABLE fixture_parent(id INTEGER PRIMARY KEY);
+         CREATE TABLE fixture_child(id INTEGER REFERENCES fixture_parent(id) DEFERRABLE INITIALLY DEFERRED);
+         CREATE TRIGGER deferred_failure AFTER INSERT ON tasks
+         BEGIN INSERT INTO fixture_child VALUES(1); END;"
+    ).unwrap();
+    let result = store.update(&mut |state| {
+        state.tasks.insert("tsk_rejected".into(), Task::default());
+        Ok(())
+    });
+    assert!(result.is_err());
+    connection
+        .execute_batch("BEGIN IMMEDIATE; ROLLBACK;")
+        .unwrap();
+    for table in ["tasks", "history", "fixture_child"] {
+        let rows: i64 = connection
+            .query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(rows, 0, "failed commit retained {table} rows");
+    }
+    assert_eq!(store.snapshot().unwrap_err().code, "storage_unavailable");
+    connection
+        .execute_batch("DROP TRIGGER deferred_failure")
+        .unwrap();
+    drop(connection);
+    drop(store);
+    let reopened = Sqlite::open(directory).unwrap();
+    assert_eq!(reopened.read_revision().unwrap().revision, 0);
+    reopened
+        .update(&mut |state| {
+            state.tasks.insert("tsk_after".into(), Task::default());
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[test]
+fn callback_unwind_rolls_back_and_closes_before_releasing_ownership() {
+    let (_root, store) = open();
+    let directory = store.directory().to_owned();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _ = store.update(&mut |_| panic!("fixture callback panic"));
+    }));
+    assert!(result.is_err());
+    assert_eq!(store.snapshot().unwrap_err().code, "storage_unavailable");
+    drop(store);
+    let reopened = Sqlite::open(directory).unwrap();
+    assert_eq!(reopened.read_revision().unwrap().revision, 0);
+}
+
+fn synchronous_store_inside_runtime() {
+    let (_root, store) = open();
+    store
+        .update(&mut |state| {
+            state.tasks.insert("tsk_runtime".into(), Task::default());
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(store.snapshot().unwrap().tasks.len(), 1);
+    let directory = store.directory().to_owned();
+    drop(store);
+    assert!(Sqlite::open(directory).is_ok());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn synchronous_port_works_inside_current_thread_tokio() {
+    synchronous_store_inside_runtime();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn synchronous_port_works_inside_multi_thread_tokio() {
+    synchronous_store_inside_runtime();
+}

@@ -1,0 +1,4 @@
+[env]
+# Normal builds never connect to an inherited database for SQL introspection.
+# The explicit metadata command uses only a fresh disposable schema fixture.
+SQLX_OFFLINE = "true"

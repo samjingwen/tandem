@@ -1,14 +1,17 @@
-.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-runtime-parity rust-workspace-parity rust-safety rust-build rust-security python-prepare python-format python-format-check python-lint python-test worktrunk-prepare
+.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-runtime-parity rust-workspace-parity rust-safety rust-build rust-security python-prepare python-format python-format-check python-lint python-test worktrunk-prepare rust-env-check rust-sqlx-prepare rust-sqlx-check
 
 RUST_AUDIT_VERSION := 0.22.2
 RUST_AUDIT_ROOT := $(CURDIR)/.tmp/rust-tools
+SQLX_VERSION := 0.9.0
+SQLX_ROOT := $(CURDIR)/.tmp/sqlx-tools
 PYTHON := python3
 PYTHON_TOOLS := $(CURDIR)/.tmp/python-tools
 RUFF := $(PYTHON_TOOLS)/bin/ruff
 # Explicit maintained tooling ownership; do not scan dependencies or fixtures.
-PYTHON_SOURCES := tools/test-engine-safety.py tools/prepare-worktrunk.py tools/test-prepare-worktrunk.py
+PYTHON_SOURCES := tools/test-engine-safety.py tools/prepare-worktrunk.py tools/test-prepare-worktrunk.py tools/sqlx.py tools/test-sqlx.py tools/prove-sqlx.py
 WORKTRUNK_ROOT := $(CURDIR)/.tmp/worktrunk
 export PATH := $(WORKTRUNK_ROOT)/bin:$(PATH)
+export SQLX_OFFLINE := true
 
 # Explicit maintained-language ownership. Go's ./... can otherwise discover Go
 # sources shipped inside npm dependencies after plugin installation.
@@ -45,10 +48,21 @@ python-lint: python-format-check
 
 python-test:
 	$(PYTHON) tools/test-prepare-worktrunk.py
+	$(PYTHON) tools/test-sqlx.py
 
-rust-prepare:
+rust-prepare: rust-env-check
 	cargo fetch --locked
 	cargo install --locked --root "$(RUST_AUDIT_ROOT)" --version $(RUST_AUDIT_VERSION) cargo-audit
+	cargo install --locked --root "$(SQLX_ROOT)" --version $(SQLX_VERSION) sqlx-cli --no-default-features --features sqlite
+
+rust-env-check:
+	$(PYTHON) tools/sqlx.py guard
+
+rust-sqlx-prepare:
+	$(PYTHON) tools/sqlx.py prepare
+
+rust-sqlx-check:
+	$(PYTHON) tools/sqlx.py check
 
 format:
 	gofmt -w core internal cmd
@@ -67,7 +81,7 @@ lint: format-check rust-format-check python-lint
 	go tool staticcheck $(GO_PACKAGES)
 	$(MAKE) rust-lint
 
-rust-lint:
+rust-lint: rust-sqlx-check
 	cargo clippy --workspace --all-targets --locked -- -D warnings
 
 test:
@@ -75,10 +89,10 @@ test:
 	$(MAKE) rust-test rust-parity
 	$(MAKE) python-test
 
-rust-test:
+rust-test: rust-env-check
 	cargo test --workspace --all-targets --locked
 
-rust-parity:
+rust-parity: rust-env-check
 	cargo build --locked --example store-compat
 	cargo build --locked --example engine-compat
 	TANDEM_RUST_STORE_HELPER="$(CURDIR)/target/debug/examples/store-compat" TANDEM_RUST_ENGINE_HELPER="$(CURDIR)/target/debug/examples/engine-compat" go test ./internal/store -run '^TestRust(Store|Engine)' -count=1
@@ -86,15 +100,15 @@ rust-parity:
 	$(MAKE) rust-runtime-parity
 	$(MAKE) rust-workspace-parity
 
-rust-runtime-parity:
+rust-runtime-parity: rust-env-check
 	cargo build --locked -p tandem-opencode --example runtime-compat
 	TANDEM_RUST_OPENCODE_HELPER="$(CURDIR)/target/debug/examples/runtime-compat" go test -race ./internal/opencode -run '^TestRustOpenCode' -count=1
 
-rust-workspace-parity: worktrunk-prepare
+rust-workspace-parity: worktrunk-prepare rust-env-check
 	cargo build --locked -p tandem-workspace --example workspace-compat
 	TANDEM_RUST_WORKSPACE_HELPER="$(CURDIR)/target/debug/examples/workspace-compat" go test -race ./internal/workspace -run '^TestRustWorkspace' -count=1
 
-rust-safety:
+rust-safety: rust-env-check
 	cargo build --locked -p tandem-engine --example engine-safety
 	python3 tools/test-engine-safety.py "$(CURDIR)/target/debug/examples/engine-safety"
 
@@ -117,10 +131,11 @@ prove-quality:
 	sh tools/prove-quality.sh
 	sh tools/prove-rust-quality.sh
 	RUFF="$(RUFF)" sh tools/prove-python-quality.sh
+	$(PYTHON) tools/prove-sqlx.py
 
 build: build-core plugin-build rust-build
 
-rust-build:
+rust-build: rust-env-check
 	cargo build --workspace --release --locked
 
 build-core:

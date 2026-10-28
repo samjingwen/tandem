@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE metadata SET value=? WHERE key='revision'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "31d9c2e0fa96d3323c8b7f90ac58c50d978d55833a823515d1cea56e9a90ff85"
+}
