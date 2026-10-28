@@ -335,3 +335,23 @@ where
         () = deadline(context) => Err(Error::uncertain()),
     }
 }
+
+pub(crate) async fn workspace_read<T>(
+    context: &Context,
+    future: impl Future<Output = Result<T>>,
+) -> Result<T> {
+    context.check()?;
+    let result = future.await;
+    context.check()?;
+    result
+}
+
+pub(crate) async fn workspace_write<T>(
+    context: &Context,
+    future: impl Future<Output = Result<T>>,
+) -> Result<T> {
+    context.check().map_err(Error::not_delivered)?;
+    let result = future.await;
+    context.check().map_err(|_| Error::uncertain())?;
+    result
+}

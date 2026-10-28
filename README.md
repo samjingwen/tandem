@@ -16,7 +16,7 @@ Separate local/server instances have separate state; installation does not synch
 - Go **1.27.3** for building.
 - Rust **1.95.0** with rustfmt/Clippy and a C compiler for the bundled SQLite migration adapter.
 - Git and OpenCode **2.1.0**, with a configured usable model.
-- Worktrunk **0.80.0** for the default checkout allocator, or explicitly select `--allocator git` where project policy permits it.
+- Worktrunk **0.81.0** for the default checkout allocator, or explicitly select `--allocator git` where project policy permits it.
 - Node 24+ and npm only for building/checking the optional TypeScript plugin.
 - A local macOS/Linux filesystem for SQLite state and locking, not NFS or a shared cross-host database.
 
@@ -41,13 +41,15 @@ make build
 The race detector is a development check and needs its supported native C toolchain.
 Go dependencies and tools are pinned in `go.mod`/`go.sum`; plugin dependencies use their own npm lockfile.
 The native engine, service, and CLI are [migrating to Rust](docs/RUST_MIGRATION.md), preserving SQLite, the v1 HTTP API, and the TypeScript plugin.
-The current executable is still Go; Rust libraries implement domain/storage, abstract-port coordination and a pinned HTTP/SSE runtime adapter verified with controlled HTTP fixtures, not a replacement daemon or CLI yet.
+The current executable is still Go; Rust libraries implement domain/storage, coordination, a pinned HTTP/SSE runtime adapter and Git/Worktrunk workspaces verified with disposable fixtures, not a replacement daemon or CLI yet.
 Rust dependencies use `Cargo.toml`/`Cargo.lock`; `rust-toolchain.toml` pins the toolchain.
 Python quality tooling requires Python 3.11+ with `venv` and pip (CI uses 3.11).
 `make prepare` installs pinned Ruff from `tools/python-requirements.txt` into `.tmp/python-tools`, without changing global tools.
-`make lint` checks formatting and focused Python lint for the maintained `tools/test-engine-safety.py` driver only; dependencies, generated files and private data are excluded.
+`make lint` checks formatting and focused Python lint for the maintained engine-safety driver, Worktrunk preparation tool and its behavioral tests; dependencies, generated files and private data are excluded.
 `make format` applies safe Ruff fixes and formatting; `make prove-quality` also exercises disposable Python analyzer consumers.
 `make check` includes Rust tests and real Go/Rust/Go and Rust/Go/Rust persistence/ownership tests against fresh disposable stores.
+`make prepare` installs checksum-verified Worktrunk 0.81.0 under `.tmp/worktrunk` for the real allocator tests, without changing global tools or Rust's pinned compiler.
+Make targets add that installation to their own `PATH`; to use it with `./bin/tandem serve` in the current shell, run `export PATH="$PWD/.tmp/worktrunk/bin:$PATH"` from the repository root first.
 See the [verification contract](docs/VERIFICATION.md#routine-deterministic-checks) for coordination/oracle coverage and its acceptance limits.
 No retained database, native service, or provider is needed for those checks.
 

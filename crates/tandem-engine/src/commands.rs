@@ -8,7 +8,7 @@ use tandem_core::{
     ReplyDecision, Result, RuntimeInfo, Service, State, SubmitResult, Task, TaskResult, Workspace,
 };
 
-use crate::{Engine, id, journal, operation_conflict, read, state::*};
+use crate::{Engine, id, journal, operation_conflict, read, state::*, workspace_read};
 
 #[derive(Serialize)]
 pub(crate) struct Empty {}
@@ -178,7 +178,8 @@ impl Engine {
         if input.name.trim().is_empty() || input.path.is_empty() || input.base_ref.is_empty() {
             return Err(Error::invalid("name, path and baseRef are required"));
         }
-        let mut project = read(context, self.inner.workspaces.register(context, &input)).await?;
+        let mut project =
+            workspace_read(context, self.inner.workspaces.register(context, &input)).await?;
         let engine = self.clone();
         self.mutate(
             context,
@@ -556,7 +557,7 @@ impl Engine {
                 .projects
                 .get(&task.project_id)
                 .ok_or_else(missing_project)?;
-            read(
+            workspace_read(
                 context,
                 self.inner
                     .workspaces

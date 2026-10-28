@@ -65,7 +65,7 @@ CI invokes these same Makefile targets; targeted regression and opt-in native co
 No live model or shared native service is required by normal CI.
 An absent opt-in fixture is reported skipped, never described as a live pass.
 `make test` also runs the Rust workspace tests and `make rust-parity`; the latter invokes a separate Go storage/engine-oracle test run with Go's default package timeout and explicit Rust fixture executables.
-These checks cover [Rust domain/SQLite, abstract-port coordination and controlled runtime-adapter libraries](RUST_MIGRATION.md#verification-commands), not native OpenCode, workspace allocator, HTTP-service or CLI acceptance.
+These checks cover [Rust domain/SQLite, coordination, controlled runtime and disposable workspace-adapter libraries](RUST_MIGRATION.md#verification-commands), not native OpenCode, retained-workspace, HTTP-service or CLI acceptance.
 `crates/tandem-engine/tests/coordination.rs` executes real Rust admission/reconciliation against SQLite and controlled runtime/workspace ports, including abandoned-client, shutdown, uncertainty, same-reference recovery, generation, role/dependency bounds, capacity, finite notifications, quiet polls, explicit decisions and cleanup barriers.
 Reply regressions distinguish explicitly proven rejection from an unmarked `invalid_request`, which must retain uncertainty and prevent resend.
 The five-second bookkeeping fixture blocks only its owned storage callback, verifies that controls cannot cross the effects barrier, then releases it and rejects the expired bookkeeping change without fabricating an admission receipt.
@@ -84,6 +84,26 @@ The authority tests redirect only their test-local transport to loopback fixture
 The separate Rust executable receives only explicitly supplied fixture configuration, runs with a fresh HOME and no inherited control/provider credentials, and never starts a native runtime.
 Ordinary Go-only test invocations report this consumer skipped when not supplied; `make rust-parity` and CI supply it explicitly, and the opt-in runtime parity invocation enables the Go race detector.
 These fixtures do not start native OpenCode or establish plugin/provider compatibility or retained-state cutover acceptance.
+
+### Workspace adapter checks
+
+`make rust-workspace-parity`, also invoked by `make rust-parity` and aggregate CI, builds the actual Rust `workspace-compat` consumer and drives it alongside the executable Go reference against real disposable Git and Worktrunk repositories.
+`make prepare` and this focused target provide Worktrunk 0.81.0 through project-local, SHA-256-verified official macOS or static Linux-musl binaries rather than requiring a newer Rust compiler to build that external CLI.
+Preparation rechecks the archive and replaces the local binary from verified bytes even when a cached executable reports the expected version.
+Offline installer tests execute a conforming fixture binary and reject checksum corruption, nonregular archive members, symlink destinations and unexpected versions; explicit Ruff ownership and real negative enforcement probes cover both maintained Python tools.
+There is no global installation, automatic runtime discovery or private credential/configuration read.
+
+Workspace oracles compare registration text/order, malformed policy UTF-8 as actually JSON-encoded by Go, stable pure plans, both allocators, same-repository/branch ownership, current-HEAD recovery and branch-preserving cleanup.
+They refuse invalid policy, foreign bindings, symlinks, tracked/untracked/ignored dirt and live cwd holders without stopping those holders.
+Allocator tests disable actual Git/Worktrunk hooks and include a deliberate disposable-hook positive control.
+The ambiguity fixture executes the real allocator, injects only a failed post-execution command result, then verifies that read-only recovery performs no second allocation.
+Credential tests use synthetic control/provider values and a Git wrapper that rejects inherited settings.
+Rust command-consumer tests exercise cancellation/deadlines, bounded stdout/stderr, private diagnostic suppression, joined command groups and retained partial effects.
+`crates/tandem-workspace/src/settlement_tests.rs` composes the engine with real command and blocking-filesystem work across registration, allocation, inspection, acceptance and removal, checking retained ownership under cancellation, deadlines and abandoned waits, plus shutdown during acceptance.
+Platform-specific executable regressions in `crates/tandem-workspace/src/holders.rs` cover macOS `lsof` Unicode/backslash and ambiguous caret renderings, and Linux live threads after main-thread exit; each runs only on its matching platform.
+`crates/tandem-workspace/tests/coordination.rs` composes the real Rust engine, SQLite and Git adapter, asserting durable ownership before allocation/runtime effects and cleanup, exact cleanup receipt replay and retained branches; only runtime execution is simulated.
+Go-only test invocations without the explicit Rust consumer report these parity tests skipped; the focused/aggregate opted-in run supplies it and requires actual Worktrunk rather than skipping a missing allocator.
+No retained checkout, native OpenCode/provider session or default-binary cutover is part of this evidence.
 
 ## Isolated native contract
 

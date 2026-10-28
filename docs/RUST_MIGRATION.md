@@ -6,11 +6,12 @@ The native coordination engine, HTTP service, and CLI will move from Go to Rust.
 SQLite, the v1 HTTP API and its OpenAPI contract, the TypeScript OpenCode plugin, and OpenCode's ownership of model/tool execution remain unchanged.
 This is a compatibility migration, not a new product, parallel scheduler, or permission to start/adopt existing native services.
 
-**Current milestone: domain, SQLite, abstract-port coordination and controlled HTTP runtime-adapter libraries.**
+**Current milestone: domain, SQLite, coordination, controlled HTTP runtime and concrete workspace-adapter libraries.**
 The production executable and scheduler are still Go.
 `tandem-engine` implements command admission and reconciliation over runtime/workspace interfaces, exercised with controlled fixtures.
 `tandem-opencode` implements the pinned OpenCode 2.1.0 HTTP/SSE Runtime port, verified against disposable HTTP fixtures and the executable Go adapter, not a native OpenCode process.
-No Rust checkout allocator, HTTP service or production CLI is delivered by these libraries.
+`tandem-workspace` implements canonical registration, recorded-ownership Git/Worktrunk allocation and guarded cleanup, verified with disposable repositories and the Go reference.
+No Rust HTTP service or production CLI is delivered by these libraries.
 Do not point them at a retained state directory as a cutover experiment.
 
 ## Boundaries
@@ -21,7 +22,7 @@ Do not point them at a retained state directory as a cutover experiment.
 | SQLite adapter | `crates/tandem-store` | Transactional schema-1 store, lifetime OS lock, append-only history and immutable accepted receipts |
 | Scheduling and recovery | `crates/tandem-engine` | Admission, controls, reconciliation, bounded coordinator signals and cleanup over abstract ports; controlled-runtime verification, not native acceptance |
 | OpenCode HTTP/SSE | `crates/tandem-opencode` behind the Runtime port | Pinned wire/ownership/recovery adapter with controlled HTTP verification only; no native acceptance |
-| Worktrees | Concrete filesystem adapter behind Workspaces | Not migrated |
+| Worktrees | `crates/tandem-workspace` behind Workspaces | Read-only registration, pure planning, owned allocation/recovery and guarded branch-preserving cleanup; disposable Git/Worktrunk verification |
 | HTTP service | Same `/v1` contract, auth, bounded reads/receipts, cursors, live-only SSE | Not migrated |
 | CLI and composition root | Same client receipts/options; daemon alone owns scheduling | Not migrated |
 | Plugin | Existing TypeScript package | Remains TypeScript and API-only |
@@ -64,6 +65,7 @@ Coordinators have a separate single-slot limit and a default 32-notification bud
 
 Dropping an API/client future abandons only that wait, not the owned operation.
 Explicit cancellation, deadline expiry or shutdown signals its cooperative context, while the tracked operation retains the store and effects barrier through independent five-second outcome bookkeeping.
+Workspace calls await actual subprocess or blocking-filesystem settlement before outcome bookkeeping, including registration and acceptance inspection; cancellation does not release ownership by dropping the adapter future.
 Shutdown closes admission atomically with task registration, stops scheduler reads/event listening, and waits for owned tasks without stopping external workers.
 The event listener shares the owned run's cancellation and deadline, so event reads and reconnection stop even while outcome bookkeeping is blocked.
 A storage lock may delay return beyond the bookkeeping deadline; its callback must then refuse the expired change, and ownership remains retained until the blocking storage task actually returns.
@@ -77,6 +79,15 @@ See the [verification contract](VERIFICATION.md#routine-deterministic-checks) fo
 
 See the [OpenCode integration contract](OPENCODE.md#rust-runtime-migration) for Rust configuration, stable identities, permission isolation, uncertain recovery, cancellation and quiescence behavior.
 Neither the Go binary nor a retained state directory is switched to these libraries by compiling or testing them.
+
+## Concrete workspace adapter
+
+The composition root supplies a canonical state/worktree root; construction and planning do not create directories or launch commands.
+The adapter validates recorded allocator, owner, path, branch and common repository before adopting an existing checkout, and checks ownership before creating a missing checkout.
+Recovery returns the existing checkout's current HEAD, matching Go rather than resetting worker commits to the original base.
+Command failure or cancellation never triggers speculative allocation retry or checkout rollback.
+The engine remains responsible for persisting ownership before allocation and proving terminal intent and runtime quiescence before cleanup.
+See [operations](OPERATIONS.md#workspace-adapter-boundary) for filesystem, subprocess, credential and cleanup limits, and [verification](VERIFICATION.md#workspace-adapter-checks) for actual executable consumers.
 
 ## Delivery sequence and cutover gates
 
@@ -110,4 +121,4 @@ All compatibility stores, leases and forced-crash processes belong to newly crea
 The Rust quality proof runs the formatter, Clippy and compiler against conforming and deliberately violating fixtures and retains non-secret output in `.tmp`.
 `make test-race` remains Go race-detector evidence, not a Rust sanitizer result.
 
-The current milestone proves storage/model, abstract-port coordination and controlled HTTP runtime-adapter behavior only, not migration completion, live OpenCode compatibility, production cutover, external consumer acceptance or permission to publish/deploy an executable.
+The current milestone proves storage/model, coordination, controlled HTTP runtime and disposable Git/Worktrunk adapter behavior only, not migration completion, live OpenCode compatibility, production cutover, external consumer acceptance or permission to publish/deploy an executable.
