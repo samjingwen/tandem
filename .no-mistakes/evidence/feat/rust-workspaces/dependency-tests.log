@@ -1,0 +1,111 @@
+$ cargo test --locked -p tandem-engine -p tandem-store -p tandem-opencode --all-targets
+   Compiling tokio v1.54.1
+   Compiling rustix v1.1.5
+   Compiling errno v0.3.14
+   Compiling tempfile v3.27.0
+   Compiling tandem-store v0.1.0 (<managed-checkout>/crates/tandem-store)
+   Compiling hyper v1.12.0
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.6
+   Compiling tokio-util v0.7.20
+   Compiling tandem-engine v0.1.0 (<managed-checkout>/crates/tandem-engine)
+   Compiling tower-http v0.6.11
+   Compiling hyper-util v0.1.21
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.13.5
+   Compiling tandem-opencode v0.1.0 (<managed-checkout>/crates/tandem-opencode)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.01s
+     Running unittests src/lib.rs (.tmp/local-test-phase/target/debug/deps/tandem_engine-4f6a9f18404f5909)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/coordination.rs (.tmp/local-test-phase/target/debug/deps/coordination-b66eca25c734465d)
+
+running 20 tests
+test cancellation_books_uncertainty_and_shutdown_waits_for_owned_operations ... ok
+test allocation_orders_actual_instants_not_timestamp_strings ... ok
+test cleanup_barrier_cannot_be_crossed_by_controls_or_new_results ... ok
+test decisions_require_explicit_valid_answers_and_uncertainty_blocks_cleanup ... ok
+test admission_replay_generation_acceptance_and_cleanup_are_durable ... ok
+test lifecycle_run_stops_without_interrupting_workers ... ok
+test failed_attempt_retry_and_cleanup_require_background_quiescence ... ok
+test lost_session_creation_response_recovers_same_reference_after_restart ... ok
+test registration_and_input_limits_are_transactional_and_graphs_stay_acyclic ... ok
+test coordinator_evidence_is_coalesced_bounded_and_unchanged_polls_are_quiet ... ok
+test dropping_the_client_wait_does_not_drop_owned_effect_or_control_barrier ... ok
+test ambiguous_prompt_holds_capacity_and_never_speculatively_resends ... ok
+test shutdown_cancels_scheduler_reads_in_flight_without_a_client_cancel ... ok
+test paused_ancestor_blocks_new_children_but_does_not_pause_existing_child ... ok
+test rejected_reply_returns_to_pending_without_losing_the_old_receipt ... ok
+test unmarked_invalid_reply_preserves_uncertainty_and_blocks_resend ... ok
+test proven_non_delivery_has_a_finite_budget_and_explicit_resume ... ok
+test independent_worker_and_coordinator_limits_and_dependency_release ... ok
+test bookkeeping::bookkeeping_deadline_expires_without_releasing_effect_ownership_early ... ok
+test bookkeeping::run_cancellation_stops_events_before_blocked_bookkeeping_settles ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.13s
+
+     Running unittests examples/engine-compat.rs (.tmp/local-test-phase/target/debug/examples/engine_compat-f460bb8127d955d8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/engine-safety.rs (.tmp/local-test-phase/target/debug/examples/engine_safety-f9dfae41c8e07496)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (.tmp/local-test-phase/target/debug/deps/tandem_opencode-68324a6a287e73c5)
+
+running 1 test
+test client::tests::go_authority_identity_oracle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/configuration.rs (.tmp/local-test-phase/target/debug/deps/configuration-ed0954183b21642e)
+
+running 2 tests
+test operator_model_references_retain_native_defaults_and_exact_identifiers ... ok
+test explicit_configuration_rejects_unsafe_endpoints_and_incomplete_models ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/runtime-compat.rs (.tmp/local-test-phase/target/debug/examples/runtime_compat-e633b2fb8d253750)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (.tmp/local-test-phase/target/debug/deps/tandem_store-1175b483b602ddfd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/persistence.rs (.tmp/local-test-phase/target/debug/deps/persistence-8e043d73553f837a)
+
+running 9 tests
+test permissive_or_nonregular_state_is_refused_without_repair ... ok
+test invalid_record_encoding_cannot_be_committed ... ok
+test unrelated_updates_retain_unknown_fields ... ok
+test all_failed_mutations_leave_durable_state_unchanged ... ok
+test no_op_is_quiet_and_only_changed_rows_append_history ... ok
+test same_process_and_canonical_alias_cannot_bypass_ownership ... ok
+test commit_rollback_and_reopen_preserve_identity_and_receipt ... ok
+test newer_schema_and_corrupt_records_fail_closed ... ok
+test concurrent_changes_are_serialized_and_large_content_is_complete ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s
+
+     Running unittests examples/store-compat.rs (.tmp/local-test-phase/target/debug/examples/store_compat-9be0d9569d1003d3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+EXIT STATUS: 0

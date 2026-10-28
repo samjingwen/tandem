@@ -1,0 +1,11 @@
+$ make python-test
+python3 tools/test-prepare-worktrunk.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 1.017s
+
+OK
+Verified Worktrunk 0.81.0: <managed-checkout>/.tmp/local-test-phase/tmp/tmpfk70zx1u/tools/bin/wt
+Verified Worktrunk 0.81.0: <managed-checkout>/.tmp/local-test-phase/tmp/tmpfk70zx1u/tools/bin/wt
+
+EXIT STATUS: 0

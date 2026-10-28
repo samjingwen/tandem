@@ -1,0 +1,59 @@
+$ go test -v -race ./internal/workspace -run ^TestRustWorkspace -count=1
+=== RUN   TestRustWorkspaceRegisterAndPurePlanOracle
+--- PASS: TestRustWorkspaceRegisterAndPurePlanOracle (0.82s)
+=== RUN   TestRustWorkspaceRegistrationRefusalsOracle
+=== RUN   TestRustWorkspaceRegistrationRefusalsOracle/missing_base
+=== RUN   TestRustWorkspaceRegistrationRefusalsOracle/unknown_base
+=== RUN   TestRustWorkspaceRegistrationRefusalsOracle/subdirectory
+=== RUN   TestRustWorkspaceRegistrationRefusalsOracle/environment
+=== RUN   TestRustWorkspaceRegistrationRefusalsOracle/environment_alias
+=== RUN   TestRustWorkspaceRegistrationRefusalsOracle/directory
+=== RUN   TestRustWorkspaceRegistrationRefusalsOracle/oversized
+=== RUN   TestRustWorkspaceRegistrationRefusalsOracle/many
+--- PASS: TestRustWorkspaceRegistrationRefusalsOracle (0.58s)
+    --- PASS: TestRustWorkspaceRegistrationRefusalsOracle/missing_base (0.04s)
+    --- PASS: TestRustWorkspaceRegistrationRefusalsOracle/unknown_base (0.08s)
+    --- PASS: TestRustWorkspaceRegistrationRefusalsOracle/subdirectory (0.04s)
+    --- PASS: TestRustWorkspaceRegistrationRefusalsOracle/environment (0.07s)
+    --- PASS: TestRustWorkspaceRegistrationRefusalsOracle/environment_alias (0.06s)
+    --- PASS: TestRustWorkspaceRegistrationRefusalsOracle/directory (0.08s)
+    --- PASS: TestRustWorkspaceRegistrationRefusalsOracle/oversized (0.08s)
+    --- PASS: TestRustWorkspaceRegistrationRefusalsOracle/many (0.10s)
+=== RUN   TestRustWorkspaceAllocationRecoveryAndCleanupOracle
+=== RUN   TestRustWorkspaceAllocationRecoveryAndCleanupOracle/git
+=== RUN   TestRustWorkspaceAllocationRecoveryAndCleanupOracle/git/go
+=== RUN   TestRustWorkspaceAllocationRecoveryAndCleanupOracle/git/rust
+=== RUN   TestRustWorkspaceAllocationRecoveryAndCleanupOracle/worktrunk
+=== RUN   TestRustWorkspaceAllocationRecoveryAndCleanupOracle/worktrunk/go
+=== RUN   TestRustWorkspaceAllocationRecoveryAndCleanupOracle/worktrunk/rust
+--- PASS: TestRustWorkspaceAllocationRecoveryAndCleanupOracle (6.71s)
+    --- PASS: TestRustWorkspaceAllocationRecoveryAndCleanupOracle/git (3.27s)
+        --- PASS: TestRustWorkspaceAllocationRecoveryAndCleanupOracle/git/go (1.67s)
+        --- PASS: TestRustWorkspaceAllocationRecoveryAndCleanupOracle/git/rust (1.54s)
+    --- PASS: TestRustWorkspaceAllocationRecoveryAndCleanupOracle/worktrunk (3.44s)
+        --- PASS: TestRustWorkspaceAllocationRecoveryAndCleanupOracle/worktrunk/go (1.59s)
+        --- PASS: TestRustWorkspaceAllocationRecoveryAndCleanupOracle/worktrunk/rust (1.70s)
+=== RUN   TestRustWorkspaceRefusesUnownedAndSymlinkBindings
+=== RUN   TestRustWorkspaceRefusesUnownedAndSymlinkBindings/allocator
+=== RUN   TestRustWorkspaceRefusesUnownedAndSymlinkBindings/owner
+=== RUN   TestRustWorkspaceRefusesUnownedAndSymlinkBindings/path
+=== RUN   TestRustWorkspaceRefusesUnownedAndSymlinkBindings/branch
+--- PASS: TestRustWorkspaceRefusesUnownedAndSymlinkBindings (0.86s)
+    --- PASS: TestRustWorkspaceRefusesUnownedAndSymlinkBindings/allocator (0.02s)
+    --- PASS: TestRustWorkspaceRefusesUnownedAndSymlinkBindings/owner (0.02s)
+    --- PASS: TestRustWorkspaceRefusesUnownedAndSymlinkBindings/path (0.02s)
+    --- PASS: TestRustWorkspaceRefusesUnownedAndSymlinkBindings/branch (0.02s)
+=== RUN   TestRustWorkspaceCleanupRefusesLiveCwdWithoutSignalling
+--- PASS: TestRustWorkspaceCleanupRefusesLiveCwdWithoutSignalling (1.56s)
+=== RUN   TestRustWorkspaceChildrenOmitCredentialsAndDisableHooks
+--- PASS: TestRustWorkspaceChildrenOmitCredentialsAndDisableHooks (0.69s)
+=== RUN   TestRustWorkspaceAmbiguousAllocationRecoversWithoutAnotherMutation
+=== RUN   TestRustWorkspaceAmbiguousAllocationRecoversWithoutAnotherMutation/git
+=== RUN   TestRustWorkspaceAmbiguousAllocationRecoversWithoutAnotherMutation/wt
+--- PASS: TestRustWorkspaceAmbiguousAllocationRecoversWithoutAnotherMutation (1.55s)
+    --- PASS: TestRustWorkspaceAmbiguousAllocationRecoversWithoutAnotherMutation/git (0.73s)
+    --- PASS: TestRustWorkspaceAmbiguousAllocationRecoversWithoutAnotherMutation/wt (0.83s)
+PASS
+ok  	github.com/samjingwen/tandem/internal/workspace	14.344s
+
+EXIT STATUS: 0

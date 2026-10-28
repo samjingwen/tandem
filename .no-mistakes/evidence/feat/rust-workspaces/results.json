@@ -1,0 +1,114 @@
+[
+  {
+    "step": "prepare",
+    "command": [
+      "make",
+      "worktrunk-prepare"
+    ],
+    "exit_status": 0
+  },
+  {
+    "step": "workspace-rust",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "tandem-workspace",
+      "--all-targets",
+      "--",
+      "--nocapture"
+    ],
+    "exit_status": 0
+  },
+  {
+    "step": "consumers-build",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "--example",
+      "workspace-compat",
+      "--example",
+      "store-compat",
+      "--example",
+      "engine-compat",
+      "--example",
+      "runtime-compat",
+      "--example",
+      "engine-safety"
+    ],
+    "exit_status": 0
+  },
+  {
+    "step": "workspace-oracle",
+    "command": [
+      "go",
+      "test",
+      "-v",
+      "-race",
+      "./internal/workspace",
+      "-run",
+      "^TestRustWorkspace",
+      "-count=1"
+    ],
+    "exit_status": 0
+  },
+  {
+    "step": "store-engine-oracle",
+    "command": [
+      "go",
+      "test",
+      "-v",
+      "./internal/store",
+      "-run",
+      "^TestRust(Store|Engine)",
+      "-count=1"
+    ],
+    "exit_status": 0
+  },
+  {
+    "step": "runtime-oracle",
+    "command": [
+      "go",
+      "test",
+      "-v",
+      "-race",
+      "./internal/opencode",
+      "-run",
+      "^TestRustOpenCode",
+      "-count=1"
+    ],
+    "exit_status": 0
+  },
+  {
+    "step": "engine-safety",
+    "command": [
+      "python3",
+      "tools/test-engine-safety.py",
+      "<managed-checkout>/.tmp/local-test-phase/target/debug/examples/engine-safety"
+    ],
+    "exit_status": 0
+  },
+  {
+    "step": "installer",
+    "command": [
+      "make",
+      "python-test"
+    ],
+    "exit_status": 0
+  },
+  {
+    "step": "integration",
+    "command": [
+      "go",
+      "test",
+      "-v",
+      "./internal/integration",
+      "-run",
+      "^Test(IndependentClientsDuplicateCreateDisconnectAndRestart|AnotherClientAnswersDecisionAndAcceptsCurrentGeneration|TaskCleanupResolvesOwnedAttempt)$",
+      "-count=1"
+    ],
+    "exit_status": 0
+  }
+]

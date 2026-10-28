@@ -1,0 +1,16 @@
+$ python3 tools/test-engine-safety.py <managed-checkout>/.tmp/local-test-phase/target/debug/examples/engine-safety
+PASS uncertainty
+PASS generations-cleanup
+PASS limits
+PASS delivery-budget
+PASS role-limits
+PASS notification-budget
+PASS expired-bookkeeping-dropped-wait
+PASS shutdown-reconnecting-False
+PASS shutdown-reconnecting-True
+PASS cancel-reconnecting-False
+PASS cancel-reconnecting-True
+PASS deadline-reconnecting-False
+PASS deadline-reconnecting-True
+
+EXIT STATUS: 0

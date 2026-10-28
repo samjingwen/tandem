@@ -1,0 +1,437 @@
+$ go test -v -race ./internal/opencode -run ^TestRustOpenCode -count=1
+=== RUN   TestRustOpenCodeIdentityAndExactCreatePolicy
+=== RUN   TestRustOpenCodeIdentityAndExactCreatePolicy/go
+=== RUN   TestRustOpenCodeIdentityAndExactCreatePolicy/go/role=worker
+=== RUN   TestRustOpenCodeIdentityAndExactCreatePolicy/go/role=coordinator
+=== RUN   TestRustOpenCodeIdentityAndExactCreatePolicy/go/role=
+=== RUN   TestRustOpenCodeIdentityAndExactCreatePolicy/rust
+=== RUN   TestRustOpenCodeIdentityAndExactCreatePolicy/rust/role=worker
+=== RUN   TestRustOpenCodeIdentityAndExactCreatePolicy/rust/role=coordinator
+=== RUN   TestRustOpenCodeIdentityAndExactCreatePolicy/rust/role=
+--- PASS: TestRustOpenCodeIdentityAndExactCreatePolicy (0.85s)
+    --- PASS: TestRustOpenCodeIdentityAndExactCreatePolicy/go (0.02s)
+        --- PASS: TestRustOpenCodeIdentityAndExactCreatePolicy/go/role=worker (0.01s)
+        --- PASS: TestRustOpenCodeIdentityAndExactCreatePolicy/go/role=coordinator (0.01s)
+        --- PASS: TestRustOpenCodeIdentityAndExactCreatePolicy/go/role= (0.01s)
+    --- PASS: TestRustOpenCodeIdentityAndExactCreatePolicy/rust (0.83s)
+        --- PASS: TestRustOpenCodeIdentityAndExactCreatePolicy/rust/role=worker (0.65s)
+        --- PASS: TestRustOpenCodeIdentityAndExactCreatePolicy/rust/role=coordinator (0.08s)
+        --- PASS: TestRustOpenCodeIdentityAndExactCreatePolicy/rust/role= (0.09s)
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/200
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/400
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/401
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/403
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/404
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/408
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/409
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/500
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/503
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/inbox
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/message
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/absent
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/collision
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/inbox-collision
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/projection-race
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/200
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/400
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/401
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/403
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/404
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/408
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/409
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/500
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/503
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/inbox
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/message
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/absent
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/collision
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/inbox-collision
+=== RUN   TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/projection-race
+--- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends (0.40s)
+    --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go (0.05s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/200 (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/400 (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/401 (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/403 (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/404 (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/408 (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/409 (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/500 (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/503 (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/inbox (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/message (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/absent (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/collision (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/inbox-collision (0.00s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/go/projection-race (0.01s)
+    --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust (0.35s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/200 (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/400 (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/401 (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/403 (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/404 (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/408 (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/409 (0.02s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/500 (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/503 (0.01s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/inbox (0.04s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/message (0.04s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/absent (0.03s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/collision (0.03s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/inbox-collision (0.03s)
+        --- PASS: TestRustOpenCodeOnly404CreatesAndAmbiguityNeverResends/rust/projection-race (0.04s)
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/200
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/400
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/401
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/403
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/404
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/408
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/409
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/500
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/form/200
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/form/400
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/form/401
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/form/403
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/form/404
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/form/408
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/form/409
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/go/form/500
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/200
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/400
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/401
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/403
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/404
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/408
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/409
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/500
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/200
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/400
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/401
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/403
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/404
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/408
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/409
+=== RUN   TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/500
+--- PASS: TestRustOpenCodeReplyProofAndPendingIdentity (1.03s)
+    --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go (0.12s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/200 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/400 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/401 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/403 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/404 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/408 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/409 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/permission/500 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/form/200 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/form/400 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/form/401 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/form/403 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/form/404 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/form/408 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/form/409 (0.01s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/go/form/500 (0.01s)
+    --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust (0.91s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/200 (0.06s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/400 (0.05s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/401 (0.05s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/403 (0.05s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/404 (0.05s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/408 (0.06s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/409 (0.07s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/permission/500 (0.06s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/200 (0.05s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/400 (0.06s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/401 (0.06s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/403 (0.05s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/404 (0.06s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/408 (0.05s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/409 (0.05s)
+        --- PASS: TestRustOpenCodeReplyProofAndPendingIdentity/rust/form/500 (0.06s)
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/idle
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/failed
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/running
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/permission
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/form
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/shell
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/pty
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/persistent
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/foreign
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/unknown
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/go/missing-inventory
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/idle
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/failed
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/running
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/permission
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/form
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/shell
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/pty
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/persistent
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/foreign
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/unknown
+=== RUN   TestRustOpenCodeScopedQuiescenceAndObservation/rust/missing-inventory
+--- PASS: TestRustOpenCodeScopedQuiescenceAndObservation (0.42s)
+    --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go (0.07s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/idle (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/failed (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/running (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/permission (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/form (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/shell (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/pty (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/persistent (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/foreign (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/unknown (0.01s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/go/missing-inventory (0.01s)
+    --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust (0.35s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/idle (0.03s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/failed (0.03s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/running (0.03s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/permission (0.03s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/form (0.03s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/shell (0.03s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/pty (0.04s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/persistent (0.04s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/foreign (0.03s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/unknown (0.03s)
+        --- PASS: TestRustOpenCodeScopedQuiescenceAndObservation/rust/missing-inventory (0.03s)
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/go
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/go/valid
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/go/double-encoded
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/go/missing-type
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/go/line-bound
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/go/frame-bound
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/go/content-type
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/go/deadline
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/go/cancel
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/rust
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/rust/valid
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/rust/double-encoded
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/rust/missing-type
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/rust/line-bound
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/rust/frame-bound
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/rust/content-type
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/rust/deadline
+=== RUN   TestRustOpenCodeSSEBoundsAndCancellation/rust/cancel
+--- PASS: TestRustOpenCodeSSEBoundsAndCancellation (0.71s)
+    --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/go (0.28s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/go/valid (0.00s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/go/double-encoded (0.00s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/go/missing-type (0.00s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/go/line-bound (0.01s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/go/frame-bound (0.01s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/go/content-type (0.00s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/go/deadline (0.25s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/go/cancel (0.00s)
+    --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/rust (0.43s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/rust/valid (0.02s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/rust/double-encoded (0.01s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/rust/missing-type (0.01s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/rust/line-bound (0.04s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/rust/frame-bound (0.04s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/rust/content-type (0.01s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/rust/deadline (0.26s)
+        --- PASS: TestRustOpenCodeSSEBoundsAndCancellation/rust/cancel (0.01s)
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/200
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/302
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/307
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/400
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/401
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/403
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/404
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/408
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/409
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/429
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/500
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/503
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/200
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/302
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/307
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/400
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/401
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/403
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/404
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/408
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/409
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/429
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/500
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/503
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/200
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/302
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/307
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/400
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/401
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/403
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/404
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/408
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/409
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/429
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/500
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/503
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/200
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/302
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/307
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/400
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/401
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/403
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/404
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/408
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/409
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/429
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/500
+=== RUN   TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/503
+--- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion (0.41s)
+    --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go (0.05s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/200 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/302 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/307 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/400 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/401 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/403 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/404 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/408 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/409 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/429 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/500 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/preflight/503 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/200 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/302 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/307 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/400 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/401 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/403 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/404 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/408 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/409 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/429 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/500 (0.00s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/go/post/503 (0.00s)
+    --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust (0.36s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/200 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/302 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/307 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/400 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/401 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/403 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/404 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/408 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/409 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/429 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/500 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/preflight/503 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/200 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/302 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/307 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/400 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/401 (0.02s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/403 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/404 (0.02s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/408 (0.02s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/409 (0.02s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/429 (0.01s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/500 (0.02s)
+        --- PASS: TestRustOpenCodePromptNonDeliveryAndLiveVersion/rust/post/503 (0.01s)
+=== RUN   TestRustOpenCodeLostCreateAndSelectiveCancellation
+=== RUN   TestRustOpenCodeLostCreateAndSelectiveCancellation/go
+=== RUN   TestRustOpenCodeLostCreateAndSelectiveCancellation/rust
+--- PASS: TestRustOpenCodeLostCreateAndSelectiveCancellation (0.08s)
+    --- PASS: TestRustOpenCodeLostCreateAndSelectiveCancellation/go (0.01s)
+    --- PASS: TestRustOpenCodeLostCreateAndSelectiveCancellation/rust (0.06s)
+=== RUN   TestRustOpenCodeRedirectsDoNotForwardOrReplay
+=== RUN   TestRustOpenCodeRedirectsDoNotForwardOrReplay/go
+=== RUN   TestRustOpenCodeRedirectsDoNotForwardOrReplay/go/preflight
+=== RUN   TestRustOpenCodeRedirectsDoNotForwardOrReplay/go/post
+=== RUN   TestRustOpenCodeRedirectsDoNotForwardOrReplay/rust
+=== RUN   TestRustOpenCodeRedirectsDoNotForwardOrReplay/rust/preflight
+=== RUN   TestRustOpenCodeRedirectsDoNotForwardOrReplay/rust/post
+--- PASS: TestRustOpenCodeRedirectsDoNotForwardOrReplay (0.03s)
+    --- PASS: TestRustOpenCodeRedirectsDoNotForwardOrReplay/go (0.01s)
+        --- PASS: TestRustOpenCodeRedirectsDoNotForwardOrReplay/go/preflight (0.00s)
+        --- PASS: TestRustOpenCodeRedirectsDoNotForwardOrReplay/go/post (0.00s)
+    --- PASS: TestRustOpenCodeRedirectsDoNotForwardOrReplay/rust (0.03s)
+        --- PASS: TestRustOpenCodeRedirectsDoNotForwardOrReplay/rust/preflight (0.01s)
+        --- PASS: TestRustOpenCodeRedirectsDoNotForwardOrReplay/rust/post (0.01s)
+=== RUN   TestRustOpenCodePreflightCancellationAndResponseCaps
+=== RUN   TestRustOpenCodePreflightCancellationAndResponseCaps/go
+=== RUN   TestRustOpenCodePreflightCancellationAndResponseCaps/go/canceled
+=== RUN   TestRustOpenCodePreflightCancellationAndResponseCaps/go/deadline
+=== RUN   TestRustOpenCodePreflightCancellationAndResponseCaps/go/oversize
+=== RUN   TestRustOpenCodePreflightCancellationAndResponseCaps/rust
+=== RUN   TestRustOpenCodePreflightCancellationAndResponseCaps/rust/canceled
+=== RUN   TestRustOpenCodePreflightCancellationAndResponseCaps/rust/deadline
+=== RUN   TestRustOpenCodePreflightCancellationAndResponseCaps/rust/oversize
+--- PASS: TestRustOpenCodePreflightCancellationAndResponseCaps (0.30s)
+    --- PASS: TestRustOpenCodePreflightCancellationAndResponseCaps/go (0.14s)
+        --- PASS: TestRustOpenCodePreflightCancellationAndResponseCaps/go/canceled (0.00s)
+        --- PASS: TestRustOpenCodePreflightCancellationAndResponseCaps/go/deadline (0.00s)
+        --- PASS: TestRustOpenCodePreflightCancellationAndResponseCaps/go/oversize (0.14s)
+    --- PASS: TestRustOpenCodePreflightCancellationAndResponseCaps/rust (0.16s)
+        --- PASS: TestRustOpenCodePreflightCancellationAndResponseCaps/rust/canceled (0.01s)
+        --- PASS: TestRustOpenCodePreflightCancellationAndResponseCaps/rust/deadline (0.01s)
+        --- PASS: TestRustOpenCodePreflightCancellationAndResponseCaps/rust/oversize (0.13s)
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle/#00
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle////
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//prefix/
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//a%2fb/
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//space_here
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//a%2Fb
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//%FF
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//a/../b
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//%41/%e4%b8%96/
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//!/
+=== RUN   TestRustOpenCodeGoEndpointIdentityOracle//é/
+--- PASS: TestRustOpenCodeGoEndpointIdentityOracle (0.16s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle/#00 (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle// (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//// (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//prefix/ (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//a%2fb/ (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//space_here (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//a%2Fb (0.02s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//%FF (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//a/../b (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//%41/%e4%b8%96/ (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//!/ (0.01s)
+    --- PASS: TestRustOpenCodeGoEndpointIdentityOracle//é/ (0.01s)
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/https://bücher.example
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/https://b%c3%bccher.example
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/https://B%C3%9CCHER.example
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/https://xn--bcher-kva.example
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/https://BÜCHER.example:443/prefix/
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/http://%C4%B0.example:80/a%2fb
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/http://İ.example:80/a%2fb
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/http://ΟΣ.example/
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/http://EXAMPLE.test:80/
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/https://[2001:DB8::A]:443/
+=== RUN   TestRustOpenCodeGoAuthorityIdentityOracle/http://127.0.0.1:80/
+--- PASS: TestRustOpenCodeGoAuthorityIdentityOracle (0.01s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/https://bücher.example (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/https://b%c3%bccher.example (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/https://B%C3%9CCHER.example (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/https://xn--bcher-kva.example (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/https://BÜCHER.example:443/prefix/ (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/http://%C4%B0.example:80/a%2fb (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/http://İ.example:80/a%2fb (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/http://ΟΣ.example/ (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/http://EXAMPLE.test:80/ (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/https://[2001:DB8::A]:443/ (0.00s)
+    --- PASS: TestRustOpenCodeGoAuthorityIdentityOracle/http://127.0.0.1:80/ (0.00s)
+PASS
+ok  	github.com/samjingwen/tandem/internal/opencode	6.273s
+
+EXIT STATUS: 0

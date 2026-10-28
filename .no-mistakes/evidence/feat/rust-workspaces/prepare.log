@@ -1,0 +1,5 @@
+$ make worktrunk-prepare
+python3 tools/prepare-worktrunk.py "<managed-checkout>/.tmp/worktrunk"
+Verified Worktrunk 0.81.0: <managed-checkout>/.tmp/worktrunk/bin/wt
+
+EXIT STATUS: 0

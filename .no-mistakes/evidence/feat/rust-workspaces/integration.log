@@ -1,0 +1,11 @@
+$ go test -v ./internal/integration -run ^Test(IndependentClientsDuplicateCreateDisconnectAndRestart|AnotherClientAnswersDecisionAndAcceptsCurrentGeneration|TaskCleanupResolvesOwnedAttempt)$ -count=1
+=== RUN   TestTaskCleanupResolvesOwnedAttempt
+--- PASS: TestTaskCleanupResolvesOwnedAttempt (0.98s)
+=== RUN   TestIndependentClientsDuplicateCreateDisconnectAndRestart
+--- PASS: TestIndependentClientsDuplicateCreateDisconnectAndRestart (0.44s)
+=== RUN   TestAnotherClientAnswersDecisionAndAcceptsCurrentGeneration
+--- PASS: TestAnotherClientAnswersDecisionAndAcceptsCurrentGeneration (0.58s)
+PASS
+ok  	github.com/samjingwen/tandem/internal/integration	2.275s
+
+EXIT STATUS: 0

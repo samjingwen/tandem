@@ -1,0 +1,1151 @@
+[
+  {
+    "request": {
+      "root": "<disposable-root>/git-trees",
+      "useWorktrunk": false,
+      "method": "plan",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "owner": "run_git"
+    },
+    "response": {
+      "value": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_git",
+        "owner": "run_git",
+        "path": "<disposable-root>/git-trees/prj_probe/run_git"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/git-trees",
+      "useWorktrunk": false,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_git",
+        "owner": "run_git",
+        "path": "<disposable-root>/git-trees/prj_probe/run_git"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_git",
+        "owner": "run_git",
+        "path": "<disposable-root>/git-trees/prj_probe/run_git"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/git-trees",
+      "useWorktrunk": false,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_git",
+        "owner": "run_git",
+        "path": "<disposable-root>/git-trees/prj_probe/run_git"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "f6b2a485610dc21f67c93bdf5f77d79d130ded64",
+        "branch": "tandem/run_git",
+        "owner": "run_git",
+        "path": "<disposable-root>/git-trees/prj_probe/run_git"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/git-trees",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_git",
+        "owner": "run_git",
+        "path": "<disposable-root>/git-trees/prj_probe/run_git"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "refusing cleanup of dirty workspace, including untracked or ignored files"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/git-trees",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_git",
+        "owner": "run_git",
+        "path": "<disposable-root>/git-trees/prj_probe/run_git"
+      }
+    },
+    "response": {
+      "value": null
+    }
+  },
+  {
+    "asserted": "pure plan; current HEAD recovery; dirty refusal preserves bytes; clean removal retains worker branch",
+    "allocator": false,
+    "retainedHead": "f6b2a485610dc21f67c93bdf5f77d79d130ded64"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/wt-trees",
+      "useWorktrunk": true,
+      "method": "plan",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "owner": "run_wt"
+    },
+    "response": {
+      "value": {
+        "allocated": false,
+        "allocator": "worktrunk",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_wt",
+        "owner": "run_wt",
+        "path": "<disposable-root>/wt-trees/prj_probe/run_wt"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/wt-trees",
+      "useWorktrunk": true,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "worktrunk",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_wt",
+        "owner": "run_wt",
+        "path": "<disposable-root>/wt-trees/prj_probe/run_wt"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "worktrunk",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_wt",
+        "owner": "run_wt",
+        "path": "<disposable-root>/wt-trees/prj_probe/run_wt"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/wt-trees",
+      "useWorktrunk": true,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "worktrunk",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_wt",
+        "owner": "run_wt",
+        "path": "<disposable-root>/wt-trees/prj_probe/run_wt"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "worktrunk",
+        "baseRef": "master",
+        "baseSha": "8992776f228727e62b05ebfcd48d727de02e52b6",
+        "branch": "tandem/run_wt",
+        "owner": "run_wt",
+        "path": "<disposable-root>/wt-trees/prj_probe/run_wt"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/wt-trees",
+      "useWorktrunk": true,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "worktrunk",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_wt",
+        "owner": "run_wt",
+        "path": "<disposable-root>/wt-trees/prj_probe/run_wt"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "refusing cleanup of dirty workspace, including untracked or ignored files"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/wt-trees",
+      "useWorktrunk": true,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "worktrunk",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_wt",
+        "owner": "run_wt",
+        "path": "<disposable-root>/wt-trees/prj_probe/run_wt"
+      }
+    },
+    "response": {
+      "value": null
+    }
+  },
+  {
+    "asserted": "pure plan; current HEAD recovery; dirty refusal preserves bytes; clean removal retains worker branch",
+    "allocator": true,
+    "retainedHead": "8992776f228727e62b05ebfcd48d727de02e52b6"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/bell-\u0007",
+      "useWorktrunk": false,
+      "method": "plan",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "owner": "run_holder0"
+    },
+    "response": {
+      "value": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder0",
+        "owner": "run_holder0",
+        "path": "<disposable-root>/bell-\u0007/prj_probe/run_holder0"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/bell-\u0007",
+      "useWorktrunk": false,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder0",
+        "owner": "run_holder0",
+        "path": "<disposable-root>/bell-\u0007/prj_probe/run_holder0"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder0",
+        "owner": "run_holder0",
+        "path": "<disposable-root>/bell-\u0007/prj_probe/run_holder0"
+      }
+    }
+  },
+  {
+    "holderPathKind": "bell-\u0007",
+    "lsof": "p18623\nfcwd\nn<disposable-root>/bell-^G/prj_probe/run_holder0\n"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/bell-\u0007",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder0",
+        "owner": "run_holder0",
+        "path": "<disposable-root>/bell-\u0007/prj_probe/run_holder0"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/bell-\u0007",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder0",
+        "owner": "run_holder0",
+        "path": "<disposable-root>/bell-\u0007/prj_probe/run_holder0"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "asserted": "live holder preserved without signal; fixture holder released and joined; ambiguous inventory remains fail-closed",
+    "pathKind": "bell-\u0007"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/vertical-\u000b",
+      "useWorktrunk": false,
+      "method": "plan",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "owner": "run_holder1"
+    },
+    "response": {
+      "value": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder1",
+        "owner": "run_holder1",
+        "path": "<disposable-root>/vertical-\u000b/prj_probe/run_holder1"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/vertical-\u000b",
+      "useWorktrunk": false,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder1",
+        "owner": "run_holder1",
+        "path": "<disposable-root>/vertical-\u000b/prj_probe/run_holder1"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder1",
+        "owner": "run_holder1",
+        "path": "<disposable-root>/vertical-\u000b/prj_probe/run_holder1"
+      }
+    }
+  },
+  {
+    "holderPathKind": "vertical-\u000b",
+    "lsof": "p18652\nfcwd\nn<disposable-root>/vertical-^K/prj_probe/run_holder1\n"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/vertical-\u000b",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder1",
+        "owner": "run_holder1",
+        "path": "<disposable-root>/vertical-\u000b/prj_probe/run_holder1"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/vertical-\u000b",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder1",
+        "owner": "run_holder1",
+        "path": "<disposable-root>/vertical-\u000b/prj_probe/run_holder1"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "asserted": "live holder preserved without signal; fixture holder released and joined; ambiguous inventory remains fail-closed",
+    "pathKind": "vertical-\u000b"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/escape-\u001b",
+      "useWorktrunk": false,
+      "method": "plan",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "owner": "run_holder2"
+    },
+    "response": {
+      "value": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder2",
+        "owner": "run_holder2",
+        "path": "<disposable-root>/escape-\u001b/prj_probe/run_holder2"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/escape-\u001b",
+      "useWorktrunk": false,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder2",
+        "owner": "run_holder2",
+        "path": "<disposable-root>/escape-\u001b/prj_probe/run_holder2"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder2",
+        "owner": "run_holder2",
+        "path": "<disposable-root>/escape-\u001b/prj_probe/run_holder2"
+      }
+    }
+  },
+  {
+    "holderPathKind": "escape-\u001b",
+    "lsof": "p18703\nfcwd\nn<disposable-root>/escape-^[/prj_probe/run_holder2\n"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/escape-\u001b",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder2",
+        "owner": "run_holder2",
+        "path": "<disposable-root>/escape-\u001b/prj_probe/run_holder2"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/escape-\u001b",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder2",
+        "owner": "run_holder2",
+        "path": "<disposable-root>/escape-\u001b/prj_probe/run_holder2"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "asserted": "live holder preserved without signal; fixture holder released and joined; ambiguous inventory remains fail-closed",
+    "pathKind": "escape-\u001b"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^G",
+      "useWorktrunk": false,
+      "method": "plan",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "owner": "run_holder3"
+    },
+    "response": {
+      "value": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder3",
+        "owner": "run_holder3",
+        "path": "<disposable-root>/literal-^G/prj_probe/run_holder3"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^G",
+      "useWorktrunk": false,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder3",
+        "owner": "run_holder3",
+        "path": "<disposable-root>/literal-^G/prj_probe/run_holder3"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder3",
+        "owner": "run_holder3",
+        "path": "<disposable-root>/literal-^G/prj_probe/run_holder3"
+      }
+    }
+  },
+  {
+    "holderPathKind": "literal-^G",
+    "lsof": "p18734\nfcwd\nn<disposable-root>/literal-^G/prj_probe/run_holder3\n"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^G",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder3",
+        "owner": "run_holder3",
+        "path": "<disposable-root>/literal-^G/prj_probe/run_holder3"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^G",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder3",
+        "owner": "run_holder3",
+        "path": "<disposable-root>/literal-^G/prj_probe/run_holder3"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "asserted": "live holder preserved without signal; fixture holder released and joined; ambiguous inventory remains fail-closed",
+    "pathKind": "literal-^G"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^K",
+      "useWorktrunk": false,
+      "method": "plan",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "owner": "run_holder4"
+    },
+    "response": {
+      "value": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder4",
+        "owner": "run_holder4",
+        "path": "<disposable-root>/literal-^K/prj_probe/run_holder4"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^K",
+      "useWorktrunk": false,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder4",
+        "owner": "run_holder4",
+        "path": "<disposable-root>/literal-^K/prj_probe/run_holder4"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder4",
+        "owner": "run_holder4",
+        "path": "<disposable-root>/literal-^K/prj_probe/run_holder4"
+      }
+    }
+  },
+  {
+    "holderPathKind": "literal-^K",
+    "lsof": "p18783\nfcwd\nn<disposable-root>/literal-^K/prj_probe/run_holder4\n"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^K",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder4",
+        "owner": "run_holder4",
+        "path": "<disposable-root>/literal-^K/prj_probe/run_holder4"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^K",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder4",
+        "owner": "run_holder4",
+        "path": "<disposable-root>/literal-^K/prj_probe/run_holder4"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "asserted": "live holder preserved without signal; fixture holder released and joined; ambiguous inventory remains fail-closed",
+    "pathKind": "literal-^K"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^[",
+      "useWorktrunk": false,
+      "method": "plan",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "owner": "run_holder5"
+    },
+    "response": {
+      "value": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder5",
+        "owner": "run_holder5",
+        "path": "<disposable-root>/literal-^[/prj_probe/run_holder5"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^[",
+      "useWorktrunk": false,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder5",
+        "owner": "run_holder5",
+        "path": "<disposable-root>/literal-^[/prj_probe/run_holder5"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder5",
+        "owner": "run_holder5",
+        "path": "<disposable-root>/literal-^[/prj_probe/run_holder5"
+      }
+    }
+  },
+  {
+    "holderPathKind": "literal-^[",
+    "lsof": "p18816\nfcwd\nn<disposable-root>/literal-^[/prj_probe/run_holder5\n"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^[",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder5",
+        "owner": "run_holder5",
+        "path": "<disposable-root>/literal-^[/prj_probe/run_holder5"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/literal-^[",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder5",
+        "owner": "run_holder5",
+        "path": "<disposable-root>/literal-^[/prj_probe/run_holder5"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "ambiguous process cwd encoding; cleanup refused"
+      }
+    }
+  },
+  {
+    "asserted": "live holder preserved without signal; fixture holder released and joined; ambiguous inventory remains fail-closed",
+    "pathKind": "literal-^["
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/unicode-\u00e9-backslash-\\xc3",
+      "useWorktrunk": false,
+      "method": "plan",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "owner": "run_holder6"
+    },
+    "response": {
+      "value": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder6",
+        "owner": "run_holder6",
+        "path": "<disposable-root>/unicode-\u00e9-backslash-\\xc3/prj_probe/run_holder6"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/unicode-\u00e9-backslash-\\xc3",
+      "useWorktrunk": false,
+      "method": "ensure",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": false,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "",
+        "branch": "tandem/run_holder6",
+        "owner": "run_holder6",
+        "path": "<disposable-root>/unicode-\u00e9-backslash-\\xc3/prj_probe/run_holder6"
+      }
+    },
+    "response": {
+      "value": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder6",
+        "owner": "run_holder6",
+        "path": "<disposable-root>/unicode-\u00e9-backslash-\\xc3/prj_probe/run_holder6"
+      }
+    }
+  },
+  {
+    "holderPathKind": "unicode-\u00e9-backslash-\\xc3",
+    "lsof": "p18866\nfcwd\nn<disposable-root>/unicode-\\xc3\\xa9-backslash-\\\\xc3/prj_probe/run_holder6\n"
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/unicode-\u00e9-backslash-\\xc3",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder6",
+        "owner": "run_holder6",
+        "path": "<disposable-root>/unicode-\u00e9-backslash-\\xc3/prj_probe/run_holder6"
+      }
+    },
+    "response": {
+      "error": {
+        "code": "workspace_unavailable",
+        "message": "refusing cleanup: a process still holds a cwd inside the workspace"
+      }
+    }
+  },
+  {
+    "request": {
+      "root": "<disposable-root>/unicode-\u00e9-backslash-\\xc3",
+      "useWorktrunk": false,
+      "method": "remove",
+      "project": {
+        "id": "prj_probe",
+        "name": "Probe",
+        "path": "<disposable-root>/repo",
+        "baseRef": "master"
+      },
+      "workspace": {
+        "allocated": true,
+        "allocator": "git",
+        "baseRef": "master",
+        "baseSha": "d6d2c48c1eb21b38bc90f23047498242ce3abdf3",
+        "branch": "tandem/run_holder6",
+        "owner": "run_holder6",
+        "path": "<disposable-root>/unicode-\u00e9-backslash-\\xc3/prj_probe/run_holder6"
+      }
+    },
+    "response": {
+      "value": null
+    }
+  },
+  {
+    "asserted": "live holder preserved without signal; fixture holder released and joined; ambiguous inventory remains fail-closed",
+    "pathKind": "unicode-\u00e9-backslash-\\xc3"
+  }
+]
