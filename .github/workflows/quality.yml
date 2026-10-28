@@ -10,9 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     # Cleanup must inspect every same-user cwd and fail closed on unreadable
     # processes. Keep unrelated hosted-runner processes outside its /proc view.
-    # Keep Python built for Bookworm rather than using a host-toolcache binary
-    # whose GLIBC requirement can exceed the container's version.
-    container: python:3.11-bookworm
+    # Trixie supplies Git >= 2.43, required by pinned Worktrunk 0.81.0.
+    # Keep Python built for the container rather than using a host-toolcache
+    # binary whose GLIBC requirement can exceed the container's version.
+    container: python:3.11-trixie
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
