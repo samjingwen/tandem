@@ -1,10 +1,7 @@
 //! Test-only consumer. Callers supply disposable directories explicitly; there
 //! is no service/runtime discovery or retained application state access.
 
-use std::{
-    io::{self, Read},
-    time::Duration,
-};
+use std::io::{self, Read};
 
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -26,29 +23,12 @@ struct Request {
     input: RegisterProject,
     #[serde(default)]
     owner: String,
-    timeout_ms: Option<u64>,
-    cancel_after_ms: Option<u64>,
-    #[serde(default)]
-    canceled: bool,
 }
 
 async fn run(request: Request) -> tandem_core::Result<Value> {
     let workspaces = Git::new(&request.root, request.use_worktrunk)?;
-    let mut context = Context::background();
-    if let Some(timeout) = request.timeout_ms {
-        context = context.with_timeout(Duration::from_millis(timeout));
-    }
-    if request.canceled {
-        context.cancel();
-    }
-    let cancel = request.cancel_after_ms.map(|delay| {
-        let context = context.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(delay)).await;
-            context.cancel();
-        })
-    });
-    let result = match request.method.as_str() {
+    let context = Context::background();
+    match request.method.as_str() {
         "plan" => Ok(json!(workspaces.plan(&request.project, &request.owner))),
         "register" => workspaces
             .register(&context, &request.input)
@@ -67,12 +47,7 @@ async fn run(request: Request) -> tandem_core::Result<Value> {
             .await
             .map(|()| Value::Null),
         _ => Err(Error::invalid("unknown fixture method")),
-    };
-    if let Some(cancel) = cancel {
-        cancel.abort();
-        let _ = cancel.await;
     }
-    result
 }
 
 #[tokio::main]

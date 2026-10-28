@@ -188,7 +188,7 @@ async fn settlement(stage: &'static str, command: bool, trigger: &str) {
     let workspaces = Arc::new(Settling {
         git: Git::new(root.join("trees"), false).unwrap(),
         root: root.clone(),
-        stage,
+        stage: if stage == "accept" { "inspect" } else { stage },
         command,
         armed: AtomicBool::new(false),
         release: release.clone(),
@@ -207,6 +207,7 @@ async fn settlement(stage: &'static str, command: bool, trigger: &str) {
         ..Default::default()
     };
     let background = Context::background();
+    let mut task_id = String::new();
     if stage != "register" {
         let project = engine
             .register(&background, "register", input.clone())
@@ -225,6 +226,31 @@ async fn settlement(stage: &'static str, command: bool, trigger: &str) {
             )
             .await
             .unwrap();
+        task_id = task.id.clone();
+        if stage == "accept" {
+            engine.tick(&background).await.unwrap();
+            engine.tick(&background).await.unwrap();
+            let snapshot = store.snapshot().unwrap();
+            let task = &snapshot.tasks[&task.id];
+            engine
+                .submit_result(
+                    &background,
+                    "result",
+                    &task.id,
+                    SubmitResult {
+                        attempt_id: task.attempt_id.clone(),
+                        generation: task.generation,
+                        summary: "Fixture result".into(),
+                        evidence: vec![EvidenceInput {
+                            name: "fixture".into(),
+                            reference: "fixture://result".into(),
+                            passed: true,
+                        }],
+                    },
+                )
+                .await
+                .unwrap();
+        }
         if stage == "remove" {
             engine.tick(&background).await.unwrap();
             engine
@@ -247,6 +273,22 @@ async fn settlement(stage: &'static str, command: bool, trigger: &str) {
                 .unwrap();
         }
     }
+    if trigger == "success" {
+        let accepted = engine
+            .accept(&background, "accept", &task_id)
+            .await
+            .unwrap();
+        assert_eq!(accepted.state, "completed");
+        assert_eq!(
+            engine
+                .accept(&background, "accept", &task_id)
+                .await
+                .unwrap(),
+            accepted
+        );
+        engine.shutdown().await;
+        return;
+    }
     workspaces.armed.store(true, Ordering::SeqCst);
     let context = if trigger == "deadline" {
         Context::background().with_timeout(Duration::from_secs(2))
@@ -255,10 +297,16 @@ async fn settlement(stage: &'static str, command: bool, trigger: &str) {
     };
     let caller_engine = engine.clone();
     let caller_context = context.clone();
-    let caller = tokio::spawn(async move {
+    let caller_task_id = task_id.clone();
+    let mut caller = tokio::spawn(async move {
         if stage == "register" {
             caller_engine
                 .register(&caller_context, "register", input)
+                .await
+                .map(|_| ())
+        } else if stage == "accept" {
+            caller_engine
+                .accept(&caller_context, "accept", &caller_task_id)
                 .await
                 .map(|_| ())
         } else {
@@ -275,13 +323,14 @@ async fn settlement(stage: &'static str, command: bool, trigger: &str) {
     match trigger {
         "cancel" => {
             context.cancel();
-            assert_eq!(caller.await.unwrap().unwrap_err().code, "canceled");
+            assert_eq!((&mut caller).await.unwrap().unwrap_err().code, "canceled");
         }
-        "deadline" => assert_eq!(caller.await.unwrap().unwrap_err().code, "timeout"),
+        "deadline" => assert_eq!((&mut caller).await.unwrap().unwrap_err().code, "timeout"),
         "abandon" => {
             caller.abort();
-            let _ = caller.await;
+            let _ = (&mut caller).await;
         }
+        "shutdown" => {}
         _ => unreachable!(),
     }
     let shutdown_engine = engine.clone();
@@ -290,6 +339,10 @@ async fn settlement(stage: &'static str, command: bool, trigger: &str) {
         .await
         .is_ok();
     let before = store.snapshot().unwrap();
+    if stage == "accept" {
+        assert!(!before.operations.contains_key("accept"));
+        assert_eq!(before.tasks[&task_id].state, "ready_for_review");
+    }
     release.notify_one();
     if !command {
         sender.send(()).unwrap();
@@ -299,6 +352,9 @@ async fn settlement(stage: &'static str, command: bool, trigger: &str) {
             .await
             .unwrap()
             .unwrap();
+    }
+    if trigger == "shutdown" {
+        assert_eq!(caller.await.unwrap().unwrap_err().code, "canceled");
     }
     if !command {
         tokio::time::timeout(Duration::from_secs(5), async {
@@ -341,15 +397,25 @@ async fn settlement(stage: &'static str, command: bool, trigger: &str) {
         }
     }
     let after = store.snapshot().unwrap();
+    if stage == "accept" {
+        assert!(!after.operations.contains_key("accept"));
+        assert_eq!(after.tasks[&task_id].state, "ready_for_review");
+    }
     tokio::time::sleep(Duration::from_millis(25)).await;
     assert_eq!(store.snapshot().unwrap(), after);
 }
 
 #[tokio::test]
 async fn engine_retains_all_workspace_operations_until_effects_settle() {
-    for stage in ["register", "ensure", "inspect", "remove"] {
+    settlement("accept", false, "success").await;
+    for stage in ["accept", "register", "ensure", "inspect", "remove"] {
         for command in [false, true] {
-            for trigger in ["cancel", "deadline", "abandon"] {
+            let triggers: &[&str] = if stage == "accept" {
+                &["cancel", "deadline", "abandon", "shutdown"]
+            } else {
+                &["cancel", "deadline", "abandon"]
+            };
+            for trigger in triggers {
                 settlement(stage, command, trigger).await;
             }
         }

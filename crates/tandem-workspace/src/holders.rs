@@ -128,6 +128,13 @@ fn linux_exited(context: &Context, process: &Path) -> Result<bool> {
 #[cfg(any(target_os = "macos", test))]
 fn macos_name(value: &str) -> Result<std::path::PathBuf> {
     let invalid = || failure("ambiguous process cwd encoding; cleanup refused");
+    if value
+        .as_bytes()
+        .windows(2)
+        .any(|pair| pair[0] == b'^' && (matches!(pair[1], b'@'..=b'_') || pair[1] == b'?'))
+    {
+        return Err(invalid());
+    }
     let mut bytes = value.bytes();
     let mut decoded = Vec::with_capacity(value.len());
     while let Some(byte) = bytes.next() {
@@ -220,49 +227,67 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn executable_lsof_unicode_holder_is_not_quiescent() {
+    fn executable_lsof_encoded_holders_are_not_quiescent() {
         use std::{
             io::Write,
             process::{Command, Stdio},
         };
         let fixture = tempfile::tempdir().unwrap();
-        let path = fixture
-            .path()
-            .canonicalize()
-            .unwrap()
-            .join("holder-é-\\xc3");
-        std::fs::create_dir(&path).unwrap();
-        let mut child = Command::new("sh")
-            .args(["-c", "read release"])
-            .current_dir(&path)
-            .stdin(Stdio::piped())
-            .spawn()
-            .unwrap();
-        let output = Command::new("lsof")
-            .args([
-                "-nP",
-                "-a",
-                "-d",
-                "cwd",
-                "-Fpn",
-                "-p",
-                &child.id().to_string(),
-            ])
-            .env_clear()
-            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
-            .env("LC_ALL", "C")
-            .output();
-        child.stdin.take().unwrap().write_all(b"release\n").unwrap();
-        child.wait().unwrap();
-        let output = output.unwrap();
-        assert!(output.status.success());
-        assert!(output.stderr.is_empty());
+        let mut missed = Vec::new();
+        for name in [
+            "holder-é-\\xc3",
+            "holder-\u{7}",
+            "holder-\u{b}",
+            "holder-\u{1b}",
+            "holder-^G",
+            "holder-^K",
+            "holder-^[",
+        ] {
+            let path = fixture.path().canonicalize().unwrap().join(name);
+            std::fs::create_dir(&path).unwrap();
+            let mut child = Command::new("sh")
+                .args(["-c", "read release"])
+                .current_dir(&path)
+                .stdin(Stdio::piped())
+                .spawn()
+                .unwrap();
+            let output = Command::new("lsof")
+                .args([
+                    "-nP",
+                    "-a",
+                    "-d",
+                    "cwd",
+                    "-Fpn",
+                    "-p",
+                    &child.id().to_string(),
+                ])
+                .env_clear()
+                .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+                .env("LC_ALL", "C")
+                .output();
+            child.stdin.take().unwrap().write_all(b"release\n").unwrap();
+            child.wait().unwrap();
+            let output = output.unwrap();
+            assert!(output.status.success());
+            assert!(output.stderr.is_empty());
+            eprintln!(
+                "lsof cwd for {name:?}: {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+            if macos_output(&path, &output.stdout).is_ok() {
+                missed.push(name);
+            }
+            if name == "holder-é-\\xc3" {
+                assert!(
+                    macos_output(&path.with_file_name("holder-é-\\xc3-other"), &output.stdout)
+                        .is_ok()
+                );
+            }
+        }
         assert!(
-            macos_output(&path, &output.stdout).is_err(),
-            "live Unicode cwd holder was missed: {:?}",
-            output.stdout
+            missed.is_empty(),
+            "live encoded cwd holders were missed: {missed:?}"
         );
-        assert!(macos_output(&path.with_file_name("holder-é-\\xc3-other"), &output.stdout).is_ok());
     }
 
     #[cfg(target_os = "linux")]
@@ -335,6 +360,12 @@ int main(void) {
             b"p1\nn/fixture/\\q\n",
             b"p1\nn/fixture/\\xGG\n",
             b"p1\nn/fixture/\\x00\n",
+            b"p1\nn/other/^G\n",
+            b"p1\nn/other/^K\n",
+            b"p1\nn/other/^[\n",
+            b"p1\nn/other/^@\n",
+            b"p1\nn/other/^^\n",
+            b"p1\nn/other/^?\n",
         ] {
             assert!(macos_output(path, output).is_err());
         }

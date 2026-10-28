@@ -557,7 +557,7 @@ impl Engine {
                 .projects
                 .get(&task.project_id)
                 .ok_or_else(missing_project)?;
-            read(
+            workspace_read(
                 context,
                 self.inner
                     .workspaces
