@@ -7,6 +7,9 @@ mod holders;
 mod process;
 mod register;
 
+#[cfg(all(test, unix))]
+mod settlement_tests;
+
 use std::{
     ffi::OsStr,
     fs,

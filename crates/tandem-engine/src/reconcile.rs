@@ -15,7 +15,7 @@ use crate::{
     commands::{ancestors, missing_attempt, missing_project, sequence, task},
     id, journal, read,
     state::*,
-    write,
+    workspace_read, workspace_write, write,
 };
 
 impl Engine {
@@ -363,11 +363,12 @@ impl Engine {
             if attempt.failure_count >= 8 {
                 return Ok(());
             }
-            let result = write(&context, || {
+            let result = workspace_write(
+                &context,
                 self.inner
                     .workspaces
-                    .ensure(&context, project, &attempt.workspace)
-            })
+                    .ensure(&context, project, &attempt.workspace),
+            )
             .await;
             match result {
                 Ok(workspace) => attempt.workspace = workspace,
@@ -381,7 +382,7 @@ impl Engine {
             })
             .await?;
         }
-        if let Err(error) = read(
+        if let Err(error) = workspace_read(
             &context,
             self.inner
                 .workspaces
@@ -484,11 +485,12 @@ impl Engine {
                 ));
             }
             read(context, self.inner.runtime.check_quiescence(context, &spec)).await?;
-            write(context, || {
+            workspace_write(
+                context,
                 self.inner
                     .workspaces
-                    .remove(context, project, &attempt.workspace)
-            })
+                    .remove(context, project, &attempt.workspace),
+            )
             .await
         }
         .await;

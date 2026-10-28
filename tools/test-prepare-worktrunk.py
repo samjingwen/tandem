@@ -26,7 +26,7 @@ def archive_for(binary, *, kind=tarfile.REGTYPE, name="worktrunk-fixture/wt"):
         member.linkname = "../../escape"
         archive.addfile(member, io.BytesIO(binary))
         # A release contains other files. None may be extracted, even if hostile.
-        other = tarfile.TarInfo("../../must-not-extract")
+        other = tarfile.TarInfo("../must-not-extract")
         other.size = 7
         archive.addfile(other, io.BytesIO(b"ignored"))
     return output.getvalue()
