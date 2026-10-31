@@ -41,23 +41,38 @@ def environment(offline):
     env.pop("DATABASE_URL", None)
     env.pop("SQLX_OFFLINE_DIR", None)
     env["SQLX_OFFLINE"] = "true" if offline else "false"
-    env["PATH"] = str(ROOT / ".tmp/sqlx-tools/bin") + os.pathsep + env.get("PATH", "")
     return env
+
+
+def prepare_command(database):
+    command = [
+        str(ROOT / ".tmp/sqlx-tools/bin/cargo-sqlx"),
+        "sqlx",
+        "--no-dotenv",
+    ]
+    version = subprocess.run(
+        command + ["--version"],
+        cwd=ROOT,
+        env=environment(offline=False),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if version.stdout.split()[-1:] != ["0.9.0"]:
+        raise RuntimeError("The project-local SQLx CLI must be version 0.9.0")
+    return command + [
+        "prepare",
+        "--workspace",
+        "--database-url",
+        "sqlite://" + str(database.resolve()),
+    ]
 
 
 def prepare(root, database, check=False):
     guard(root)
     env = environment(offline=False)
     env["DATABASE_URL"] = "sqlite://" + str(database.resolve())
-    command = [
-        "cargo",
-        "sqlx",
-        "--no-dotenv",
-        "prepare",
-        "--workspace",
-        "--database-url",
-        env["DATABASE_URL"],
-    ]
+    command = prepare_command(database)
     if check:
         command.append("--check")
     command += ["--", "--locked", "--all-targets"]

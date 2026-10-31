@@ -69,15 +69,7 @@ def main():
             )
 
     check = ["cargo", "check", "--locked", "--offline"]
-    prepare = [
-        "cargo",
-        "sqlx",
-        "--no-dotenv",
-        "prepare",
-        "--workspace",
-        "--database-url",
-        "sqlite://" + str(database),
-    ]
+    prepare = sqlx.prepare_command(database)
     run("lock", ["cargo", "generate-lockfile", "--offline"])
     run("prepare", prepare + ["--", "--locked", "--offline"], offline=False)
     before = metadata_hashes(fixture)

@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Behavioral checks for safe disposable SQLx preparation."""
 
+import json
 import os
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 
 import sqlx
 
@@ -61,8 +65,6 @@ class SqlxPreparation(unittest.TestCase):
                 sqlx.guard(root)
 
     def test_compiler_environment_drops_inherited_database_and_cache(self):
-        from unittest.mock import patch
-
         with patch.dict(
             os.environ, {"DATABASE_URL": "synthetic", "SQLX_OFFLINE_DIR": "synthetic"}
         ):
@@ -70,6 +72,97 @@ class SqlxPreparation(unittest.TestCase):
         self.assertNotIn("DATABASE_URL", env)
         self.assertNotIn("SQLX_OFFLINE_DIR", env)
         self.assertEqual(env["SQLX_OFFLINE"], "true")
+
+    def test_local_cli_selection_is_closed_to_global_discovery(self):
+        with tempfile.TemporaryDirectory(dir=sqlx.ROOT / ".tmp") as directory:
+            root = Path(directory)
+            database = root / "schema.db"
+            sqlx.schema(database)
+            local = root / ".tmp/sqlx-tools/bin/cargo-sqlx"
+            local.parent.mkdir(parents=True)
+            global_bin = root / "global/bin"
+            global_bin.mkdir(parents=True)
+            marker = root / "global-invoked"
+            for name in ("cargo", "cargo-sqlx"):
+                executable = global_bin / name
+                executable.write_text(
+                    f"#!{sys.executable}\nfrom pathlib import Path\n"
+                    f"Path({str(marker)!r}).touch()\nraise SystemExit(99)\n"
+                )
+                executable.chmod(0o700)
+            receipt = root / "local-receipt.json"
+            script = (
+                f"#!{sys.executable}\nimport json, os, sys\n"
+                "from pathlib import Path\n"
+                "if sys.argv[1:] == ['sqlx', '--no-dotenv', '--version']:\n"
+                "    print('sqlx-cli VERSION')\n"
+                "else:\n"
+                f"    Path({str(receipt)!r}).write_text(json.dumps({{\n"
+                "        'args': sys.argv[1:],\n"
+                "        'database': os.environ.get('DATABASE_URL'),\n"
+                "        'cache': os.environ.get('SQLX_OFFLINE_DIR'),\n"
+                "        'offline': os.environ.get('SQLX_OFFLINE'),\n"
+                "    }))\n"
+            )
+            with (
+                patch.object(sqlx, "ROOT", root),
+                patch.dict(
+                    os.environ,
+                    {
+                        "PATH": str(global_bin),
+                        "CARGO_HOME": str(global_bin.parent),
+                        "DATABASE_URL": "synthetic-retained",
+                        "SQLX_OFFLINE_DIR": "synthetic-cache",
+                    },
+                ),
+            ):
+                for check in (False, True):
+                    with self.subTest(check=check, cli="missing"):
+                        with self.assertRaises(FileNotFoundError):
+                            sqlx.prepare(root, database, check=check)
+                self.assertFalse(marker.exists())
+                for version in ("0.8.6", "0.9.0"):
+                    local.write_text(script.replace("VERSION", version))
+                    local.chmod(0o700)
+                    for check in (False, True):
+                        with self.subTest(check=check, version=version):
+                            if version != "0.9.0":
+                                with self.assertRaisesRegex(RuntimeError, "0.9.0"):
+                                    sqlx.prepare(root, database, check=check)
+                                self.assertFalse(receipt.exists())
+                                continue
+                            sqlx.prepare(root, database, check=check)
+                            observed = json.loads(receipt.read_text())
+                            url = "sqlite://" + str(database.resolve())
+                            self.assertEqual(
+                                observed,
+                                {
+                                    "args": [
+                                        "sqlx",
+                                        "--no-dotenv",
+                                        "prepare",
+                                        "--workspace",
+                                        "--database-url",
+                                        url,
+                                    ]
+                                    + (["--check"] if check else [])
+                                    + ["--", "--locked", "--all-targets"],
+                                    "database": url,
+                                    "cache": None,
+                                    "offline": "false",
+                                },
+                            )
+                subprocess.run(
+                    sqlx.prepare_command(database) + ["--", "--locked", "--offline"],
+                    cwd=root,
+                    env=sqlx.environment(offline=False),
+                    check=True,
+                )
+                self.assertEqual(
+                    json.loads(receipt.read_text())["args"][-3:],
+                    ["--", "--locked", "--offline"],
+                )
+                self.assertFalse(marker.exists())
 
 
 if __name__ == "__main__":
