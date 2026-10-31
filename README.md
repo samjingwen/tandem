@@ -53,7 +53,9 @@ Make targets add that installation to their own `PATH`; to use it with `./bin/ta
 See the [verification contract](docs/VERIFICATION.md#routine-deterministic-checks) for coordination/oracle coverage and its acceptance limits.
 No retained database, native service, or provider is needed for those checks.
 The Rust store uses SQLx 0.9.0 with compile-time-checked static queries and committed `.sqlx` metadata; ordinary builds default to `SQLX_OFFLINE=true` without a database connection.
+Its complete SQLx dependency graph is pinned to fork revision `1d5c394d783a50cf8cc068a71b60bfaa7bff02ef` until the [startup-cleanup fix](https://github.com/transact-rs/sqlx/pull/4494) is available in an upstream release.
 `make prepare` installs the matching SQLx CLI under `.tmp/sqlx-tools`; `make rust-sqlx-check`, included in lint and CI, checks metadata against a fresh disposable copy of the canonical SQLite schema.
+Metadata consumers invoke only that exact local CLI and supply its Cargo executable explicitly, including from shells where `CARGO` is unset.
 After intentionally changing a query or migration, regenerate metadata with `make rust-sqlx-prepare`, then review and commit the generated `.sqlx` files.
 Use the supported Make targets in a checkout without ancestor `.env` files; they refuse those files by existence metadata before SQLx's automatic dotenv discovery can read them.
 Do not supply retained database URLs or private environment files for compilation or metadata preparation.

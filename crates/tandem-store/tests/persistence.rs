@@ -377,6 +377,33 @@ fn failed_commit_is_drained_and_fails_closed_until_reopen() {
 }
 
 #[test]
+fn failed_constructor_preserves_corrupt_bytes_and_returns_scheduler_ownership() {
+    let (_root, store) = open();
+    let directory = store.directory().to_owned();
+    drop(store);
+    let database = directory.join("tandem.db");
+    let corrupt = b"not a SQLite database";
+    fs::write(&database, corrupt).unwrap();
+
+    for _ in 0..3 {
+        assert_eq!(
+            Sqlite::open(&directory).err().unwrap().code,
+            "storage_unavailable"
+        );
+        // Check OS ownership directly, without another store/worker operation
+        // that could incidentally wait for pending SQLite cleanup.
+        let lock = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(directory.join("scheduler.lock"))
+            .unwrap();
+        lock.try_lock().unwrap();
+        assert_eq!(Sqlite::open(&directory).err().unwrap().code, "store_owned");
+        assert_eq!(fs::read(&database).unwrap(), corrupt);
+    }
+}
+
+#[test]
 fn callback_unwind_rolls_back_and_closes_before_releasing_ownership() {
     let (_root, store) = open();
     let directory = store.directory().to_owned();

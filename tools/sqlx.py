@@ -3,6 +3,7 @@
 
 import argparse
 import os
+import shutil
 import sqlite3
 import subprocess
 import tempfile
@@ -41,6 +42,13 @@ def environment(offline):
     env.pop("DATABASE_URL", None)
     env.pop("SQLX_OFFLINE_DIR", None)
     env["SQLX_OFFLINE"] = "true" if offline else "false"
+    # Direct cargo-sqlx invocation does not get Cargo's subcommand environment.
+    # Preserve an explicit executable override, otherwise resolve the same Cargo
+    # used by our compiler consumers. Never resolve the SQLx CLI through PATH.
+    cargo = shutil.which(env.get("CARGO") or "cargo", path=env.get("PATH"))
+    if cargo is None:
+        raise RuntimeError("The Cargo executable is unavailable")
+    env["CARGO"] = os.path.abspath(cargo)
     return env
 
 

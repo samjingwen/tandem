@@ -25,6 +25,8 @@ impl Database {
             .synchronous(SqliteSynchronous::Full)
             .foreign_keys(true)
             .busy_timeout(Duration::from_secs(5));
+        // The immutable driver patch awaits startup-error worker shutdown before
+        // returning Err, while Sqlite::open still owns the scheduler lock.
         let connection =
             block_on(SqliteConnection::connect_with(&options)).map_err(|_| storage_error())?;
         Ok(Self {

@@ -21,7 +21,9 @@ rustix = { version = "=1.1.5", features = ["fs", "process"] }
 pollster = "=0.4.0"
 # Independent test reader shares SQLx's supported native SQLite ABI.
 rusqlite = { version = "=0.39.0", features = ["bundled"] }
-sqlx = { version = "=0.9.0", default-features = false, features = ["sqlite", "macros"] }
+# Await SQLite worker cleanup on startup errors until upstream releases the fix.
+# https://github.com/transact-rs/sqlx/pull/4494
+sqlx = { version = "=0.9.0", git = "https://github.com/samjingwen/sqlx", rev = "1d5c394d783a50cf8cc068a71b60bfaa7bff02ef", default-features = false, features = ["sqlite", "macros"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.154", features = ["raw_value", "arbitrary_precision"] }
 sha2 = "=0.11.1"

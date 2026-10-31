@@ -97,11 +97,14 @@ class SqlxPreparation(unittest.TestCase):
                 "if sys.argv[1:] == ['sqlx', '--no-dotenv', '--version']:\n"
                 "    print('sqlx-cli VERSION')\n"
                 "else:\n"
+                "    if not os.environ.get('CARGO'):\n"
+                "        raise SystemExit('CARGO was not supplied')\n"
                 f"    Path({str(receipt)!r}).write_text(json.dumps({{\n"
                 "        'args': sys.argv[1:],\n"
                 "        'database': os.environ.get('DATABASE_URL'),\n"
                 "        'cache': os.environ.get('SQLX_OFFLINE_DIR'),\n"
                 "        'offline': os.environ.get('SQLX_OFFLINE'),\n"
+                "        'cargo': os.environ['CARGO'],\n"
                 "    }))\n"
             )
             with (
@@ -116,6 +119,7 @@ class SqlxPreparation(unittest.TestCase):
                     },
                 ),
             ):
+                os.environ.pop("CARGO", None)
                 for check in (False, True):
                     with self.subTest(check=check, cli="missing"):
                         with self.assertRaises(FileNotFoundError):
@@ -150,6 +154,7 @@ class SqlxPreparation(unittest.TestCase):
                                     "database": url,
                                     "cache": None,
                                     "offline": "false",
+                                    "cargo": str(global_bin / "cargo"),
                                 },
                             )
                 subprocess.run(
@@ -163,6 +168,18 @@ class SqlxPreparation(unittest.TestCase):
                     ["--", "--locked", "--offline"],
                 )
                 self.assertFalse(marker.exists())
+
+    def test_explicit_cargo_override_is_used_and_missing_cargo_is_refused(self):
+        with tempfile.TemporaryDirectory(dir=sqlx.ROOT / ".tmp") as directory:
+            root = Path(directory)
+            cargo = root / "selected-cargo"
+            cargo.write_text(f"#!{sys.executable}\nraise SystemExit(0)\n")
+            cargo.chmod(0o700)
+            with patch.dict(os.environ, {"CARGO": str(cargo), "PATH": str(root)}):
+                self.assertEqual(sqlx.environment(offline=True)["CARGO"], str(cargo))
+                cargo.unlink()
+                with self.assertRaisesRegex(RuntimeError, "Cargo executable"):
+                    sqlx.environment(offline=False)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 
 import hashlib
 import json
+import os
 import sqlite3
 import subprocess
 import tempfile
@@ -22,6 +23,10 @@ def metadata_hashes(root):
 
 def main():
     sqlx.guard(sqlx.ROOT)
+    # Exercise the actual installed CLI from an ordinary shell, where Cargo has
+    # not injected CARGO. Every shared environment must supply it independently.
+    os.environ.pop("CARGO", None)
+    cargo = sqlx.environment(offline=True)["CARGO"]
     fixture = Path(tempfile.mkdtemp(prefix="sqlx-proof-", dir=sqlx.ROOT / ".tmp"))
     (fixture / "src").mkdir()
     manifest = tomllib.loads((sqlx.ROOT / "Cargo.toml").read_text())
@@ -68,9 +73,9 @@ def main():
                 f"Unexpected SQLx proof result: {name}; see {fixture.name}/{name}.log"
             )
 
-    check = ["cargo", "check", "--locked", "--offline"]
+    check = [cargo, "check", "--locked", "--offline"]
     prepare = sqlx.prepare_command(database)
-    run("lock", ["cargo", "generate-lockfile", "--offline"])
+    run("lock", [cargo, "generate-lockfile", "--offline"])
     run("prepare", prepare + ["--", "--locked", "--offline"], offline=False)
     before = metadata_hashes(fixture)
     assert before, "SQLx did not produce real query metadata"
@@ -125,7 +130,7 @@ def main():
     # profile too. Dev-only cargo check misses macOS dylib stripping failures.
     run(
         "release-macro-consumer",
-        ["cargo", "build", "--release", "--locked", "--offline"],
+        [cargo, "build", "--release", "--locked", "--offline"],
     )
     run("release-executable", [str(fixture / "target/release/sqlx-offline-proof")])
     print(

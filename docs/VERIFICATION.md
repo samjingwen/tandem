@@ -73,6 +73,9 @@ The same proof builds and executes a release-profile consumer, including actual 
 `tools/test-sqlx.py` verifies the disposable schema's actual query/constraint behavior and refusal of dotenv FIFOs and broken symlinks without opening their contents.
 Independent SQLite writer regressions prove failed-statement and failed-commit rollbacks have released write ownership before return, rather than incidentally waiting through another store query.
 Additional store tests cover callback unwinding, close/reopen ownership and synchronous callers under both current-thread and multi-thread Tokio contexts.
+Failed-constructor checks also preserve corrupt-file bytes and test scheduler ownership directly with an independent OS lock, without an intervening store operation that could drain pending work.
+The pinned driver's native-destructor regression separately proves startup worker settlement, rather than treating corrupt-file rejection alone as cleanup acknowledgement.
+The real metadata/compiler/release proof begins with `CARGO` unset, while strict executable fixtures verify missing/incompatible local CLI refusal, shadowing resistance and explicit Cargo selection.
 `crates/tandem-engine/tests/coordination.rs` executes real Rust admission/reconciliation against SQLite and controlled runtime/workspace ports, including abandoned-client, shutdown, uncertainty, same-reference recovery, generation, role/dependency bounds, capacity, finite notifications, quiet polls, explicit decisions and cleanup barriers.
 Reply regressions distinguish explicitly proven rejection from an unmarked `invalid_request`, which must retain uncertainty and prevent resend.
 The five-second bookkeeping fixture blocks only its owned storage callback, verifies that controls cannot cross the effects barrier, then releases it and rejects the expired bookkeeping change without fabricating an admission receipt.
