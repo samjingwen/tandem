@@ -1,0 +1,339 @@
+{
+  "publication_notice": "Public rendering of fresh local evidence. Raw logs remain private. Build/cwd paths are omitted; receipts, diagnostics, classifications, exit statuses and hashes are retained. Only disposable synthetic test state is shown.",
+  "source_commit": "2d0edea0a6db4e6209303ea706c2b6e36c67d9de",
+  "source_tree": "b47f6c539e1c4b6d40452e63f4251ce08d7af47a",
+  "platform": "aarch64-apple-darwin; Rust 1.95.0",
+  "dependency_provenance": {
+    "revision": "1d5c394d783a50cf8cc068a71b60bfaa7bff02ef",
+    "regression_sha256": "809b55775c4e756714348c0816eee60ce22ce92df28cbcc6f913b27e277f46b8",
+    "native_sqlite_version": "0.37.0",
+    "sqlx_packages": [
+      "sqlx",
+      "sqlx-core",
+      "sqlx-macros",
+      "sqlx-macros-core",
+      "sqlx-mysql",
+      "sqlx-postgres",
+      "sqlx-sqlite"
+    ]
+  },
+  "executable_sha256": {
+    "store-compat": "1b81b0d436c3cdf50d529f6930952c3f1b747240e44ee86b4e205a17629fb5f6",
+    "engine-compat": "ac98e39475445ee29b5014668a96d3ff81e656348dfd8bb053adfcdeca285df6",
+    "engine-safety": "264fb1f3affe0406a507773bf3a2bfd4e48f713f571f45ee5c949c098ed50644",
+    "project-local-cargo-sqlx": "d1c1bcd5574d3fa6b6c5406588a3b964801a816b5434109530ce8e4b6a6074e5",
+    "native-startup-regression": "181a0da95f661b420d11861d02a19da055a3ce02637e72fff6d9c5f4403fa5c4",
+    "release-macro-consumer": "6f84945bed6cae0c4e5c66eebe4dc19956651e6f7cc9973d3d04f3e6de2dab31"
+  },
+  "completed_commands": [
+    {
+      "name": "store-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "tandem-store",
+        "--all-targets"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "consumers-build",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "--example",
+        "store-compat",
+        "--example",
+        "engine-compat",
+        "--example",
+        "engine-safety"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "cross-language",
+      "command": [
+        "go",
+        "test",
+        "./internal/store",
+        "-run",
+        "^TestRust(Store|Engine)",
+        "-count=1",
+        "-v"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "engine-safety",
+      "command": [
+        "python3",
+        "tools/test-engine-safety.py",
+        "target/debug/examples/engine-safety"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "sqlx-tooling",
+      "command": [
+        "python3",
+        "tools/test-sqlx.py"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "metadata-check",
+      "command": [
+        "make",
+        "rust-sqlx-check"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "sqlx-proof",
+      "command": [
+        "python3",
+        "tools/prove-sqlx.py"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "native-lock",
+      "command": [
+        "cargo",
+        "generate-lockfile",
+        "--manifest-path",
+        ".tmp/test-phase/startup-regression/Cargo.toml",
+        "--offline"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "native-cleanup",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        ".tmp/test-phase/startup-regression/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--test",
+        "startup_cleanup",
+        "--",
+        "--nocapture"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "product-probe-final",
+      "command": [
+        "python3",
+        ".tmp/test-phase/product-probe.py"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "tool-boundaries",
+      "command": [
+        "python3",
+        ".tmp/test-phase/tool-boundaries.py"
+      ],
+      "exit_status": 0
+    },
+    {
+      "name": "engine-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "tandem-engine",
+        "--all-targets"
+      ],
+      "exit_status": 0
+    }
+  ],
+  "sqlx_proof": [
+    {
+      "case": "conforming-metadata",
+      "classification": "accepted as required",
+      "compiler_or_cli_diagnostics": []
+    },
+    {
+      "case": "conforming-offline",
+      "classification": "accepted as required",
+      "compiler_or_cli_diagnostics": []
+    },
+    {
+      "case": "lock",
+      "classification": "accepted as required",
+      "compiler_or_cli_diagnostics": []
+    },
+    {
+      "case": "prepare",
+      "classification": "accepted as required",
+      "compiler_or_cli_diagnostics": []
+    },
+    {
+      "case": "rejected-missing-cache",
+      "classification": "rejected as required",
+      "compiler_or_cli_diagnostics": [
+        "error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`",
+        "error: could not compile `sqlx-offline-proof` (bin \"sqlx-offline-proof\") due to 1 previous error"
+      ]
+    },
+    {
+      "case": "rejected-row-type",
+      "classification": "rejected as required",
+      "compiler_or_cli_diagnostics": [
+        "error[E0277]: the trait bound `i64: From<String>` is not satisfied",
+        "error: could not compile `sqlx-offline-proof` (bin \"sqlx-offline-proof\") due to 1 previous error"
+      ]
+    },
+    {
+      "case": "rejected-schema-drift",
+      "classification": "rejected as required",
+      "compiler_or_cli_diagnostics": [
+        "error: error returned from database: (code: 1) no such column: body",
+        "error: could not compile `sqlx-offline-proof` (bin \"sqlx-offline-proof\") due to 1 previous error",
+        "error: `cargo check` failed with status: exit status: 101"
+      ]
+    },
+    {
+      "case": "rejected-stale-query-metadata",
+      "classification": "rejected as required",
+      "compiler_or_cli_diagnostics": [
+        "error: prepare check failed: .sqlx is missing one or more queries; you should re-run sqlx prepare"
+      ]
+    },
+    {
+      "case": "rejected-uncached-query",
+      "classification": "rejected as required",
+      "compiler_or_cli_diagnostics": [
+        "error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`",
+        "error: could not compile `sqlx-offline-proof` (bin \"sqlx-offline-proof\") due to 1 previous error"
+      ]
+    },
+    {
+      "case": "release-executable",
+      "classification": "accepted as required",
+      "compiler_or_cli_diagnostics": []
+    },
+    {
+      "case": "release-macro-consumer",
+      "classification": "accepted as required",
+      "compiler_or_cli_diagnostics": []
+    },
+    {
+      "case": "restored-metadata",
+      "classification": "accepted as required",
+      "compiler_or_cli_diagnostics": []
+    },
+    {
+      "case": "restored-offline",
+      "classification": "accepted as required",
+      "compiler_or_cli_diagnostics": []
+    }
+  ],
+  "native_cleanup": {
+    "test": "startup_errors_wait_for_connection_cleanup",
+    "actual_test_result": [
+      "test startup_errors_wait_for_connection_cleanup ... ok"
+    ],
+    "observed_by_assertions": [
+      "invalid PRAGMA, corrupt-file WAL initialization and invalid collation names preserve their original errors",
+      "connect future remains pending while the worker holds its connection",
+      "native SQLite destructor acknowledgement precedes error completion",
+      "corrupt file bytes unchanged and registered/rejected collation references released"
+    ],
+    "in_flight_cancellation_tested": false
+  },
+  "storage_integration_results": [
+    "test newer_schema_and_corrupt_records_fail_closed ... ok",
+    "test permissive_or_nonregular_state_is_refused_without_repair ... ok",
+    "test invalid_record_encoding_cannot_be_committed ... ok",
+    "test failed_constructor_preserves_corrupt_bytes_and_returns_scheduler_ownership ... ok",
+    "test callback_unwind_rolls_back_and_closes_before_releasing_ownership ... ok",
+    "test failed_statement_settles_rollback_before_returning_to_an_independent_writer ... ok",
+    "test commit_rollback_and_reopen_preserve_identity_and_receipt ... ok",
+    "test same_process_and_canonical_alias_cannot_bypass_ownership ... ok",
+    "test failed_commit_is_drained_and_fails_closed_until_reopen ... ok",
+    "test no_op_is_quiet_and_only_changed_rows_append_history ... ok",
+    "test synchronous_port_works_inside_current_thread_tokio ... ok",
+    "test synchronous_port_works_inside_multi_thread_tokio ... ok",
+    "test unrelated_updates_retain_unknown_fields ... ok",
+    "test all_failed_mutations_leave_durable_state_unchanged ... ok",
+    "test concurrent_changes_are_serialized_and_large_content_is_complete ... ok"
+  ],
+  "cross_language_consumer_results": [
+    "--- PASS: TestRustStoreGoRustGoPersistence (2.72s)",
+    "--- PASS: TestRustStoreRustGoRustPersistence (0.02s)",
+    "--- PASS: TestRustStoreCrossLanguageOwnershipAndCrash (0.03s)",
+    "--- PASS: TestRustStoreMalformedTimestampMatchesGoRefusal (0.01s)",
+    "--- PASS: TestRustStoreTimestampCorpusMatchesGo (0.23s)",
+    "--- PASS: TestRustEngineGoFingerprintOracle (0.67s)",
+    "--- PASS: TestRustEngineObserveRejectsForbiddenEffects (0.06s)",
+    "--- PASS: TestRustEngineReplaysActualGoOperationsAndGoReplaysRustCreate (0.12s)",
+    "--- PASS: TestRustEngineGoDecisionAndCoordinatorSignalOracle (0.05s)"
+  ],
+  "engine_safety_consumer_results": [
+    "PASS uncertainty",
+    "PASS generations-cleanup",
+    "PASS limits",
+    "PASS delivery-budget",
+    "PASS role-limits",
+    "PASS notification-budget",
+    "PASS expired-bookkeeping-dropped-wait",
+    "PASS shutdown-reconnecting-False",
+    "PASS shutdown-reconnecting-True",
+    "PASS cancel-reconnecting-False",
+    "PASS cancel-reconnecting-True",
+    "PASS deadline-reconnecting-False",
+    "PASS deadline-reconnecting-True"
+  ],
+  "tool_boundary_receipts": [
+    {
+      "guard_input": "fifo",
+      "exit_status": 1,
+      "diagnostic": "SQLx dotenv discovery is unsafe: an ancestor .env exists; no contents were read"
+    },
+    {
+      "guard_input": "broken-symlink",
+      "exit_status": 1,
+      "diagnostic": "SQLx dotenv discovery is unsafe: an ancestor .env exists; no contents were read"
+    },
+    {
+      "missing_local_cli_mode": "check",
+      "exit_status": 1,
+      "global_cli_not_invoked": true
+    },
+    {
+      "missing_local_cli_mode": "prepare",
+      "exit_status": 1,
+      "global_cli_not_invoked": true
+    },
+    {
+      "real_cli_check": "CARGO unset; inherited URL and query cache poisoned; global CLI shadow present",
+      "exit_status": 0,
+      "metadata_unchanged": true,
+      "global_cli_not_invoked": true
+    }
+  ],
+  "setup_corrections": [
+    {
+      "attempt": "product-probe",
+      "exit_status": 1,
+      "classification": "driver expectation error, not product failure",
+      "observation": "WAL snapshot succeeded while another writer held BEGIN IMMEDIATE; changed the contention action to a real mutation."
+    },
+    {
+      "attempt": "product-probe-corrected",
+      "exit_status": 1,
+      "classification": "driver timing expectation error, not product failure",
+      "observation": "SQLite rejected the contended read-to-write upgrade immediately. Removed the invented minimum wait; required bounded failure and unchanged durable state. The final repeat passed."
+    }
+  ],
+  "scope": "Storage/tooling slice only. No UI changes, native OpenCode runtime, models, migration cutover, broad suite, analyzers, publication or CI phase executed."
+}

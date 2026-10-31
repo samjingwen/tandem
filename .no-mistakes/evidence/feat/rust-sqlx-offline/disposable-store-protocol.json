@@ -1,0 +1,493 @@
+{
+  "binary_sha256": "1b81b0d436c3cdf50d529f6930952c3f1b747240e44ee86b4e205a17629fb5f6",
+  "receipts": [
+    {
+      "mode": "seed",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "316301bd196ee57c870ec22f7731bec3",
+          "revision": 1,
+          "projects": {},
+          "tasks": {
+            "tsk_rust": {
+              "id": "tsk_rust",
+              "projectId": "",
+              "dependencies": [],
+              "title": "Rust created \u4e16\u754c",
+              "instructions": "",
+              "role": "",
+              "desired": "",
+              "state": "",
+              "generation": 7,
+              "createdAt": "0001-01-01T00:00:00Z",
+              "updatedAt": "0001-01-01T00:00:00Z"
+            }
+          },
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {
+          "rust-operation": {
+            "id": "rust-operation",
+            "fingerprint": "synthetic-rust-fingerprint",
+            "outcome": {
+              "value": 9007199254740993,
+              "answer": null,
+              "text": "<"
+            },
+            "createdAt": "0001-01-01T00:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "mode": "noop",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "316301bd196ee57c870ec22f7731bec3",
+          "revision": 1,
+          "projects": {},
+          "tasks": {
+            "tsk_rust": {
+              "id": "tsk_rust",
+              "projectId": "",
+              "dependencies": [],
+              "title": "Rust created \u4e16\u754c",
+              "instructions": "",
+              "role": "",
+              "desired": "",
+              "state": "",
+              "generation": 7,
+              "createdAt": "0001-01-01T00:00:00Z",
+              "updatedAt": "0001-01-01T00:00:00Z"
+            }
+          },
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {
+          "rust-operation": {
+            "id": "rust-operation",
+            "fingerprint": "synthetic-rust-fingerprint",
+            "outcome": {
+              "value": 9007199254740993,
+              "answer": null,
+              "text": "<"
+            },
+            "createdAt": "0001-01-01T00:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "316301bd196ee57c870ec22f7731bec3",
+          "revision": 1,
+          "projects": {},
+          "tasks": {
+            "tsk_rust": {
+              "id": "tsk_rust",
+              "projectId": "",
+              "dependencies": [],
+              "title": "Rust created \u4e16\u754c",
+              "instructions": "",
+              "role": "",
+              "desired": "",
+              "state": "",
+              "generation": 7,
+              "createdAt": "0001-01-01T00:00:00Z",
+              "updatedAt": "0001-01-01T00:00:00Z"
+            }
+          },
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {
+          "rust-operation": {
+            "id": "rust-operation",
+            "fingerprint": "synthetic-rust-fingerprint",
+            "outcome": {
+              "value": 9007199254740993,
+              "answer": null,
+              "text": "<"
+            },
+            "createdAt": "0001-01-01T00:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "oracle": "independent Python SQLite reader",
+      "schema_version": 1,
+      "revision": 1,
+      "all_durable_rows_unchanged_after_noop_and_reopen": true,
+      "operation_body": "{\"id\":\"rust-operation\",\"fingerprint\":\"synthetic-rust-fingerprint\",\"outcome\":{\"value\":9007199254740993,\"answer\":null,\"text\":\"\\u003c\"},\"createdAt\":\"0001-01-01T00:00:00Z\"}"
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 1,
+      "response": {
+        "error": {
+          "code": "store_owned",
+          "message": "state store already has an active scheduler owner; connect as a client instead"
+        }
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 1,
+      "response": {
+        "error": {
+          "code": "store_owned",
+          "message": "state store already has an active scheduler owner; connect as a client instead"
+        }
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "316301bd196ee57c870ec22f7731bec3",
+          "revision": 1,
+          "projects": {},
+          "tasks": {
+            "tsk_rust": {
+              "id": "tsk_rust",
+              "projectId": "",
+              "dependencies": [],
+              "title": "Rust created \u4e16\u754c",
+              "instructions": "",
+              "role": "",
+              "desired": "",
+              "state": "",
+              "generation": 7,
+              "createdAt": "0001-01-01T00:00:00Z",
+              "updatedAt": "0001-01-01T00:00:00Z"
+            }
+          },
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {
+          "rust-operation": {
+            "id": "rust-operation",
+            "fingerprint": "synthetic-rust-fingerprint",
+            "outcome": {
+              "value": 9007199254740993,
+              "answer": null,
+              "text": "<"
+            },
+            "createdAt": "0001-01-01T00:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "eb541782240721a3fbb20bbcde7718b1",
+          "revision": 0,
+          "projects": {},
+          "tasks": {},
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {}
+      }
+    },
+    {
+      "mode": "seed",
+      "exit_status": 1,
+      "response": {
+        "error": {
+          "code": "storage_unavailable",
+          "message": "SQLite state operation failed"
+        }
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "eb541782240721a3fbb20bbcde7718b1",
+          "revision": 0,
+          "projects": {},
+          "tasks": {},
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {}
+      }
+    },
+    {
+      "oracle": "independent writer held BEGIN IMMEDIATE",
+      "bounded_busy_failure_seconds": 0.007,
+      "state_unchanged_after_lock_release": true
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "6cefb8cb715cf2a385b64eb9778f79ef",
+          "revision": 0,
+          "projects": {},
+          "tasks": {},
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {}
+      }
+    },
+    {
+      "mode": "seed",
+      "exit_status": 1,
+      "response": {
+        "error": {
+          "code": "storage_unavailable",
+          "message": "SQLite state operation failed"
+        }
+      }
+    },
+    {
+      "failure": "statement",
+      "independent_writer_acquired_without_store_query": true,
+      "durable_counts": {
+        "tasks": 0,
+        "operations": 0,
+        "history": 0
+      },
+      "revision": 0
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "6cefb8cb715cf2a385b64eb9778f79ef",
+          "revision": 0,
+          "projects": {},
+          "tasks": {},
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {}
+      }
+    },
+    {
+      "mode": "seed",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "6cefb8cb715cf2a385b64eb9778f79ef",
+          "revision": 1,
+          "projects": {},
+          "tasks": {
+            "tsk_rust": {
+              "id": "tsk_rust",
+              "projectId": "",
+              "dependencies": [],
+              "title": "Rust created \u4e16\u754c",
+              "instructions": "",
+              "role": "",
+              "desired": "",
+              "state": "",
+              "generation": 7,
+              "createdAt": "0001-01-01T00:00:00Z",
+              "updatedAt": "0001-01-01T00:00:00Z"
+            }
+          },
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {
+          "rust-operation": {
+            "id": "rust-operation",
+            "fingerprint": "synthetic-rust-fingerprint",
+            "outcome": {
+              "value": 9007199254740993,
+              "answer": null,
+              "text": "<"
+            },
+            "createdAt": "0001-01-01T00:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "1e49094738dbbafb9dae514772486342",
+          "revision": 0,
+          "projects": {},
+          "tasks": {},
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {}
+      }
+    },
+    {
+      "mode": "seed",
+      "exit_status": 1,
+      "response": {
+        "error": {
+          "code": "storage_unavailable",
+          "message": "SQLite state operation failed"
+        }
+      }
+    },
+    {
+      "failure": "commit",
+      "independent_writer_acquired_without_store_query": true,
+      "durable_counts": {
+        "tasks": 0,
+        "operations": 0,
+        "history": 0
+      },
+      "revision": 0
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "1e49094738dbbafb9dae514772486342",
+          "revision": 0,
+          "projects": {},
+          "tasks": {},
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {}
+      }
+    },
+    {
+      "mode": "seed",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "1e49094738dbbafb9dae514772486342",
+          "revision": 1,
+          "projects": {},
+          "tasks": {
+            "tsk_rust": {
+              "id": "tsk_rust",
+              "projectId": "",
+              "dependencies": [],
+              "title": "Rust created \u4e16\u754c",
+              "instructions": "",
+              "role": "",
+              "desired": "",
+              "state": "",
+              "generation": 7,
+              "createdAt": "0001-01-01T00:00:00Z",
+              "updatedAt": "0001-01-01T00:00:00Z"
+            }
+          },
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {
+          "rust-operation": {
+            "id": "rust-operation",
+            "fingerprint": "synthetic-rust-fingerprint",
+            "outcome": {
+              "value": 9007199254740993,
+              "answer": null,
+              "text": "<"
+            },
+            "createdAt": "0001-01-01T00:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 0,
+      "response": {
+        "state": {
+          "instanceId": "73714bb94c2a5a9e5c63d177819b550a",
+          "revision": 0,
+          "projects": {},
+          "tasks": {},
+          "attempts": {},
+          "commands": {},
+          "decisions": {},
+          "results": {}
+        },
+        "operations": {}
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 1,
+      "response": {
+        "error": {
+          "code": "storage_unavailable",
+          "message": "SQLite state operation failed"
+        }
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 1,
+      "response": {
+        "error": {
+          "code": "storage_unavailable",
+          "message": "SQLite state operation failed"
+        }
+      }
+    },
+    {
+      "mode": "snapshot",
+      "exit_status": 1,
+      "response": {
+        "error": {
+          "code": "storage_unavailable",
+          "message": "SQLite state operation failed"
+        }
+      }
+    },
+    {
+      "corrupt_constructor_attempts": 3,
+      "corrupt_bytes_unchanged": true,
+      "independent_scheduler_lock_acquired_after_each_failure": true
+    }
+  ]
+}
