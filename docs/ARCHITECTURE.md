@@ -35,9 +35,9 @@ Dependency versions and tools are pinned in go.mod, with integrity checksums in 
 The subsequent user decision is to migrate the native engine, service, and CLI to Rust, not to replace SQLite or the HTTP/plugin contracts.
 The Rust core stays independent of concrete storage/runtime packages; the storage crate uses SQLx with bundled SQLite and the original version-1 SQL migration.
 Static query macros and committed offline metadata validate the actual read/write queries at compile time, while a disposable-schema check detects metadata drift.
-The synchronous Store port retains one mutex-serialized connection; SQLx's runtime-agnostic SQLite worker is driven without a second Tokio runtime or a connection pool.
-Commit and rollback settle before the mutex releases, and explicit connection close joins the SQLx worker before the lifetime OS lock releases.
-The complete SQLx dependency graph uses an immutable [startup-cleanup fork](https://github.com/transact-rs/sqlx/pull/4494) so even constructor errors await native handle release while the store retains scheduler ownership.
+The synchronous Store port retains one mutex-serialized connection; a synchronous polling bridge drives SQLx's runtime-agnostic SQLite worker without a second Tokio runtime or a connection pool.
+Commit, rollback and queued failure cleanup settle before the mutex releases, and explicit connection close joins the SQLx worker before the lifetime OS lock releases, including initialization failure and callback unwinding.
+Constructor errors also await native handle release while the store retains scheduler ownership; see the [migration dependency provenance](RUST_MIGRATION.md#compatibility-rules) for the required driver patch and its limits.
 An uncertain commit or rollback leaves that store handle fail-closed until explicit close/reopen, rather than retrying a mutation.
 An independent rusqlite reader remains test-only, pinned to SQLx's supported native SQLite ABI for durable-state and transaction-settlement oracles.
 The Rust coordination engine is a separate crate over core ports, with Tokio-owned effect tasks and cancellation-independent bookkeeping rather than request-future ownership of admitted work.

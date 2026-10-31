@@ -66,8 +66,7 @@ No live model or shared native service is required by normal CI.
 An absent opt-in fixture is reported skipped, never described as a live pass.
 `make test` also runs the Rust workspace tests and `make rust-parity`; the latter invokes a separate Go storage/engine-oracle test run with Go's default package timeout and explicit Rust fixture executables.
 These checks cover [Rust domain/SQLite, coordination, controlled runtime and disposable workspace-adapter libraries](RUST_MIGRATION.md#verification-commands), not native OpenCode, retained-workspace, HTTP-service or CLI acceptance.
-The Rust store executes the actual SQLx-checked queries with committed offline metadata, preserving the original SQLite schema and Go/Rust reopen/replay tests.
-`make rust-sqlx-check`, required by Rust lint, runs SQLx's real metadata comparison against a fresh canonical schema without modifying committed metadata.
+The [SQLx offline workflow](RUST_MIGRATION.md#sqlx-offline-query-checks) defines metadata preparation and the non-mutating check required by Rust lint and CI.
 `tools/prove-sqlx.py`, included in `make prove-quality`, compiles conforming queries offline with an intentionally unusable database URL and rejects wrong row types, missing/uncached queries, stale query metadata and schema drift through the real compiler/CLI.
 The same proof builds and executes a release-profile consumer, including actual SQLx host proc-macro loading on macOS.
 `tools/test-sqlx.py` verifies the disposable schema's actual query/constraint behavior and refusal of dotenv FIFOs and broken symlinks without opening their contents.

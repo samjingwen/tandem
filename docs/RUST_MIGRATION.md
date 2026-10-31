@@ -46,13 +46,11 @@ Bundled SQLite needs a build-time C compiler but no separately provisioned SQLit
 - One canonical state directory has one lifetime OS lock and one scheduling owner, including across Go and Rust processes and symlink aliases.
 - Keep schema migrations append-only and data-preserving; the initial Rust store reuses the original SQL migration instead of creating a competing schema lineage.
 
-The Rust store uses SQLx 0.9.0, serializes snapshots/transactions behind one mutex and reads each snapshot at one SQLite transaction point.
+The Rust store uses SQLx 0.9.0 and reads each snapshot at one SQLite transaction point.
 SQLx and its internal crates share immutable fork revision `1d5c394d783a50cf8cc068a71b60bfaa7bff02ef` from [samjingwen/sqlx](https://github.com/samjingwen/sqlx) pending an upstream release of [PR #4494](https://github.com/transact-rs/sqlx/pull/4494).
 The driver patch awaits native connection cleanup before returning startup PRAGMA/collation errors, preserves the original error and skips optional optimize-on-close commands on that failure path.
 It does not change cancellation or drop semantics of an in-flight connection future; Tandem's synchronous constructor drives initialization through completion while retaining scheduler ownership.
-The runtime-agnostic SQLite connection is driven through a synchronous polling bridge, preserving the core Store interface without adding a connection pool or another Tokio runtime.
-Commit/rollback and queued failure cleanup settle before releasing the connection mutex; uncertain transaction settlement fails closed until close/reopen.
-Explicit close joins SQLx's background SQLite worker before releasing the instance's OS ownership lock, including initialization failure and callback unwinding.
+The [storage architecture](ARCHITECTURE.md#language-migration-and-sqlite) defines the synchronous connection, settlement and lifetime-ownership guarantees.
 An unchanged transaction does not change revision or append history.
 Unchanged persisted rows retain their exact stored JSON, including accepted operation bodies; only changed records append history at the new atomic revision.
 Unknown record fields and original timestamp spellings survive unrelated Rust updates.
@@ -134,15 +132,12 @@ The only raw SQL is the canonical multi-statement migration, executed unchanged 
 Bundled SQLite connection options own WAL, FULL synchronization, foreign keys and the existing five-second busy timeout.
 Committed `.sqlx` files are generated query descriptions, not database contents or a second migration lineage, and must not be hand-edited.
 Normal Cargo builds default to `SQLX_OFFLINE=true` through `.cargo/config.toml`; supported Make targets also set it explicitly.
-`make prepare` installs the matching pinned SQLx CLI project-locally, while `make rust-sqlx-check` runs its real `prepare --check --workspace` consumer against a new disposable database created from the original schema migration.
+After the [build prerequisites](../README.md#build-and-check) are prepared, `make rust-sqlx-check` runs the pinned SQLx CLI's real `prepare --check --workspace` consumer against a new disposable database created from the original schema migration.
 Both metadata modes and the proof invoke the exact local executable with an explicitly supplied Cargo executable, without global SQLx discovery or fallback.
-The proof deliberately starts with `CARGO` unset and exercises real preparation and check-mode consumers, not only version probes or executable stubs.
 Lint and configured CI require this check, and intentional query/schema changes use the separate mutating `make rust-sqlx-prepare` command before committing regenerated metadata.
 SQLx macros automatically search ancestor `.env` files even in offline mode, so supported targets first refuse any such file by existence metadata, and CLI preparation additionally passes `--no-dotenv`.
 Neither the guard nor schema preparation reads private environment files or accepts a retained/application database URL.
-`make prove-quality` executes actual offline compilation and metadata consumers against conforming and deliberately wrong row types, missing/uncached queries, stale query metadata and schema drift.
-It also builds and executes a conforming SQLx consumer under the maintained release profile, checking actual host proc-macro loading rather than only development compilation.
 Build-time procedural macros remain unstripped so the macOS compiler can load their dylibs; final release artifacts retain their independent debug-info stripping policy.
-These checks complement transaction, lossless JSON and Go/Rust interoperability tests; SQL type checking alone does not validate receipt semantics or JSON record contents.
+See the [verification contract](VERIFICATION.md#routine-deterministic-checks) for compiler/CLI probes and transaction, lossless JSON and Go/Rust interoperability coverage; SQL type checking alone does not validate receipt semantics or JSON record contents.
 
 The current milestone proves storage/model, coordination, controlled HTTP runtime and disposable Git/Worktrunk adapter behavior only, not migration completion, live OpenCode compatibility, production cutover, external consumer acceptance or permission to publish/deploy an executable.
