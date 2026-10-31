@@ -45,13 +45,17 @@ The current executable is still Go; Rust libraries implement domain/storage, coo
 Rust dependencies use `Cargo.toml`/`Cargo.lock`; `rust-toolchain.toml` pins the toolchain.
 Python quality tooling requires Python 3.11+ with `venv` and pip (CI uses 3.11).
 `make prepare` installs pinned Ruff from `tools/python-requirements.txt` into `.tmp/python-tools`, without changing global tools.
-`make lint` checks formatting and focused Python lint for the maintained engine-safety driver, Worktrunk preparation tool and its behavioral tests; dependencies, generated files and private data are excluded.
+`make lint` checks formatting and focused Python lint for the maintained engine-safety driver, Worktrunk and SQLx preparation tools and their behavioral checks; dependencies, generated files and private data are excluded.
 `make format` applies safe Ruff fixes and formatting; `make prove-quality` also exercises disposable Python analyzer consumers.
 `make check` includes Rust tests and real Go/Rust/Go and Rust/Go/Rust persistence/ownership tests against fresh disposable stores.
 `make prepare` installs checksum-verified Worktrunk 0.81.0 under `.tmp/worktrunk` for the real allocator tests, without changing global tools or Rust's pinned compiler.
 Make targets add that installation to their own `PATH`; to use it with `./bin/tandem serve` in the current shell, run `export PATH="$PWD/.tmp/worktrunk/bin:$PATH"` from the repository root first.
 See the [verification contract](docs/VERIFICATION.md#routine-deterministic-checks) for coordination/oracle coverage and its acceptance limits.
 No retained database, native service, or provider is needed for those checks.
+`make prepare` installs the pinned SQLx CLI under `.tmp/sqlx-tools`.
+Use the supported Make targets in a checkout without ancestor `.env` files.
+Do not supply retained database URLs or private environment files for compilation or metadata preparation.
+See the [SQLx offline workflow](docs/RUST_MIGRATION.md#sqlx-offline-query-checks) for metadata checking/regeneration and the [dependency provenance](docs/RUST_MIGRATION.md#compatibility-rules) for the temporary driver fork.
 
 ## Connect a runtime and start an instance
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO decisions(id,body) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6abd40708dda7f4443cfe62aea131b998c14c0c700476358d137ab0c3efbca39"
+}

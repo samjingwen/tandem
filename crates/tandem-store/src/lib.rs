@@ -8,19 +8,24 @@ use std::{
     fs::{self, File, OpenOptions, TryLockError},
     path::{Path, PathBuf},
     sync::Mutex,
-    time::Duration,
 };
 
-use rusqlite::{Connection, Transaction, params};
+use pollster::block_on;
 use serde::{Serialize, de::DeserializeOwned};
+use sqlx::SqliteConnection;
 use tandem_core::{Error, Result, Revision, State, Store};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 const INITIAL: &str = include_str!("../../../internal/store/migrations/001_initial.sql");
 
+mod connection;
+mod entities;
+
+use connection::Database;
+
 pub struct Sqlite {
     // Declaration order closes SQLite before releasing OS ownership on Drop.
-    connection: Mutex<Connection>,
+    connection: Mutex<Database>,
     _lock: File,
     directory: PathBuf,
 }
@@ -111,17 +116,8 @@ impl Sqlite {
             }
             Err(TryLockError::Error(_)) => return Err(io_error()),
         }
-        let mut connection =
-            Connection::open(directory.join("tandem.db")).map_err(|_| storage_error())?;
-        connection
-            .busy_timeout(Duration::from_secs(5))
-            .map_err(|_| storage_error())?;
-        connection
-            .execute_batch(
-                "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;",
-            )
-            .map_err(|_| storage_error())?;
-        initialize(&mut connection)?;
+        let mut connection = Database::open(&directory.join("tandem.db"))?;
+        connection.transaction(initialize)?;
         Ok(Self {
             connection: Mutex::new(connection),
             _lock: lock,
@@ -134,16 +130,15 @@ impl Sqlite {
     }
 }
 
-fn initialize(connection: &mut Connection) -> Result<()> {
-    let transaction = connection.transaction().map_err(|_| storage_error())?;
-    transaction.execute_batch("CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)").map_err(|_| storage_error())?;
-    let version: i64 = transaction
-        .query_row(
-            "SELECT coalesce(max(version),0) FROM schema_migrations",
-            [],
-            |row| row.get(0),
+fn initialize(connection: &mut SqliteConnection) -> Result<()> {
+    block_on(sqlx::query!("CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)").execute(&mut *connection)).map_err(|_| storage_error())?;
+    let version = block_on(
+        sqlx::query_scalar!(
+            "SELECT coalesce(max(version),0) AS \"version!\" FROM schema_migrations"
         )
-        .map_err(|_| storage_error())?;
+        .fetch_one(&mut *connection),
+    )
+    .map_err(|_| storage_error())?;
     if version > 1 {
         return Err(Error::new(
             "newer_schema",
@@ -154,55 +149,37 @@ fn initialize(connection: &mut Connection) -> Result<()> {
         return Err(corrupt());
     }
     if version == 0 {
-        transaction
-            .execute_batch(INITIAL)
-            .map_err(|_| storage_error())?;
+        // The canonical multi-statement migration is the sole raw-SQL boundary.
+        // It is executed on disposable schemas during metadata generation and
+        // compatibility tests, not copied into a competing SQLx migration line.
+        block_on(sqlx::raw_sql(INITIAL).execute(&mut *connection)).map_err(|_| storage_error())?;
         let mut random = [0_u8; 16];
         getrandom::fill(&mut random)
             .map_err(|_| Error::new("entropy_unavailable", "cannot allocate instance identity"))?;
         let instance: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
-        transaction
-            .execute(
+        block_on(
+            sqlx::query!(
                 "INSERT INTO metadata(key,value) VALUES('instance_id',?)",
-                [instance],
+                instance
             )
-            .map_err(|_| storage_error())?;
-        transaction
-            .execute("INSERT INTO schema_migrations VALUES(1,?)", [timestamp()?])
-            .map_err(|_| storage_error())?;
+            .execute(&mut *connection),
+        )
+        .map_err(|_| storage_error())?;
+        let at = timestamp()?;
+        block_on(
+            sqlx::query!("INSERT INTO schema_migrations VALUES(1,?)", at).execute(&mut *connection),
+        )
+        .map_err(|_| storage_error())?;
     }
-    transaction.commit().map_err(|_| storage_error())
+    Ok(())
 }
 
-fn load_map<T: DeserializeOwned>(
-    connection: &Connection,
-    table: &str,
-) -> Result<BTreeMap<String, T>> {
-    // table is a fixed implementation-owned literal, never caller input.
-    let mut statement = connection
-        .prepare(&format!("SELECT id,body FROM {table}"))
-        .map_err(|_| storage_error())?;
-    let rows = statement
-        .query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|_| storage_error())?;
-    let mut values = BTreeMap::new();
-    for row in rows {
-        let (id, body) = row.map_err(|_| storage_error())?;
-        if !body.trim_start().starts_with('{') {
-            return Err(corrupt());
-        }
-        values.insert(id, serde_json::from_str(&body).map_err(|_| corrupt())?);
-    }
-    Ok(values)
-}
-
-fn revision(connection: &Connection) -> Result<Revision> {
-    let (instance_id, revision): (String, String) = connection.query_row(
-        "SELECT (SELECT value FROM metadata WHERE key='instance_id'), (SELECT value FROM metadata WHERE key='revision')", [],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    ).map_err(|_| corrupt())?;
+fn revision(connection: &mut SqliteConnection) -> Result<Revision> {
+    let row = block_on(sqlx::query!(
+        "SELECT (SELECT value FROM metadata WHERE key='instance_id') AS instance_id, (SELECT value FROM metadata WHERE key='revision') AS revision"
+    ).fetch_one(connection)).map_err(|_| corrupt())?;
+    let instance_id = row.instance_id.ok_or_else(corrupt)?;
+    let revision = row.revision.ok_or_else(corrupt)?;
     let revision: i64 = revision.parse().map_err(|_| corrupt())?;
     if instance_id.is_empty() || revision < 0 {
         return Err(corrupt());
@@ -213,27 +190,28 @@ fn revision(connection: &Connection) -> Result<Revision> {
     })
 }
 
-fn snapshot(connection: &Connection) -> Result<State> {
+fn snapshot(connection: &mut SqliteConnection) -> Result<State> {
     let revision = revision(connection)?;
     Ok(State {
         instance_id: revision.instance_id,
         revision: revision.revision,
-        projects: load_map(connection, "projects")?,
-        tasks: load_map(connection, "tasks")?,
-        attempts: load_map(connection, "attempts")?,
-        commands: load_map(connection, "commands")?,
-        decisions: load_map(connection, "decisions")?,
-        results: load_map(connection, "results")?,
-        operations: load_map(connection, "operations")?,
+        projects: entities::projects(connection)?,
+        tasks: entities::tasks(connection)?,
+        attempts: entities::attempts(connection)?,
+        commands: entities::commands(connection)?,
+        decisions: entities::decisions(connection)?,
+        results: entities::results(connection)?,
+        operations: entities::operations(connection)?,
     })
 }
 
 fn write_map<T: Serialize + DeserializeOwned + PartialEq>(
-    transaction: &Transaction<'_>,
-    table: &str,
+    connection: &mut SqliteConnection,
     before: &BTreeMap<String, T>,
     after: &BTreeMap<String, T>,
     revision: i64,
+    table: &str,
+    mut write: impl FnMut(&mut SqliteConnection, &str, &str) -> Result<()>,
 ) -> Result<()> {
     if before.keys().any(|key| !after.contains_key(key)) {
         return Err(Error::invalid(
@@ -255,13 +233,20 @@ fn write_map<T: Serialize + DeserializeOwned + PartialEq>(
                 "record encoding would discard retained data",
             ));
         }
-        transaction.execute(&format!("INSERT INTO {table}(id,body) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body"), params![id, body]).map_err(|_| storage_error())?;
-        transaction
-            .execute(
+        write(connection, id, &body)?;
+        let at = timestamp()?;
+        block_on(
+            sqlx::query!(
                 "INSERT INTO history(revision,entity,id,at,body) VALUES(?,?,?,?,?)",
-                params![revision, table, id, timestamp()?, body],
+                revision,
+                table,
+                id,
+                at,
+                body
             )
-            .map_err(|_| storage_error())?;
+            .execute(&mut *connection),
+        )
+        .map_err(|_| storage_error())?;
     }
     Ok(())
 }
@@ -269,90 +254,56 @@ fn write_map<T: Serialize + DeserializeOwned + PartialEq>(
 impl Store for Sqlite {
     fn snapshot(&self) -> Result<State> {
         let mut connection = self.connection.lock().map_err(|_| storage_error())?;
-        let transaction = connection.transaction().map_err(|_| storage_error())?;
-        let state = snapshot(&transaction)?;
-        transaction.commit().map_err(|_| storage_error())?;
-        Ok(state)
+        connection.transaction(snapshot)
     }
 
     fn read_revision(&self) -> Result<Revision> {
-        let connection = self.connection.lock().map_err(|_| storage_error())?;
-        revision(&connection)
+        let mut connection = self.connection.lock().map_err(|_| storage_error())?;
+        connection.transaction(revision)
     }
 
     fn update(&self, change: &mut dyn FnMut(&mut State) -> Result<()>) -> Result<()> {
         let mut connection = self.connection.lock().map_err(|_| storage_error())?;
-        let transaction = connection.transaction().map_err(|_| storage_error())?;
-        let before = snapshot(&transaction)?;
-        let mut after = before.clone();
-        change(&mut after)?;
-        if before == after {
-            return transaction.commit().map_err(|_| storage_error());
-        }
-        if before.instance_id != after.instance_id || before.revision != after.revision {
-            return Err(Error::invalid(
-                "instance identity and revision are store-owned",
-            ));
-        }
-        // Exact accepted operation receipts are immutable, including their raw
-        // outcome spelling. No rewrite/replay can silently create a new receipt.
-        if before
-            .operations
-            .iter()
-            .any(|(key, value)| after.operations.get(key) != Some(value))
-        {
-            return Err(Error::invalid("accepted operation receipts are immutable"));
-        }
-        let revision = before.revision.checked_add(1).ok_or_else(corrupt)?;
-        write_map(
-            &transaction,
-            "projects",
-            &before.projects,
-            &after.projects,
-            revision,
-        )?;
-        write_map(&transaction, "tasks", &before.tasks, &after.tasks, revision)?;
-        write_map(
-            &transaction,
-            "attempts",
-            &before.attempts,
-            &after.attempts,
-            revision,
-        )?;
-        write_map(
-            &transaction,
-            "commands",
-            &before.commands,
-            &after.commands,
-            revision,
-        )?;
-        write_map(
-            &transaction,
-            "decisions",
-            &before.decisions,
-            &after.decisions,
-            revision,
-        )?;
-        write_map(
-            &transaction,
-            "results",
-            &before.results,
-            &after.results,
-            revision,
-        )?;
-        write_map(
-            &transaction,
-            "operations",
-            &before.operations,
-            &after.operations,
-            revision,
-        )?;
-        transaction
-            .execute(
-                "UPDATE metadata SET value=? WHERE key='revision'",
-                [revision.to_string()],
-            )
-            .map_err(|_| storage_error())?;
-        transaction.commit().map_err(|_| storage_error())
+        connection.transaction(|connection| update(connection, change))
     }
+}
+
+fn update(
+    connection: &mut SqliteConnection,
+    change: &mut dyn FnMut(&mut State) -> Result<()>,
+) -> Result<()> {
+    let before = snapshot(connection)?;
+    let mut after = before.clone();
+    change(&mut after)?;
+    if before == after {
+        return Ok(());
+    }
+    if before.instance_id != after.instance_id || before.revision != after.revision {
+        return Err(Error::invalid(
+            "instance identity and revision are store-owned",
+        ));
+    }
+    // Exact accepted operation receipts are immutable, including their raw
+    // outcome spelling. No rewrite/replay can silently create a new receipt.
+    if before
+        .operations
+        .iter()
+        .any(|(key, value)| after.operations.get(key) != Some(value))
+    {
+        return Err(Error::invalid("accepted operation receipts are immutable"));
+    }
+    let revision = before.revision.checked_add(1).ok_or_else(corrupt)?;
+    entities::write_projects(connection, &before.projects, &after.projects, revision)?;
+    entities::write_tasks(connection, &before.tasks, &after.tasks, revision)?;
+    entities::write_attempts(connection, &before.attempts, &after.attempts, revision)?;
+    entities::write_commands(connection, &before.commands, &after.commands, revision)?;
+    entities::write_decisions(connection, &before.decisions, &after.decisions, revision)?;
+    entities::write_results(connection, &before.results, &after.results, revision)?;
+    entities::write_operations(connection, &before.operations, &after.operations, revision)?;
+    let value = revision.to_string();
+    block_on(
+        sqlx::query!("UPDATE metadata SET value=? WHERE key='revision'", value).execute(connection),
+    )
+    .map_err(|_| storage_error())?;
+    Ok(())
 }

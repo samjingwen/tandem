@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT (SELECT value FROM metadata WHERE key='instance_id') AS instance_id, (SELECT value FROM metadata WHERE key='revision') AS revision",
+  "describe": {
+    "columns": [
+      {
+        "name": "instance_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "metadata",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "name": "revision",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "metadata",
+            "name": "value"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "16e2b07d78e68a2c85ab9d7c93fe5511aaf25ca108b191c97a5223b587cab95d"
+}

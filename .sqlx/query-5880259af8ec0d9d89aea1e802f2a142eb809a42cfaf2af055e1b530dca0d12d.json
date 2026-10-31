@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT coalesce(max(version),0) AS \"version!\" FROM schema_migrations",
+  "describe": {
+    "columns": [
+      {
+        "name": "version!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5880259af8ec0d9d89aea1e802f2a142eb809a42cfaf2af055e1b530dca0d12d"
+}

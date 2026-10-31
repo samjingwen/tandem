@@ -9,15 +9,19 @@ publish.workspace = true
 description = "Single-owner SQLite storage compatible with Tandem schema version 1"
 
 [dependencies]
+futures-util.workspace = true
 getrandom.workspace = true
-rusqlite.workspace = true
+pollster.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tandem-core.workspace = true
 time.workspace = true
+sqlx.workspace = true
 
 [dev-dependencies]
+rusqlite.workspace = true
 tempfile.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true
