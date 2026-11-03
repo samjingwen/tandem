@@ -5,6 +5,8 @@ The native engine, service, and CLI are migrating to Rust 1.95.0 under `docs/RUS
 Keep Go 1.27.3 as the executable/reference implementation until behavioral cutover criteria pass.
 Preserve SQLite compatibility, the versioned HTTP API shared by all clients, and the TypeScript OpenCode plugin.
 OpenCode V2 owns model/tool execution and its native session data.
+Follow this repository's [change delivery policy](.opencode/instructions/change-delivery.md).
+The no-mistakes gate is retired; do not restore its configuration or initialize a new gate.
 
 ## Engineering
 
@@ -15,7 +17,7 @@ OpenCode V2 owns model/tool execution and its native session data.
 - Worktrees are checkout isolation, not security sandboxes.
 - Keep runtime state, credentials, transcripts, and machine-specific handoffs outside Git.
 - Never read private environment/authentication files.
-- Use dedicated Worktrunk worktrees; preserve other workers and gates.
+- Use dedicated Worktrunk worktrees; preserve other workers, unpublished source, and independent runtime holds.
 - Do not merge/publish a managed task merely because its worker reports success.
 
 ## Commands
