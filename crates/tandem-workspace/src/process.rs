@@ -200,6 +200,7 @@ mod tests {
     async fn canceled_command_group_is_joined_and_partial_effect_is_retained() {
         let root = tempfile::tempdir().unwrap();
         let marker = root.path().join("allocated");
+        let ready = root.path().join("descendant-ready");
         let late = root.path().join("late-effect");
         let directory = root.path().to_path_buf();
         let context = Context::background();
@@ -211,13 +212,13 @@ mod tests {
                 "sh",
                 &[
                     "-c".as_ref(),
-                    "printf 'owned' > allocated; (sleep 1; touch late-effect) & wait".as_ref(),
+                    "printf 'owned' > allocated; (touch descendant-ready; while [ ! -e release ]; do sleep 0.01; done; touch late-effect) & wait".as_ref(),
                 ],
             )
             .await
         });
         tokio::time::timeout(Duration::from_secs(5), async {
-            while !marker.exists() {
+            while !marker.exists() || !ready.exists() {
                 tokio::time::sleep(Duration::from_millis(1)).await;
             }
         })
@@ -232,6 +233,10 @@ mod tests {
             .unwrap();
         assert_eq!(error.code, "canceled");
         assert_eq!(std::fs::read_to_string(marker).unwrap(), "owned");
+        // Permit a surviving descendant to mutate only after cancellation joined.
+        // A wall-clock sleep in the child could expire before the test is scheduled
+        // to request cancellation on a busy machine, producing a false failure.
+        std::fs::write(root.path().join("release"), b"release").unwrap();
         tokio::time::sleep(Duration::from_millis(1200)).await;
         assert!(
             !late.exists(),

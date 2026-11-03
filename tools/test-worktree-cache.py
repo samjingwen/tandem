@@ -42,6 +42,9 @@ class CopyTests(unittest.TestCase):
             "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
             "GIT_COMMITTER_NAME": "Cache fixture",
             "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+            "npm_config_offline": "true",
+            "npm_config_audit": "false",
+            "npm_config_fund": "false",
         }
         self.command(["git", "init", "--initial-branch=source"])
         self.command(["git", "config", "core.hooksPath", os.devnull])
@@ -188,6 +191,21 @@ class CopyTests(unittest.TestCase):
         result = self.copy(destination)
         self.assertIn("Skipping node", result.stdout)
         self.assertFalse((destination / "plugin/node_modules").exists())
+
+    def test_incompatible_groups_stay_excluded_when_another_group_copies(self):
+        self.prepare()
+        for name in [
+            "target/debug/deps/cached.rlib",
+            ".tmp/rust-tools/bin/cargo-audit",
+        ]:
+            file = self.source / name
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text("synthetic incompatible cache")
+        destination = self.destination()
+        self.copy(destination)
+        self.assertTrue((destination / "plugin/node_modules/cache-marker").exists())
+        self.assertFalse((destination / "target").exists())
+        self.assertFalse((destination / ".tmp/rust-tools").exists())
 
     def test_unknown_runtime_stamp_and_existing_cache_are_not_trusted(self):
         self.prepare()
