@@ -487,6 +487,14 @@ chmod +x "$root/bin/cargo-audit"
         self.assertIn("73", cold.stderr)
         self.assertFalse((self.source / CACHE.METADATA / "node.json").exists())
 
+    def test_dependency_preparation_does_not_require_git_ownership_trust(self):
+        self.env["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1"
+        result = self.command(["git", "rev-parse", "--show-toplevel"], check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("dubious ownership", result.stderr)
+        self.prepare()
+        self.assertTrue((self.source / CACHE.METADATA / "node.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -492,7 +492,9 @@ def main():
     copier.add_argument("--from", dest="source", type=Path, required=True)
     copier.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    root = Path(output(["git", "rev-parse", "--show-toplevel"], Path.cwd())).resolve()
+    # Preparation also runs in source archives and container-mounted checkouts
+    # where Git intentionally refuses ownership. Copying validates Git separately.
+    root = Path(__file__).resolve().parent.parent
     if args.command == "prepare-node":
         prepare_node(root, args.cold)
     elif args.command == "prepare-audit":
