@@ -144,6 +144,97 @@ class CopyTests(unittest.TestCase):
             destination,
         )
 
+    def prepare_native_caches(self):
+        # Synthetic native payloads exercise the real copy consumer, not compilers.
+        for name in ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "Makefile"]:
+            shutil.copyfile(PROJECT / name, self.source / name)
+        wrappers = self.root / "native-wrappers"
+        wrappers.mkdir()
+        for name in ["rustc", "cargo"]:
+            executable = wrappers / name
+            executable.write_text(f"#!/bin/sh\necho '{name} fixture-version'\n")
+            executable.chmod(0o700)
+        self.env["PATH"] = str(wrappers) + os.pathsep + self.env["PATH"]
+        self.command(
+            [
+                "git",
+                "add",
+                "Cargo.toml",
+                "Cargo.lock",
+                "rust-toolchain.toml",
+                "Makefile",
+            ]
+        )
+        self.command(["git", "commit", "-m", "native fixture inputs"])
+        for name in [
+            "target/.rustc_info.json",
+            "target/CACHEDIR.TAG",
+            "target/debug/.cargo-lock",
+            "target/debug/deps/cache.rlib",
+            "target/debug/.fingerprint/cache/hash",
+            "target/debug/build/cache/output",
+            "target/debug/incremental/private-state",
+            "target/debug/application",
+            ".tmp/rust-tools/bin/cargo-audit",
+            ".tmp/rust-tools/.crates.toml",
+        ]:
+            file = self.source / name
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text("synthetic cache")
+        self.command(
+            [
+                sys.executable,
+                "-c",
+                "import runpy; from pathlib import Path; m=runpy.run_path('tools/worktree-cache.py'); m['record'](Path.cwd(),'rust'); m['record'](Path.cwd(),'audit')",
+            ]
+        )
+        (self.source / CACHE.METADATA / "audit.lock").touch()
+
+    def test_native_files_and_nested_caches_are_really_copied(self):
+        self.prepare_native_caches()
+        destination = self.destination()
+        preview = self.copy(destination, "--dry-run")
+        self.assertIn("target/debug/deps", preview.stdout)
+        self.assertIn(".tmp/rust-tools/bin/cargo-audit", preview.stdout)
+        self.copy(destination)
+        for name in [
+            "target/.rustc_info.json",
+            "target/debug/deps/cache.rlib",
+            ".tmp/rust-tools/bin/cargo-audit",
+        ]:
+            self.assertEqual((destination / name).read_text(), "synthetic cache", name)
+        for name in [
+            "target/debug/.cargo-lock",
+            "target/debug/incremental",
+            "target/debug/application",
+            ".tmp/rust-tools/.crates.toml",
+        ]:
+            self.assertFalse((destination / name).exists(), name)
+
+    def test_busy_rust_cache_is_not_copied_but_audit_is(self):
+        self.prepare_native_caches()
+        destination = self.destination()
+        with CACHE.cache_lock(self.source, "target/debug/.cargo-lock", exclusive=True):
+            result = self.copy(destination)
+        self.assertIn("Skipping rust", result.stdout)
+        self.assertFalse((destination / "target").exists())
+        self.assertTrue((destination / ".tmp/rust-tools/bin/cargo-audit").exists())
+
+    def test_only_checksum_pinned_worktrunk_archive_is_copied(self):
+        relative = CACHE.archive(PROJECT)
+        archive = self.source / relative
+        archive.parent.mkdir(parents=True)
+        shutil.copyfile(PROJECT / relative, archive)
+        (archive.parent / "worktrunk-untrusted.tar.xz").write_text("untrusted")
+        destination = self.destination()
+        preview = self.copy(destination, "--dry-run")
+        self.assertIn(relative, preview.stdout)
+        self.copy(destination)
+        self.assertEqual(CACHE.digest(destination / relative), CACHE.digest(archive))
+        self.assertFalse(
+            (destination / ".tmp/worktrunk/worktrunk-untrusted.tar.xz").exists()
+        )
+
     def test_real_copy_isolated_and_private_paths_excluded(self):
         self.prepare()
         for name in [

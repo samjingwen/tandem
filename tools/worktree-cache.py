@@ -233,6 +233,15 @@ def safe_tree(root):
     Public dependency lockfiles are data, not in-use process coordination locks.
     """
 
+    # Optional compiler metadata and the audit executable are individual leaves.
+    if not root.exists():
+        return
+    mode = root.lstat().st_mode
+    if stat.S_ISREG(mode):
+        return
+    if not stat.S_ISDIR(mode):
+        raise ValueError("cache contains a special file")
+
     def fail(error):
         raise error
 
@@ -397,7 +406,8 @@ def copy(source, destination, dry_run):
                 selected.append(group)
             except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
                 print(f"Skipping {group} cache: {error}")
-                exclusions.extend(f"/{name}/" for name in roots)
+                # Roots include individual files as well as directories.
+                exclusions.extend(f"/{name}" for name in roots)
         if not selected:
             print(
                 "No compatible cache available; normal make prepare/build remains available."

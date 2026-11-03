@@ -67,6 +67,7 @@ It skips busy caches instead of waiting on, stealing, or copying control locks.
 Do not run out-of-band npm mutations against the source during copying.
 
 Worktrunk 0.81.0 copies an allowlisted directory as a whole; its additional excludes do not sanitize that directory's descendants.
+It also discovers ignored entries at directory boundaries, so `.gitignore` leaves the selected cache parents traversable while still ignoring all their contents.
 Therefore the helper inspects directory entry names/types without reading private file contents before selecting a cache tree.
 An environment file, credential store, runtime database, process lock, special file or escaping symlink inside a selected tree excludes that entire cache.
 Ordinary shipped dependency lockfiles such as `yarn.lock` are immutable dependency data, not process locks.
