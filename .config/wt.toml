@@ -1,0 +1,13 @@
+# Copy before background hooks or `wt switch --execute` can start a build.
+[pre-start]
+cache = "python3 tools/worktree-cache.py copy --from {{ base_worktree_path | default(primary_worktree_path, true) }}"
+
+[step.copy-ignored]
+exclude = [
+  "**/.env", "**/.env.*", "**/auth.json", "**/credentials", "**/credentials.json",
+  "**/.npmrc", "**/.netrc",
+  "**/*.db", "**/*.db-*", "**/*.sqlite*", "**/*.pid", "**/*.sock",
+  "**/*.lock", "**/.cargo-lock", "**/.package-cache*",
+  "**/.git/", "**/.opencode/", "**/.venv/", "**/__pycache__/",
+  "**/.aws/", "**/.ssh/", "**/.npm/", "**/.tandem/",
+]

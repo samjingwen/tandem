@@ -17,6 +17,8 @@ print(json.dumps({"conforming": True}))
 EOF
 cp "$fixture/tools/test-engine-safety.py" "$fixture/tools/prepare-worktrunk.py"
 cp "$fixture/tools/test-engine-safety.py" "$fixture/tools/test-prepare-worktrunk.py"
+cp "$fixture/tools/test-engine-safety.py" "$fixture/tools/worktree-cache.py"
+cp "$fixture/tools/test-engine-safety.py" "$fixture/tools/test-worktree-cache.py"
 check python-lint > "$fixture/conforming.log" 2>&1
 cat > "$fixture/tools/test-engine-safety.py" <<'EOF'
 print(  "unformatted"  )
@@ -52,7 +54,7 @@ fi
 grep -q 'I001' "$fixture/rejected-imports.log"
 check python-format > "$fixture/fixed-imports.log" 2>&1
 check python-lint > "$fixture/final-check.log" 2>&1
-for name in prepare-worktrunk test-prepare-worktrunk; do
+for name in prepare-worktrunk test-prepare-worktrunk worktree-cache test-worktree-cache; do
     cp "$fixture/tools/$name.py" "$fixture/tools/$name.good"
     printf 'print(undefined_name)\n' > "$fixture/tools/$name.py"
     if check python-lint > "$fixture/$name-rejected.log" 2>&1; then

@@ -1,4 +1,4 @@
-.PHONY: prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-runtime-parity rust-workspace-parity rust-safety rust-build rust-security python-prepare python-format python-format-check python-lint python-test worktrunk-prepare
+.PHONY: prepare plugin-prepare format format-check lint test test-race check build build-core plugin-build security plugin-check prove-quality rust-prepare rust-format-check rust-lint rust-test rust-parity rust-runtime-parity rust-workspace-parity rust-safety rust-build rust-security python-prepare python-format python-format-check python-lint python-test worktrunk-prepare
 
 RUST_AUDIT_VERSION := 0.22.2
 RUST_AUDIT_ROOT := $(CURDIR)/.tmp/rust-tools
@@ -6,7 +6,7 @@ PYTHON := python3
 PYTHON_TOOLS := $(CURDIR)/.tmp/python-tools
 RUFF := $(PYTHON_TOOLS)/bin/ruff
 # Explicit maintained tooling ownership; do not scan dependencies or fixtures.
-PYTHON_SOURCES := tools/test-engine-safety.py tools/prepare-worktrunk.py tools/test-prepare-worktrunk.py
+PYTHON_SOURCES := tools/test-engine-safety.py tools/prepare-worktrunk.py tools/test-prepare-worktrunk.py tools/worktree-cache.py tools/test-worktree-cache.py
 WORKTRUNK_ROOT := $(CURDIR)/.tmp/worktrunk
 export PATH := $(WORKTRUNK_ROOT)/bin:$(PATH)
 
@@ -21,10 +21,13 @@ GO_TEST_TIMEOUT := 20m
 
 prepare:
 	go mod download
-	npm --prefix plugin ci --ignore-scripts
+	$(MAKE) plugin-prepare
 	$(MAKE) rust-prepare
 	$(MAKE) python-prepare
 	$(MAKE) worktrunk-prepare
+
+plugin-prepare:
+	$(PYTHON) tools/worktree-cache.py prepare-node $(if $(filter 1,$(COLD)),--cold,)
 
 worktrunk-prepare:
 	$(PYTHON) tools/prepare-worktrunk.py "$(WORKTRUNK_ROOT)"
@@ -43,12 +46,17 @@ python-format-check:
 python-lint: python-format-check
 	"$(RUFF)" check --config ruff.toml $(PYTHON_SOURCES)
 
-python-test:
+python-test: worktrunk-prepare
 	$(PYTHON) tools/test-prepare-worktrunk.py
+	$(PYTHON) tools/test-worktree-cache.py
 
 rust-prepare:
 	cargo fetch --locked
-	cargo install --locked --root "$(RUST_AUDIT_ROOT)" --version $(RUST_AUDIT_VERSION) cargo-audit
+	$(PYTHON) tools/worktree-cache.py prepare-audit --root "$(RUST_AUDIT_ROOT)"
+
+.PHONY: cache-audit-version
+cache-audit-version:
+	@printf '%s\n' '$(RUST_AUDIT_VERSION)'
 
 format:
 	gofmt -w core internal cmd
@@ -69,6 +77,7 @@ lint: format-check rust-format-check python-lint
 
 rust-lint:
 	cargo clippy --workspace --all-targets --locked -- -D warnings
+	$(PYTHON) tools/worktree-cache.py record rust
 
 test:
 	go test -timeout=$(GO_TEST_TIMEOUT) $(GO_PACKAGES)
@@ -77,6 +86,7 @@ test:
 
 rust-test:
 	cargo test --workspace --all-targets --locked
+	$(PYTHON) tools/worktree-cache.py record rust
 
 rust-parity:
 	cargo build --locked --example store-compat
@@ -122,6 +132,7 @@ build: build-core plugin-build rust-build
 
 rust-build:
 	cargo build --workspace --release --locked
+	$(PYTHON) tools/worktree-cache.py record rust
 
 build-core:
 	mkdir -p bin

@@ -1,0 +1,12 @@
+# Only ignored dependency/build caches. Never include all of .tmp or target.
+/plugin/node_modules/
+/target/.rustc_info.json
+/target/CACHEDIR.TAG
+/target/debug/.fingerprint/
+/target/debug/deps/
+/target/debug/build/
+/target/release/.fingerprint/
+/target/release/deps/
+/target/release/build/
+/.tmp/worktrunk/worktrunk-*.tar.xz
+/.tmp/rust-tools/bin/cargo-audit

@@ -1,13 +1,24 @@
 /.worktrees/
 /bin/
-/.tmp/
+# Keep contents ignored, but let Worktrunk discover allowlisted children.
+/.tmp/*
+!/.tmp/worktrunk/
+/.tmp/worktrunk/*
+!/.tmp/rust-tools/
+/.tmp/rust-tools/*
+!/.tmp/rust-tools/bin/
+/.tmp/rust-tools/bin/*
 /.lavish/
 *.db
 *.db-shm
 *.db-wal
 *.lock
 !/Cargo.lock
-/target/
+/target/*
+!/target/debug/
+/target/debug/*
+!/target/release/
+/target/release/*
 /tools/__pycache__/
 .env
 .env.*
