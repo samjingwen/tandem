@@ -138,6 +138,14 @@ type RevisionSource interface {
 	ReadRevision(context.Context) (string, int64, error)
 }
 
+// OperationSource reads one immutable accepted operation without loading the
+// inventory or opening a write transaction. Reads must serialize with updates
+// like Snapshot and return independently owned outcome bytes. A miss is not
+// admission: callers must still check for duplicates in the committing update.
+type OperationSource interface {
+	ReadOperation(context.Context, string) (Operation, bool, error)
+}
+
 type RuntimeInfo struct {
 	ID         string `json:"id"`
 	Version    string `json:"version"`

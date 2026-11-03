@@ -59,6 +59,8 @@ Cache eviction changes performance only, not content availability, revision vali
 Every mutating API request requires a caller-stable operation ID.
 The operation's normalized input fingerprint and outcome commit with the state transition.
 Identical retries return the original receipt; conflicting reuse fails.
+An optional storage-independent operation reader returns immutable accepted receipts without loading the inventory or entering a write transaction.
+A read miss still requires duplicate detection inside the committing update, and stores without the optimization retain the transactional fallback.
 External calls and commits are not one transaction.
 Dispatch intent, worktree ownership, and runtime references are persisted before their external effects.
 Recoverable external calls use the same verified identifiers, never a speculative replacement session.

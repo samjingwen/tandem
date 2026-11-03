@@ -177,6 +177,24 @@ func (s *SQLite) ReadRevision(ctx context.Context) (string, int64, error) {
 	return instance, revision, err
 }
 
+func (s *SQLite) ReadOperation(ctx context.Context, id string) (core.Operation, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var body []byte
+	err := s.db.QueryRowContext(ctx, "SELECT body FROM operations WHERE id=?", id).Scan(&body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return core.Operation{}, false, nil
+	}
+	if err != nil {
+		return core.Operation{}, false, err
+	}
+	var operation core.Operation
+	if err := json.Unmarshal(body, &operation); err != nil {
+		return core.Operation{}, false, fmt.Errorf("corrupt operations record: %w", err)
+	}
+	return operation, true, nil
+}
+
 func writeMap[T any](ctx context.Context, tx *sql.Tx, table string, values map[string]T, revision int64) error {
 	for id, v := range values {
 		body, err := json.Marshal(v)
