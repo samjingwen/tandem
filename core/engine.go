@@ -64,6 +64,24 @@ func ID(prefix string) string {
 func now() time.Time                                          { return time.Now().UTC() }
 func (e *Engine) Snapshot(ctx context.Context) (State, error) { return e.store.Snapshot(ctx) }
 
+func (e *Engine) ReadView(ctx context.Context, operationID string) (State, error) {
+	if reader, ok := e.store.(ReadViewSource); ok {
+		return reader.ReadView(ctx, operationID)
+	}
+	state, err := e.store.Snapshot(ctx)
+	if err != nil {
+		return state, err
+	}
+	operations := map[string]Operation{}
+	if operationID != "" {
+		if operation, found := state.Operations[operationID]; found {
+			operations[operationID] = operation
+		}
+	}
+	state.Operations = operations
+	return state, nil
+}
+
 func (e *Engine) ReadRevision(ctx context.Context) (string, int64, error) {
 	if reader, ok := e.store.(RevisionSource); ok {
 		return reader.ReadRevision(ctx)
@@ -96,12 +114,25 @@ func mutate[T any](ctx context.Context, e *Engine, op, kind string, input any, c
 	}
 	hash := sha256.Sum256(append([]byte(kind+"\n"), b...))
 	fingerprint := hex.EncodeToString(hash[:])
+	readExisting := func(old Operation) error {
+		if old.Fingerprint != fingerprint {
+			return &Error{Code: "operation_conflict", Message: "operation ID was already used for a different request"}
+		}
+		return json.Unmarshal(old.Outcome, &out)
+	}
+	if reader, ok := e.store.(OperationSource); ok {
+		old, exists, err := reader.ReadOperation(ctx, op)
+		if err != nil {
+			return out, err
+		}
+		if exists {
+			err = readExisting(old)
+			return out, err
+		}
+	}
 	err = e.store.Update(ctx, func(s *State) error {
 		if old, ok := s.Operations[op]; ok {
-			if old.Fingerprint != fingerprint {
-				return &Error{Code: "operation_conflict", Message: "operation ID was already used for a different request"}
-			}
-			return json.Unmarshal(old.Outcome, &out)
+			return readExisting(old)
 		}
 		var err error
 		out, err = change(s)

@@ -148,14 +148,21 @@ func TestManagedReceiptProtocol(t *testing.T) {
 	if !reflect.DeepEqual(replay, original) {
 		t.Fatal("identical mutation replay substituted newer task data")
 	}
-	fresh := httptest.NewServer(api.New(f.engine, api.Options{Token: "integration-test-token"}))
-	defer fresh.Close()
-	input, _ = json.Marshal(map[string]any{"url": fresh.URL, "task": task, "attempt": attempt, "token": "integration-test-token", "recover": true, "expected": receipts["plugin-followup"], "receipts": receipts})
-	command = exec.CommandContext(f.ctx, "node", "../../plugin/test/receipt-protocol.ts")
-	command.Stdin = bytes.NewReader(input)
-	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("fresh-handler retained-operation recovery: %v\n%s", err, output)
-	}
+	t.Run("fresh-handler-recovery", func(t *testing.T) {
+		// Recovery is an independent process/handler phase. Retain the same
+		// bounded phase budget rather than inheriting time spent creating and
+		// consuming the original receipts under race instrumentation.
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
+		defer cancel()
+		fresh := httptest.NewServer(api.New(f.engine, api.Options{Token: "integration-test-token"}))
+		defer fresh.Close()
+		input, _ := json.Marshal(map[string]any{"url": fresh.URL, "task": task, "attempt": attempt, "token": "integration-test-token", "recover": true, "expected": receipts["plugin-followup"], "receipts": receipts})
+		command := exec.CommandContext(ctx, "node", "../../plugin/test/receipt-protocol.ts")
+		command.Stdin = bytes.NewReader(input)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("fresh-handler retained-operation recovery: %v\n%s", err, output)
+		}
+	})
 }
 
 func TestDecisionListPromptProjection(t *testing.T) {

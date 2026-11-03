@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -69,7 +70,12 @@ func (h *handler) boundedRead(w http.ResponseWriter, r *http.Request, path strin
 	if path == "content" && h.cachedContent(w, r, query) {
 		return
 	}
-	state, err := h.service.Snapshot(r.Context())
+	cursor, validScope := h.readScope(query, path)
+	operationID := ""
+	if validScope && cursor.Collection == "receipts" {
+		operationID = cursor.Key
+	}
+	state, err := h.readView(r.Context(), operationID)
 	if err != nil {
 		serviceError(w, err)
 		return
@@ -82,8 +88,7 @@ func (h *handler) boundedRead(w http.ResponseWriter, r *http.Request, path strin
 		}, MaxPageBytes: readmodel.MaxPageBytes, ContentBytes: readmodel.ContentBytes, MaxRecords: readmodel.MaxRecords})
 		return
 	}
-	cursor, ok := h.readScope(query, path)
-	if !ok {
+	if !validScope {
 		code := "invalid_request"
 		if query.Has("cursor") {
 			code = "invalid_cursor"
@@ -113,6 +118,13 @@ func (h *handler) boundedRead(w http.ResponseWriter, r *http.Request, path strin
 		return
 	}
 	h.readRecords(w, cursor, rows)
+}
+
+func (h *handler) readView(ctx context.Context, operationID string) (core.State, error) {
+	if reader, ok := h.service.(core.ReadViewSource); ok {
+		return reader.ReadView(ctx, operationID)
+	}
+	return h.service.Snapshot(ctx)
 }
 
 func readQueryValid(query url.Values, path string) bool {
@@ -410,12 +422,12 @@ func (h *handler) mutationResult(w http.ResponseWriter, r *http.Request, value a
 		writeJSON(w, http.StatusOK, value)
 		return
 	}
-	state, err := h.service.Snapshot(r.Context())
+	op := r.Header.Get("X-Operation-ID")
+	state, err := h.readView(r.Context(), op)
 	if err != nil {
 		serviceError(w, err)
 		return
 	}
-	op := r.Header.Get("X-Operation-ID")
 	outcome, exists := state.Operations[op]
 	if !exists {
 		writeError(w, 500, "internal", "durable mutation receipt unavailable; retain the operation ID for reconciliation")

@@ -114,23 +114,27 @@ func TestEffectsBookkeepingAfterExpiry(t *testing.T) {
 							}
 						}
 					}
-					callCtx, cancel := context.WithCancel(f.ctx)
-					if expiry == "deadline" {
-						cancel()
-						callCtx, cancel = context.WithTimeout(f.ctx, time.Second)
-					}
-					defer cancel()
+					callCtx, cancel := context.WithCancelCause(f.ctx)
+					defer cancel(context.Canceled)
 					calls := 0
 					call := func() error {
 						calls++
-						if expiry == "cancel" {
-							cancel()
+						cause := context.Canceled
+						if expiry == "deadline" {
+							// The wrapper reports a late outcome after an actual
+							// deadline causes caller cancellation. Start this deadline
+							// only at the target effect, not before unrelated Git/SQL.
+							deadlineCtx, stop := context.WithTimeout(f.ctx, time.Second)
+							<-deadlineCtx.Done()
+							cause = deadlineCtx.Err()
+							stop()
 						}
+						cancel(cause)
 						<-callCtx.Done()
 						if success {
 							return nil
 						}
-						return callCtx.Err()
+						return context.Cause(callCtx)
 					}
 					r := &effectsRuntime{Fake: f.runtime, stage: stage, call: call}
 					w := effectsWorkspaces{Workspaces: f.workspace, stage: stage, call: call}
@@ -140,6 +144,13 @@ func TestEffectsBookkeepingAfterExpiry(t *testing.T) {
 					a := s.Attempts[s.Tasks[task.ID].AttemptID]
 					if calls != 1 {
 						t.Fatalf("expiry injection calls=%d", calls)
+					}
+					wantCause := context.Canceled
+					if expiry == "deadline" {
+						wantCause = context.DeadlineExceeded
+					}
+					if callCtx.Err() == nil || !errors.Is(context.Cause(callCtx), wantCause) {
+						t.Fatal("effect returned before the intended caller expiry")
 					}
 					if !success {
 						if a.Error == "" || (stage != "cleanup" && a.FailureCount != 1) {
