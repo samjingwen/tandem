@@ -62,9 +62,12 @@ class CopyTests(unittest.TestCase):
         dependency = self.source / "dependency"
         dependency.mkdir()
         (dependency / "package.json").write_text(
-            '{"name":"fixture-dep","version":"1.0.0","main":"index.js"}'
+            '{"name":"fixture-dep","version":"1.0.0","main":"index.js","bin":{"fixture-tool":"cli.js"}}'
         )
         (dependency / "index.js").write_text("module.exports = 'fixture';")
+        (dependency / "cli.js").write_text(
+            "#!/usr/bin/env node\nconsole.log('fixture');\n"
+        )
         self.command(
             [
                 "npm",
@@ -320,6 +323,106 @@ class CopyTests(unittest.TestCase):
         result = self.copy(destination)
         self.assertIn("link outside", result.stdout)
         self.assertFalse((destination / "plugin/node_modules").exists())
+
+    def test_absolute_internal_symlink_is_not_shared(self):
+        self.prepare()
+        modules = self.source / "plugin/node_modules"
+        (modules / "shared").symlink_to(modules / "cache-marker")
+        destination = self.destination()
+        result = self.copy(destination)
+        self.assertIn("absolute link", result.stdout)
+        self.assertFalse((destination / "plugin/node_modules").exists())
+
+    def test_relative_executable_links_remain_local_to_destination(self):
+        self.prepare()
+        destination = self.destination()
+        self.copy(destination)
+        executable = destination / "plugin/node_modules/.bin/fixture-tool"
+        self.assertTrue(executable.is_symlink())
+        self.assertFalse(Path(os.readlink(executable)).is_absolute())
+        self.assertTrue(executable.resolve().is_relative_to(destination.resolve()))
+        executable.write_text("destination only")
+        self.assertNotEqual(
+            (self.source / "plugin/node_modules/.bin/fixture-tool").read_text(),
+            "destination only",
+        )
+
+    def test_busy_node_destination_is_not_mutated(self):
+        self.prepare()
+        destination = self.destination()
+        with CACHE.cache_lock(
+            destination, CACHE.METADATA / "node.lock", exclusive=True, create=True
+        ):
+            result = self.copy(destination)
+        self.assertIn("Skipping node", result.stdout)
+        self.assertFalse((destination / "plugin/node_modules").exists())
+
+    def test_busy_audit_destination_is_not_mutated(self):
+        self.prepare_native_caches()
+        destination = self.destination()
+        with CACHE.cache_lock(
+            destination, CACHE.METADATA / "audit.lock", exclusive=True, create=True
+        ):
+            result = self.copy(destination)
+        self.assertIn("Skipping audit", result.stdout)
+        self.assertFalse((destination / ".tmp/rust-tools").exists())
+
+    def test_preparation_normalizes_production_omit_and_executable_link_modes(self):
+        package = self.source / "plugin/package.json"
+        value = json.loads(package.read_text())
+        value["devDependencies"] = value.pop("dependencies")
+        package.write_text(json.dumps(value))
+        self.command(
+            [
+                "npm",
+                "--prefix",
+                "plugin",
+                "install",
+                "--package-lock-only",
+                "--ignore-scripts",
+            ]
+        )
+        self.env.update(
+            {
+                "NODE_ENV": "production",
+                "npm_config_omit": "dev",
+                "npm_config_bin_links": "false",
+            }
+        )
+        self.prepare()
+        self.assertTrue((self.source / "plugin/node_modules/fixture-dep").is_dir())
+        self.assertTrue(
+            (self.source / "plugin/node_modules/.bin/fixture-tool").is_symlink()
+        )
+        for name in ["NODE_ENV", "npm_config_omit", "npm_config_bin_links"]:
+            self.env.pop(name)
+        result = self.command(
+            [sys.executable, "tools/worktree-cache.py", "prepare-node"]
+        )
+        self.assertIn("Reusing compatible", result.stdout)
+
+    def test_incompatible_and_untracked_audit_binaries_are_force_reinstalled(self):
+        self.prepare_native_caches()
+        cargo = self.root / "native-wrappers/cargo"
+        cargo.write_text("""#!/bin/sh
+if [ "$1" = --version ]; then echo 'cargo fixture-version'; exit; fi
+case " $* " in *" --force "*) ;; *) exit 72 ;; esac
+while [ "$#" -gt 0 ]; do
+    if [ "$1" = --root ]; then shift; root=$1; fi
+    shift
+done
+printf '#!/bin/sh\\necho cargo-audit 0.22.2\\n' > "$root/bin/cargo-audit"
+chmod +x "$root/bin/cargo-audit"
+""")
+        self.env["RUSTFLAGS"] = "--cfg=new-toolchain-settings"
+        args = [sys.executable, "tools/worktree-cache.py", "prepare-audit", "--root"]
+        self.command([*args, str(self.source / ".tmp/rust-tools")])
+        destination = self.destination()
+        self.copy(destination)
+        self.assertFalse((destination / ".tmp/rust-tools/.crates.toml").exists())
+        self.env["RUSTFLAGS"] = "--cfg=changed-again"
+        self.command([*args, str(destination / ".tmp/rust-tools")], destination)
+        self.assertTrue((destination / CACHE.METADATA / "audit.json").exists())
 
     def test_in_use_node_cache_is_skipped(self):
         self.prepare()

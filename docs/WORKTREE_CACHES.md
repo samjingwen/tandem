@@ -62,7 +62,7 @@ Python's path-bound `.tmp/python-tools` virtual environment is recreated by norm
 Copying is allowed only with matching source/destination allowlists and recorded compatible inputs.
 The metadata is a trusted local build receipt, not an artifact signature or proof that another developer's cache is trustworthy.
 Use only trusted, quiescent source worktrees.
-The helper coordinates with project npm/tool preparation locks and holds existing Cargo profile locks while copying compiled caches.
+The helper holds source and destination project npm/tool preparation locks and existing source Cargo profile locks while copying compiled caches.
 It skips busy caches instead of waiting on, stealing, or copying control locks.
 Do not run out-of-band npm mutations against the source during copying.
 
@@ -71,7 +71,7 @@ It also discovers ignored entries at directory boundaries, so `.gitignore` leave
 Therefore the helper inspects directory entry names/types without reading private file contents before selecting a cache tree.
 An environment file, credential store, runtime database, process lock, special file or escaping symlink inside a selected tree excludes that entire cache.
 Ordinary shipped dependency lockfiles such as `yarn.lock` are immutable dependency data, not process locks.
-Relative internal npm `.bin` symlinks are allowed; links outside their own cache are refused.
+Relative internal npm `.bin` symlinks are allowed; absolute links and links outside their own cache are refused.
 Do not bypass this preflight by using raw directory copying as a substitute.
 
 No `.env`, authentication stores, application/service ownership records, databases, transcripts, user data, Python environments or validation evidence are selected from the project root.
@@ -90,6 +90,8 @@ make build
 ```
 
 `COLD=1` forces the existing script-disabled `npm ci` rather than accepting an installed dependency receipt.
+Project npm preparation always includes development, optional and peer dependencies with executable links, independent of ambient production/omit settings.
+After an incompatible audit-tool receipt, preparation forces a pinned reinstall rather than stamping an old or untracked copied binary as compatible.
 Alternatively, `npm --prefix plugin ci --ignore-scripts` is still available directly; the helper does not change npm's lockfile resolution.
 Other standard preparation commands continue to fetch missing prerequisites normally.
 When all relevant downloads are cached, the tool-specific offline options can demonstrate that a warm build needs no network.

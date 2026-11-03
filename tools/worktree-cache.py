@@ -263,8 +263,13 @@ def safe_tree(root):
             mode = path.lstat().st_mode
             if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode) or stat.S_ISLNK(mode)):
                 raise ValueError("cache contains a special file")
-            if path.is_symlink() and not path.resolve().is_relative_to(root):
-                raise ValueError("cache contains a link outside its own directory")
+            if path.is_symlink() and (
+                Path(os.readlink(path)).is_absolute()
+                or not path.resolve().is_relative_to(root)
+            ):
+                raise ValueError(
+                    "cache contains an absolute link or a link outside its own directory"
+                )
 
 
 def prepare_node(root, cold):
@@ -278,7 +283,21 @@ def prepare_node(root, cold):
                 pass
         canonical(root, METADATA / "node.json").unlink(missing_ok=True)
         subprocess.run(
-            ["npm", "--prefix", "plugin", "ci", "--ignore-scripts"],
+            [
+                "npm",
+                "--prefix",
+                "plugin",
+                "ci",
+                "--ignore-scripts",
+                # This checkout needs development tools regardless of ambient
+                # NODE_ENV/omit/production settings or disabled executable links.
+                "--include=dev",
+                "--include=optional",
+                "--include=peer",
+                "--bin-links=true",
+                "--install-strategy=hoisted",
+                "--install-links=true",
+            ],
             cwd=root,
             check=True,
         )
@@ -321,6 +340,7 @@ def prepare_audit(root, destination):
                 "cargo",
                 "install",
                 "--locked",
+                "--force",
                 "--root",
                 str(root / ".tmp/rust-tools"),
                 "--version",
@@ -367,6 +387,17 @@ def copy(source, destination, dry_run):
     with ExitStack() as locks:
         for group, roots in ROOTS.items():
             try:
+                if group in {"node", "audit"}:
+                    # Own the destination before inspecting or mutating it, so a
+                    # concurrent project prepare cannot install into our copy.
+                    locks.enter_context(
+                        cache_lock(
+                            destination,
+                            METADATA / f"{group}.lock",
+                            exclusive=True,
+                            create=True,
+                        )
+                    )
                 if any((destination / name).exists() for name in roots):
                     raise ValueError(
                         "destination already has this cache; not merging or overwriting"
@@ -441,16 +472,7 @@ def copy(source, destination, dry_run):
                             destination / "plugin/node_modules/.package-lock.json"
                         ):
                             raise ValueError("copied npm lock differs")
-                        # Create the destination's own coordination lock, never copy it.
-                        with cache_lock(
-                            destination,
-                            METADATA / f"{group}.lock",
-                            exclusive=True,
-                            create=True,
-                        ):
-                            record(destination, group)
-                    else:
-                        record(destination, group)
+                    record(destination, group)
         except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
             raise CopyError(
                 "copy incomplete; run make prepare before building"
