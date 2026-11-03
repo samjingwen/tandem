@@ -143,7 +143,7 @@ func loadMap[T any](ctx context.Context, q queryer, table string, target map[str
 	return rows.Err()
 }
 
-func load(ctx context.Context, q queryer) (core.State, error) {
+func loadInventory(ctx context.Context, q queryer) (core.State, error) {
 	s := core.NewState()
 	if err := q.QueryRowContext(ctx, "SELECT value FROM metadata WHERE key='instance_id'").Scan(&s.InstanceID); err != nil {
 		return s, err
@@ -152,7 +152,7 @@ func load(ctx context.Context, q queryer) (core.State, error) {
 		return s, err
 	}
 	for _, f := range []func() error{
-		func() error { return loadMap(ctx, q, "projects", s.Projects) }, func() error { return loadMap(ctx, q, "tasks", s.Tasks) }, func() error { return loadMap(ctx, q, "attempts", s.Attempts) }, func() error { return loadMap(ctx, q, "commands", s.Commands) }, func() error { return loadMap(ctx, q, "decisions", s.Decisions) }, func() error { return loadMap(ctx, q, "results", s.Results) }, func() error { return loadMap(ctx, q, "operations", s.Operations) },
+		func() error { return loadMap(ctx, q, "projects", s.Projects) }, func() error { return loadMap(ctx, q, "tasks", s.Tasks) }, func() error { return loadMap(ctx, q, "attempts", s.Attempts) }, func() error { return loadMap(ctx, q, "commands", s.Commands) }, func() error { return loadMap(ctx, q, "decisions", s.Decisions) }, func() error { return loadMap(ctx, q, "results", s.Results) },
 	} {
 		if err := f(); err != nil {
 			return s, err
@@ -161,10 +161,32 @@ func load(ctx context.Context, q queryer) (core.State, error) {
 	return s, nil
 }
 
+func load(ctx context.Context, q queryer) (core.State, error) {
+	state, err := loadInventory(ctx, q)
+	if err == nil {
+		err = loadMap(ctx, q, "operations", state.Operations)
+	}
+	return state, err
+}
+
 func (s *SQLite) Snapshot(ctx context.Context) (core.State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return load(ctx, s.db)
+}
+
+func (s *SQLite) ReadView(ctx context.Context, operationID string) (core.State, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, err := loadInventory(ctx, s.db)
+	if err != nil || operationID == "" {
+		return state, err
+	}
+	operation, found, err := readOperation(ctx, s.db, operationID)
+	if found {
+		state.Operations[operationID] = operation
+	}
+	return state, err
 }
 
 func (s *SQLite) ReadRevision(ctx context.Context) (string, int64, error) {
@@ -180,8 +202,12 @@ func (s *SQLite) ReadRevision(ctx context.Context) (string, int64, error) {
 func (s *SQLite) ReadOperation(ctx context.Context, id string) (core.Operation, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return readOperation(ctx, s.db, id)
+}
+
+func readOperation(ctx context.Context, q queryer, id string) (core.Operation, bool, error) {
 	var body []byte
-	err := s.db.QueryRowContext(ctx, "SELECT body FROM operations WHERE id=?", id).Scan(&body)
+	err := q.QueryRowContext(ctx, "SELECT body FROM operations WHERE id=?", id).Scan(&body)
 	if errors.Is(err, sql.ErrNoRows) {
 		return core.Operation{}, false, nil
 	}

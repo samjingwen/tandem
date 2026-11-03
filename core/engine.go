@@ -64,6 +64,24 @@ func ID(prefix string) string {
 func now() time.Time                                          { return time.Now().UTC() }
 func (e *Engine) Snapshot(ctx context.Context) (State, error) { return e.store.Snapshot(ctx) }
 
+func (e *Engine) ReadView(ctx context.Context, operationID string) (State, error) {
+	if reader, ok := e.store.(ReadViewSource); ok {
+		return reader.ReadView(ctx, operationID)
+	}
+	state, err := e.store.Snapshot(ctx)
+	if err != nil {
+		return state, err
+	}
+	operations := map[string]Operation{}
+	if operationID != "" {
+		if operation, found := state.Operations[operationID]; found {
+			operations[operationID] = operation
+		}
+	}
+	state.Operations = operations
+	return state, nil
+}
+
 func (e *Engine) ReadRevision(ctx context.Context) (string, int64, error) {
 	if reader, ok := e.store.(RevisionSource); ok {
 		return reader.ReadRevision(ctx)

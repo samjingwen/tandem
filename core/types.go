@@ -146,6 +146,14 @@ type OperationSource interface {
 	ReadOperation(context.Context, string) (Operation, bool, error)
 }
 
+// ReadViewSource provides complete public inventory at one store revision and
+// at most the exact requested operation. An empty ID omits the private journal.
+// Views follow Snapshot's serialization/ownership rules, but must never be used
+// for mutation admission or as a replacement for the store's complete state.
+type ReadViewSource interface {
+	ReadView(context.Context, string) (State, error)
+}
+
 type RuntimeInfo struct {
 	ID         string `json:"id"`
 	Version    string `json:"version"`

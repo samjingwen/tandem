@@ -145,3 +145,25 @@ func TestConcurrentReceiptMissesRecheckInsideAdmission(t *testing.T) {
 		t.Fatal("read misses bypassed transactional duplicate detection", err)
 	}
 }
+
+func TestReadViewRetainsSnapshotFallbackWithoutJournalEnumeration(t *testing.T) {
+	counted := receiptStore(t)
+	if err := counted.Update(t.Context(), func(state *core.State) error {
+		state.Operations["first"] = core.Operation{ID: "first", Outcome: []byte(`{"value":1}`)}
+		state.Operations["second"] = core.Operation{ID: "second", Outcome: []byte(`{"value":2}`)}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fallback := struct{ core.Store }{counted}
+	e := core.New(fallback, nil, nil, core.Options{})
+	for _, id := range []string{"", "first", "missing"} {
+		view, err := e.ReadView(t.Context(), id)
+		if err != nil || len(view.Projects) != 1 || len(view.Operations) > 1 {
+			t.Fatal("fallback read view changed the inventory contract", err)
+		}
+		if id == "first" && view.Operations[id].ID != id || id != "first" && len(view.Operations) != 0 {
+			t.Fatal("fallback read view exposed unrelated receipts")
+		}
+	}
+}
