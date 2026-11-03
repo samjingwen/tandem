@@ -57,8 +57,9 @@ func (r *effectsRuntime) Interrupt(ctx context.Context, sp core.SessionSpec) err
 
 type effectsWorkspaces struct {
 	core.Workspaces
-	stage string
-	call  func() error
+	stage     string
+	call      func() error
+	effectCtx context.Context
 }
 
 func (w effectsWorkspaces) Ensure(ctx context.Context, p core.Project, v core.Workspace) (core.Workspace, error) {
@@ -78,6 +79,12 @@ func (w effectsWorkspaces) Inspect(ctx context.Context, p core.Project, v core.W
 }
 
 func (w effectsWorkspaces) Remove(ctx context.Context, p core.Project, v core.Workspace) error {
+	if w.stage == "cleanup" {
+		// Model an already-dispatched effect completing despite caller expiry.
+		// The real bounded fixture context still limits Git/process-holder work;
+		// a slow scan must not abort before the intended expiry injection point.
+		ctx = w.effectCtx
+	}
 	err := w.Workspaces.Remove(ctx, p, v)
 	if err == nil && w.stage == "cleanup" {
 		err = w.call()
@@ -133,7 +140,7 @@ func TestEffectsBookkeepingAfterExpiry(t *testing.T) {
 						return callCtx.Err()
 					}
 					r := &effectsRuntime{Fake: f.runtime, stage: stage, call: call}
-					w := effectsWorkspaces{Workspaces: f.workspace, stage: stage, call: call}
+					w := effectsWorkspaces{Workspaces: f.workspace, stage: stage, call: call, effectCtx: f.ctx}
 					e := core.New(f.store, r, w, core.Options{RuntimeID: "fake"})
 					_ = e.Tick(callCtx)
 					s := f.snapshot(t, 1)
