@@ -57,9 +57,8 @@ func (r *effectsRuntime) Interrupt(ctx context.Context, sp core.SessionSpec) err
 
 type effectsWorkspaces struct {
 	core.Workspaces
-	stage     string
-	call      func() error
-	effectCtx context.Context
+	stage string
+	call  func() error
 }
 
 func (w effectsWorkspaces) Ensure(ctx context.Context, p core.Project, v core.Workspace) (core.Workspace, error) {
@@ -79,12 +78,6 @@ func (w effectsWorkspaces) Inspect(ctx context.Context, p core.Project, v core.W
 }
 
 func (w effectsWorkspaces) Remove(ctx context.Context, p core.Project, v core.Workspace) error {
-	if w.stage == "cleanup" {
-		// Model an already-dispatched effect completing despite caller expiry.
-		// The real bounded fixture context still limits Git/process-holder work;
-		// a slow scan must not abort before the intended expiry injection point.
-		ctx = w.effectCtx
-	}
 	err := w.Workspaces.Remove(ctx, p, v)
 	if err == nil && w.stage == "cleanup" {
 		err = w.call()
@@ -121,32 +114,43 @@ func TestEffectsBookkeepingAfterExpiry(t *testing.T) {
 							}
 						}
 					}
-					callCtx, cancel := context.WithCancel(f.ctx)
-					if expiry == "deadline" {
-						cancel()
-						callCtx, cancel = context.WithTimeout(f.ctx, time.Second)
-					}
-					defer cancel()
+					callCtx, cancel := context.WithCancelCause(f.ctx)
+					defer cancel(context.Canceled)
 					calls := 0
 					call := func() error {
 						calls++
-						if expiry == "cancel" {
-							cancel()
+						cause := context.Canceled
+						if expiry == "deadline" {
+							// The wrapper reports a late outcome after an actual
+							// deadline causes caller cancellation. Start this deadline
+							// only at the target effect, not before unrelated Git/SQL.
+							deadlineCtx, stop := context.WithTimeout(f.ctx, time.Second)
+							<-deadlineCtx.Done()
+							cause = deadlineCtx.Err()
+							stop()
 						}
+						cancel(cause)
 						<-callCtx.Done()
 						if success {
 							return nil
 						}
-						return callCtx.Err()
+						return context.Cause(callCtx)
 					}
 					r := &effectsRuntime{Fake: f.runtime, stage: stage, call: call}
-					w := effectsWorkspaces{Workspaces: f.workspace, stage: stage, call: call, effectCtx: f.ctx}
+					w := effectsWorkspaces{Workspaces: f.workspace, stage: stage, call: call}
 					e := core.New(f.store, r, w, core.Options{RuntimeID: "fake"})
 					_ = e.Tick(callCtx)
 					s := f.snapshot(t, 1)
 					a := s.Attempts[s.Tasks[task.ID].AttemptID]
 					if calls != 1 {
 						t.Fatalf("expiry injection calls=%d", calls)
+					}
+					wantCause := context.Canceled
+					if expiry == "deadline" {
+						wantCause = context.DeadlineExceeded
+					}
+					if callCtx.Err() == nil || !errors.Is(context.Cause(callCtx), wantCause) {
+						t.Fatal("effect returned before the intended caller expiry")
 					}
 					if !success {
 						if a.Error == "" || (stage != "cleanup" && a.FailureCount != 1) {

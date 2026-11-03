@@ -31,6 +31,8 @@ Native/model revalidation remains opt-in using the commands below; review-phase 
 
 Additional tests cover instruction-generation staleness, ancestor dependency cycles, finite write/model-notification budgets, read-only uncertain-prompt recovery, preserved native permission choices, explicit shared-policy delivery, and quiet persistence when observations do not change.
 `TestEffectsBookkeepingAfterExpiry`, `TestExpiredExternalFailuresBoundMutations`, and `TestSuccessfulDispatchAfterExpiry` inject cancelled/deadline-expired external calls against disposable SQLite/Git fixtures and check durable outcomes and bounded writes.
+The selected-effects fixture starts its real one-second deadline at the effect boundary, then asserts the caller's cancellation and deadline cause before reporting the late outcome.
+That controlled fixture does not claim the caller itself returns `context.DeadlineExceeded`; `TestAdmissionRecoveryAfterExpiry` retains real caller `WithTimeout` coverage.
 `TestDispatchBudgetSurvivesIdleAndResume` exercises API/CLI prompt/reply exhaustion, stable idle diagnostics, and same-attempt recovery through explicit resume.
 `TestPauseSettlesAfterInterruptBudget` covers individual and cascade read-only pause settlement after eight failed interrupts, including parked continuations.
 `TestCancellationPreservesUnreconciledInbox` checks that a lost admission response and transient read failure cannot cause cancellation to delete its only admission evidence.
