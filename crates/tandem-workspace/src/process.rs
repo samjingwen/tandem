@@ -160,6 +160,68 @@ pub(crate) async fn git(context: &Context, directory: &Path, args: &[&OsStr]) ->
 mod tests {
     use super::*;
 
+    const HELD_DESCENDANT: &str = "printf 'owned' > allocated; (touch descendant-ready; while [ ! -e release ] && [ -e allocated ]; do sleep 0.01; done; if [ -e release ]; then touch late-effect; fi) & wait";
+
+    #[cfg(unix)]
+    struct OwnedGroup(std::process::Child);
+
+    #[cfg(unix)]
+    impl Drop for OwnedGroup {
+        fn drop(&mut self) {
+            // Signal only while our owned direct child still reserves its PID.
+            if matches!(self.0.try_wait(), Ok(None)) {
+                if let Some(pid) = i32::try_from(self.0.id())
+                    .ok()
+                    .filter(|pid| *pid > 1)
+                    .and_then(rustix::process::Pid::from_raw)
+                {
+                    let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
+                }
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn held_descendant_exits_when_fixture_marker_is_removed() {
+        use std::os::unix::process::CommandExt;
+
+        let root = tempfile::tempdir().unwrap();
+        let mut command = std::process::Command::new("sh");
+        command
+            .current_dir(root.path())
+            .args(["-c", HELD_DESCENDANT])
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0);
+        let mut child = OwnedGroup(command.spawn().unwrap());
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !root.path().join("descendant-ready").exists() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .unwrap();
+        std::fs::remove_file(root.path().join("allocated")).unwrap();
+        let status = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if let Some(status) = child.0.try_wait().unwrap() {
+                    break status;
+                }
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(status.success());
+        assert!(!root.path().join("late-effect").exists());
+    }
+
     #[tokio::test]
     async fn command_output_is_bounded_and_diagnostics_are_not_exposed() {
         let root = tempfile::tempdir().unwrap();
@@ -210,10 +272,7 @@ mod tests {
                 &command_context,
                 &directory,
                 "sh",
-                &[
-                    "-c".as_ref(),
-                    "printf 'owned' > allocated; (touch descendant-ready; while [ ! -e release ]; do sleep 0.01; done; touch late-effect) & wait".as_ref(),
-                ],
+                &["-c".as_ref(), HELD_DESCENDANT.as_ref()],
             )
             .await
         });
